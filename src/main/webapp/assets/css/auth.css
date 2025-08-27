@@ -1,0 +1,73 @@
+.form.stack {
+    display: grid;
+    gap: 14px
+}
+
+.field {
+    display: grid;
+    gap: 6px
+}
+
+.label {
+    font-weight: 600;
+}
+
+.input {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid rgba(127, 127, 127, .28);
+    background: rgba(127, 127, 127, .06);
+    color: rgb(var(--fg));
+    font: inherit;
+    outline: 2px solid transparent;
+    transition: border-color .15s ease, outline-color .15s ease, background .15s ease;
+}
+
+.input::placeholder {
+    color: rgba(127, 127, 127, .9)
+}
+
+.input:focus {
+    border-color: rgba(var(--ring), .55);
+    outline-color: rgba(var(--ring), .45);
+    background: rgba(127, 127, 127, .08);
+}
+
+.form-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.alert {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid rgba(127, 127, 127, .22);
+    margin-bottom: 10px;
+}
+
+.alert-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-top: 4px;
+}
+
+.alert-text {
+    line-height: 1.45
+}
+
+.alert-error {
+    background: rgba(239, 68, 68, .10);
+    border-color: rgba(239, 68, 68, .35);
+    color: rgb(239, 68, 68);
+}
+
+.alert-error .alert-dot {
+    background: rgb(239, 68, 68)
+}

@@ -1,33 +1,43 @@
 package com.javarush.apalinskiy.repositories;
 
+import com.javarush.apalinskiy.exceptions.DuplicateIdException;
+import com.javarush.apalinskiy.exceptions.DuplicateLoginException;
 import com.javarush.apalinskiy.user.User;
 
+import java.util.Locale;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class InMemoryUserRepository implements UserRepository {
 
-    private final ConcurrentHashMap<Long, User> byId = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<String, Long> idByLogin = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, User> byId = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, String> idByLogin = new ConcurrentHashMap<>();
 
     @Override
     public Optional<User> findByLogin(String userLogin) {
-        Long id = idByLogin.get(userLogin);
-        return id == null ? Optional.empty() : Optional.ofNullable(byId.get(id));
+        final String key = userLogin.trim().toLowerCase(Locale.ROOT);
+        String id = idByLogin.get(key);
+        return (id == null) ? Optional.empty() : Optional.ofNullable(byId.get(id));
     }
 
     @Override
-    public Optional<User> findById(long id) {
+    public Optional<User> findById(String id) {
         return Optional.ofNullable(byId.get(id));
     }
 
     @Override
     public void save(User user) {
-        String key = user.getUserLogin();
-        Long prev = idByLogin.putIfAbsent(key, user.getUserId());
-        if (prev != null) {
-            throw new IllegalStateException("Login already exists: " + key);
+        final String id = user.getUserId();
+        final String login = user.getUserLogin();
+        synchronized (this) {
+            if (idByLogin.containsKey(login)) {
+                throw new DuplicateLoginException("Login already exists: " + login);
+            }
+            if (byId.containsKey(id)) {
+                throw new DuplicateIdException("UserId already exists: " + id);
+            }
+            idByLogin.put(login, id);
+            byId.put(id, user);
         }
-        byId.put(user.getUserId(), user);
     }
 }

@@ -1,48 +1,51 @@
 package com.javarush.apalinskiy.user;
 
 import lombok.Getter;
-import lombok.ToString;
+import org.apache.commons.lang3.StringUtils;
 
 import java.time.Instant;
-import java.util.Objects;
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.Locale;
+import java.util.UUID;
 
 @Getter
-@ToString(exclude = "password")
 public class User {
-    private static final AtomicLong SEQ = new AtomicLong(0);
     private final Role role;
-    private final long userId;
+    private final String userId;
     private final String userName;
     private final String userLogin;
     private final String password;
     private final Instant createdAt;
 
-    public User(Role role, String userName, String userLogin, String password, Instant createdAt) {
-        this.role = role == null ? Role.USER : role;
-        this.userId = SEQ.incrementAndGet();
-        this.userName = userName;
-        this.userLogin = normalize(userLogin);
+    private User(Role role, String userName, String userLogin, String password, Instant createdAt, String userId) {
+        if (StringUtils.isBlank(userName) || StringUtils.isBlank(userLogin) || StringUtils.isBlank(password)) {
+            throw new IllegalArgumentException("Username or login or password are required");
+        }
+        this.role = (role == null) ? Role.USER : role;
+        this.userId = userId;
+        this.userName = userName.trim();
+        this.userLogin = userLogin.trim().toLowerCase(Locale.ROOT);
         this.password = password;
         this.createdAt = createdAt == null ? Instant.now() : createdAt;
     }
 
     public static User of(Role role, String userName, String userLogin, String password) {
-        return new User(role, userName, userLogin, password, Instant.now());
+        return new User(role, userName, userLogin, password, null, UUID.randomUUID().toString());
     }
 
-    private static String normalize(String s) {
-        return s == null ? "" : s.trim().toLowerCase();
+    public User withId(String id) {
+        return new User(this.getRole(), this.getUserName(), this.getUserLogin(),
+                this.getPassword(), this.getCreatedAt(), id);
     }
 
     @Override
     public boolean equals(Object o) {
-        if (!(o instanceof User user)) return false;
-        return userId == user.userId;
+        if (this == o) return true;
+        if (!(o instanceof User other)) return false;
+        return userId.equals(other.userId);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hashCode(userId);
+        return userId.hashCode();
     }
 }

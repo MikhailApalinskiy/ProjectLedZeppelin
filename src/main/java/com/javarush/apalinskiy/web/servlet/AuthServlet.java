@@ -1,4 +1,4 @@
-package com.javarush.apalinskiy.web;
+package com.javarush.apalinskiy.web.servlet;
 
 import com.javarush.apalinskiy.exceptions.DuplicateLoginException;
 import com.javarush.apalinskiy.service.UserService;

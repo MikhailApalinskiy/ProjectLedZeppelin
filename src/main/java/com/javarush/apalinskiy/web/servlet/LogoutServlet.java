@@ -1,4 +1,4 @@
-package com.javarush.apalinskiy.web;
+package com.javarush.apalinskiy.web.servlet;
 
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
@@ -17,7 +17,9 @@ public class LogoutServlet extends HttpServlet {
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws IOException {
         HttpSession s = req.getSession(false);
-        if (s != null) s.invalidate();
+        if (s != null) {
+            s.invalidate();
+        }
         resp.sendRedirect(req.getContextPath() + "/");
     }
 }

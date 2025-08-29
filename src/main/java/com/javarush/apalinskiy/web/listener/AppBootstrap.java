@@ -1,4 +1,4 @@
-package com.javarush.apalinskiy;
+package com.javarush.apalinskiy.web.listener;
 
 import com.javarush.apalinskiy.repositories.InMemoryUserRepository;
 import com.javarush.apalinskiy.repositories.UserRepository;

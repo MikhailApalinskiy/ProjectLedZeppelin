@@ -5,12 +5,12 @@
          version="6.0">
 
     <listener>
-        <listener-class>com.javarush.apalinskiy.AppBootstrap</listener-class>
+        <listener-class>com.javarush.apalinskiy.web.listener.AppBootstrap</listener-class>
     </listener>
 
     <servlet>
         <servlet-name>home</servlet-name>
-        <servlet-class>com.javarush.apalinskiy.web.HomeServlet</servlet-class>
+        <servlet-class>com.javarush.apalinskiy.web.servlet.HomeServlet</servlet-class>
     </servlet>
     <servlet-mapping>
         <servlet-name>home</servlet-name>
@@ -19,7 +19,7 @@
 
     <servlet>
         <servlet-name>AuthServlet</servlet-name>
-        <servlet-class>com.javarush.apalinskiy.web.AuthServlet</servlet-class>
+        <servlet-class>com.javarush.apalinskiy.web.servlet.AuthServlet</servlet-class>
         <load-on-startup>1</load-on-startup>
     </servlet>
     <servlet-mapping>
@@ -33,7 +33,7 @@
 
     <servlet>
         <servlet-name>logout</servlet-name>
-        <servlet-class>com.javarush.apalinskiy.web.LogoutServlet</servlet-class>
+        <servlet-class>com.javarush.apalinskiy.web.servlet.LogoutServlet</servlet-class>
     </servlet>
     <servlet-mapping>
         <servlet-name>logout</servlet-name>
@@ -47,7 +47,7 @@
 
     <filter>
         <filter-name>EncodingFilter</filter-name>
-        <filter-class>com.javarush.apalinskiy.web.EncodingFilter</filter-class>
+        <filter-class>com.javarush.apalinskiy.web.filter.EncodingFilter</filter-class>
     </filter>
     <filter-mapping>
         <filter-name>EncodingFilter</filter-name>

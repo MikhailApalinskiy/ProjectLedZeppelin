@@ -1,4 +1,4 @@
-package com.javarush.apalinskiy.web;
+package com.javarush.apalinskiy.web.filter;
 
 import jakarta.servlet.*;
 

@@ -71,3 +71,38 @@
 .alert-error .alert-dot {
     background: rgb(239, 68, 68)
 }
+
+.btn {
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    padding: 12px 20px;
+    border-radius: 10px;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    min-width: 160px;
+    box-sizing: border-box;
+    transition: background .2s ease, border-color .2s ease, color .2s ease;
+}
+
+.btn-primary {
+    background-color: rgb(var(--ring));
+    color: #fff;
+    border: none;
+}
+
+.btn-primary:hover {
+    background-color: rgba(var(--ring), 0.85);
+}
+
+.btn-ghost {
+    background: transparent;
+    border: 1px solid rgba(127, 127, 127, 0.35);
+    color: rgb(var(--fg));
+}
+
+.btn-ghost:hover {
+    background: rgba(127, 127, 127, 0.08);
+}

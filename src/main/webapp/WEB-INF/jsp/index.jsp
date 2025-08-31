@@ -69,7 +69,9 @@
             <section aria-labelledby="quickNavTitle" style="margin-top:16px">
                 <h2 id="quickNavTitle" class="user-title" style="margin-bottom:8px">Быстрые действия</h2>
                 <div class="linkrow" role="navigation" aria-label="Основная навигация">
-                    <button type="button" class="link" title="Начать главный квест (скоро)">Главный квест — начать</button>
+                    <!-- было: <button type="button" class="link" title="Начать главный квест (скоро)">Главный квест — начать</button> -->
+                    <a class="link" href="<c:url value='/quest'/>" title="Начать главный квест">Главный квест — начать</a>
+
                     <button type="button" class="link" title="Каталог квестов (скоро)">Каталог квестов</button>
                     <c:if test="${isAuth}">
                         <button type="button" class="link" title="Мои квесты (скоро)">Мои квесты</button>

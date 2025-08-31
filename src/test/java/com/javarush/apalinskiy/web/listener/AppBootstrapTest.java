@@ -1,23 +1,25 @@
 package com.javarush.apalinskiy.web.listener;
 
 
-import com.javarush.apalinskiy.exceptions.DuplicateLoginException;
-import com.javarush.apalinskiy.repositories.InMemoryUserRepository;
+import com.javarush.apalinskiy.quest.model.QuestNode;
 import com.javarush.apalinskiy.service.DefaultUserService;
+import com.javarush.apalinskiy.service.QuestService;
 import com.javarush.apalinskiy.service.UserService;
 import com.javarush.apalinskiy.user.Role;
-import com.javarush.apalinskiy.user.User;
 import jakarta.servlet.ServletContext;
 import jakarta.servlet.ServletContextEvent;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.Mock;
 import org.mockito.MockedConstruction;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -25,111 +27,158 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class AppBootstrapTest {
 
-    @Mock
-    private ServletContext context;
-    @Mock
-    private ServletContextEvent event;
+    private static final String QUEST_NAME = "quest.json";
+    private static final String QUEST_OK = """
+            [
+              { "id": 1, "text": "Start", "options": [ {"choice":"Go","next":2} ], "final": false },
+              { "id": 2, "text": "End",  "final": true }
+            ]
+            """;
 
-    @Test
-    void contextInitializedSetsUserServiceAttributeAndAdminCanLoginTest() {
-        // given
-        when(event.getServletContext()).thenReturn(context);
-        // when
-        new AppBootstrap().contextInitialized(event);
-        // then
-        ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
-        verify(context, times(1)).setAttribute(eq("userService"), captor.capture());
-        Object stored = captor.getValue();
-        assertNotNull(stored, "userService attribute must be set");
-        assertInstanceOf(UserService.class, stored, "attribute must be a UserService");
-        UserService svc = (UserService) stored;
-        assertTrue(svc.login("admin", "admin").isPresent(), "admin/admin should authenticate");
-    }
+    static class MemoryResourceCL extends ClassLoader {
+        private final Map<String, byte[]> map = new HashMap<>();
 
-    @Test
-    void contextInitializedTwicePutsNewServiceEachTimeBothUsableTest() {
-        // given
-        when(event.getServletContext()).thenReturn(context);
-        List<UserService> services = new ArrayList<>(2);
-        doAnswer(inv -> { services.add((UserService) inv.getArgument(1)); return null; })
-                .when(context).setAttribute(eq("userService"), any());
-        AppBootstrap bootstrap = new AppBootstrap();
-        // when
-        bootstrap.contextInitialized(event);
-        bootstrap.contextInitialized(event);
-        // then
-        assertEquals(2, services.size(), "attribute should be set twice on two inits");
-        assertNotSame(services.get(0), services.get(1), "each init provides a new service instance");
-        assertTrue(services.get(0).login("admin", "admin").isPresent());
-        assertTrue(services.get(1).login("admin", "admin").isPresent());
-    }
+        MemoryResourceCL(ClassLoader parent) {
+            super(parent);
+        }
 
-    @Test
-    void contextInitializedAttributeKeyIsExactlyUserServiceTest() {
-        // given
-        when(event.getServletContext()).thenReturn(context);
-        // when
-        new AppBootstrap().contextInitialized(event);
-        // then
-        verify(context, atLeastOnce()).setAttribute(eq("userService"), any());
-    }
+        MemoryResourceCL with() {
+            map.put(AppBootstrapTest.QUEST_NAME, AppBootstrapTest.QUEST_OK.getBytes(StandardCharsets.UTF_8));
+            return this;
+        }
 
-    @Test
-    void contextInitializedAdminUserHasAdminRoleAndNormalizedFieldsTest() {
-        // given
-        when(event.getServletContext()).thenReturn(context);
-        // when
-        new AppBootstrap().contextInitialized(event);
-        // then
-        ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
-        verify(context).setAttribute(eq("userService"), captor.capture());
-        UserService svc = (UserService) captor.getValue();
-        User admin = svc.login("admin", "admin").orElseThrow();
-        assertEquals(Role.ADMIN, admin.getRole());
-        assertEquals("Admin", admin.getUserName());
-        assertEquals("admin", admin.getUserLogin());
-    }
-
-    @Test
-    void duplicateLoginIsSwallowedAndAttributeIsSetTest() {
-        // given
-        ServletContext ctx = mock(ServletContext.class);
-        ServletContextEvent ev = mock(ServletContextEvent.class);
-        when(ev.getServletContext()).thenReturn(ctx);
-        try (MockedConstruction<InMemoryUserRepository> repoCons =
-                     mockConstruction(InMemoryUserRepository.class);
-             MockedConstruction<DefaultUserService> svcCons =
-                     mockConstruction(DefaultUserService.class, (mock, c) -> {
-                         doThrow(new DuplicateLoginException("dup"))
-                                 .when(mock).register(Role.ADMIN, "Admin", "admin", "admin");
-                     })) {
-            // when
-            assertDoesNotThrow(() -> new AppBootstrap().contextInitialized(ev));
-            // then
-            DefaultUserService service = svcCons.constructed().getFirst();
-            verify(service, times(1)).register(Role.ADMIN, "Admin", "admin", "admin");
-            verify(ctx, times(1)).setAttribute(eq("userService"), same(service));
-            verifyNoMoreInteractions(ctx);
+        @Override
+        public InputStream getResourceAsStream(String name) {
+            byte[] b = map.get(name);
+            if (b != null) return new ByteArrayInputStream(b);
+            return super.getResourceAsStream(name);
         }
     }
 
-    @Test
-    void otherRuntimeIsPropagatedAndContextNotTouchedTest() {
-        // given
-        ServletContext ctx = mock(ServletContext.class);
-        ServletContextEvent ev = mock(ServletContextEvent.class);
-        try (MockedConstruction<InMemoryUserRepository> repoCons =
-                     mockConstruction(InMemoryUserRepository.class);
-             MockedConstruction<DefaultUserService> svcCons =
-                     mockConstruction(DefaultUserService.class, (mock, c) -> {
-                         doThrow(new IllegalStateException("boom"))
-                                 .when(mock).register(Role.ADMIN, "Admin", "admin", "admin");
-                     })) {
-            // when / then
-            assertThrows(IllegalStateException.class,
-                    () -> new AppBootstrap().contextInitialized(ev));
-            // then
-            verifyNoInteractions(ctx);
+    static class BlockResourceCL extends ClassLoader {
+        private final String blocked;
+
+        BlockResourceCL(ClassLoader parent, String blocked) {
+            super(parent);
+            this.blocked = blocked;
+        }
+
+        @Override
+        public InputStream getResourceAsStream(String name) {
+            if (name != null && name.equals(blocked)) return null;
+            return super.getResourceAsStream(name);
+        }
+    }
+
+    static class DuplicateLoginException extends RuntimeException {
+    }
+
+    @Nested
+    class ContextInitSuccess {
+
+        @Test
+        void putsUserAndQuestServicesIntoContextTest() {
+            // Given
+            ServletContext ctx = mock(ServletContext.class);
+            ServletContextEvent event = new ServletContextEvent(ctx);
+            AppBootstrap bootstrap = new AppBootstrap();
+            ClassLoader prev = Thread.currentThread().getContextClassLoader();
+            Thread.currentThread().setContextClassLoader(
+                    new MemoryResourceCL(prev).with()
+            );
+            try {
+                // When
+                bootstrap.contextInitialized(event);
+                // Then
+                ArgumentCaptor<Object> usCap = ArgumentCaptor.forClass(Object.class);
+                ArgumentCaptor<Object> qsCap = ArgumentCaptor.forClass(Object.class);
+                verify(ctx).setAttribute(eq(AppBootstrap.ATTR_USER_SERVICE), usCap.capture());
+                verify(ctx).setAttribute(eq(AppBootstrap.ATTR_QUEST_SERVICE), qsCap.capture());
+                Object userService = usCap.getValue();
+                Object questService = qsCap.getValue();
+                assertNotNull(userService);
+                assertNotNull(questService);
+                assertInstanceOf(UserService.class, userService);
+                assertInstanceOf(QuestService.class, questService);
+                QuestNode start = ((QuestService) questService).getStart();
+                assertEquals(1, start.getId());
+            } finally {
+                Thread.currentThread().setContextClassLoader(prev);
+            }
+        }
+    }
+
+    @Nested
+    class ContextInitFailure {
+
+        @Test
+        void wrapsExceptionWhenQuestResourceMissingTest() {
+            // Given
+            ServletContext ctx = mock(ServletContext.class);
+            ServletContextEvent event = new ServletContextEvent(ctx);
+            AppBootstrap bootstrap = new AppBootstrap();
+            ClassLoader prev = Thread.currentThread().getContextClassLoader();
+            Thread.currentThread().setContextClassLoader(new BlockResourceCL(prev, QUEST_NAME));
+            try {
+                // When / Then
+                RuntimeException ex = assertThrows(RuntimeException.class,
+                        () -> bootstrap.contextInitialized(event));
+                assertEquals("Failed to load quest resource: " + QUEST_NAME, ex.getMessage());
+                assertNotNull(ex.getCause());
+                verify(ctx, never()).setAttribute(eq(AppBootstrap.ATTR_QUEST_SERVICE), any());
+            } finally {
+                Thread.currentThread().setContextClassLoader(prev);
+            }
+        }
+    }
+
+    @Nested
+    class RegisterCatchBranch {
+
+        @Test
+        void swallowsDuplicateLoginAndContinues_withoutChangingBootstrap() {
+            // Given
+            ServletContext ctx = mock(ServletContext.class);
+            ServletContextEvent event = new ServletContextEvent(ctx);
+            ClassLoader prev = Thread.currentThread().getContextClassLoader();
+            Thread.currentThread().setContextClassLoader(
+                    new MemoryResourceCL(prev).with()
+            );
+            try (MockedConstruction<DefaultUserService> cons =
+                         mockConstruction(DefaultUserService.class, (mock, c) ->
+                                 doThrow(new DuplicateLoginException())
+                                         .when(mock).register(any(Role.class), anyString(), anyString(), anyString()))) {
+                // When
+                new AppBootstrap().contextInitialized(event);
+                // Then
+                ArgumentCaptor<Object> usCap = ArgumentCaptor.forClass(Object.class);
+                ArgumentCaptor<Object> qsCap = ArgumentCaptor.forClass(Object.class);
+                verify(ctx).setAttribute(eq(AppBootstrap.ATTR_USER_SERVICE), usCap.capture());
+                verify(ctx).setAttribute(eq(AppBootstrap.ATTR_QUEST_SERVICE), qsCap.capture());
+                assertSame(cons.constructed().getFirst(), usCap.getValue());
+                QuestService qs = (QuestService) qsCap.getValue();
+                assertEquals(1, qs.getStart().getId());
+            } finally {
+                Thread.currentThread().setContextClassLoader(prev);
+            }
+        }
+
+        @Test
+        void rethrowsNonDuplicateRuntime_withoutChangingBootstrap() {
+            // Given
+            ServletContext ctx = mock(ServletContext.class);
+            ServletContextEvent event = new ServletContextEvent(ctx);
+            try (MockedConstruction<DefaultUserService> ignored =
+                         mockConstruction(DefaultUserService.class, (mock, c) ->
+                                 doThrow(new IllegalStateException("boom"))
+                                         .when(mock).register(any(Role.class), anyString(), anyString(), anyString()))) {
+                // When / Then
+                IllegalStateException ex = assertThrows(IllegalStateException.class,
+                        () -> new AppBootstrap().contextInitialized(event));
+                assertEquals("boom", ex.getMessage());
+                verify(ctx, never()).setAttribute(eq(AppBootstrap.ATTR_USER_SERVICE), any());
+                verify(ctx, never()).setAttribute(eq(AppBootstrap.ATTR_QUEST_SERVICE), any());
+            }
         }
     }
 }

@@ -16,7 +16,8 @@
         "next": 4
       }
     ],
-    "final": false
+    "final": false,
+    "image": "/assets/img/quest/1.jpg"
   },
   {
     "id": 2,
@@ -31,7 +32,8 @@
         "next": 6
       }
     ],
-    "final": false
+    "final": false,
+    "image": "/assets/img/quest/2.jpg"
   },
   {
     "id": 3,
@@ -46,7 +48,8 @@
         "next": 8
       }
     ],
-    "final": false
+    "final": false,
+    "image": "/assets/img/quest/3.jpg"
   },
   {
     "id": 4,
@@ -61,7 +64,8 @@
         "next": 10
       }
     ],
-    "final": false
+    "final": false,
+    "image": "/assets/img/quest/4.jpg"
   },
   {
     "id": 5,
@@ -76,7 +80,8 @@
         "next": 11
       }
     ],
-    "final": false
+    "final": false,
+    "image": "/assets/img/quest/5.jpg"
   },
   {
     "id": 6,
@@ -91,7 +96,8 @@
         "next": 12
       }
     ],
-    "final": false
+    "final": false,
+    "image": "/assets/img/quest/6.jpg"
   },
   {
     "id": 7,
@@ -106,7 +112,8 @@
         "next": 15
       }
     ],
-    "final": false
+    "final": false,
+    "image": "/assets/img/quest/7.jpg"
   },
   {
     "id": 8,
@@ -121,7 +128,8 @@
         "next": 16
       }
     ],
-    "final": false
+    "final": false,
+    "image": "/assets/img/quest/8.jpg"
   },
   {
     "id": 9,
@@ -136,7 +144,8 @@
         "next": 18
       }
     ],
-    "final": false
+    "final": false,
+    "image": "/assets/img/quest/9.jpg"
   },
   {
     "id": 10,
@@ -151,7 +160,8 @@
         "next": 20
       }
     ],
-    "final": false
+    "final": false,
+    "image": "/assets/img/quest/10.jpg"
   },
   {
     "id": 11,
@@ -166,7 +176,8 @@
         "next": 12
       }
     ],
-    "final": false
+    "final": false,
+    "image": "/assets/img/quest/11.jpg"
   },
   {
     "id": 12,
@@ -181,7 +192,8 @@
         "next": 23
       }
     ],
-    "final": false
+    "final": false,
+    "image": "/assets/img/quest/12.jpg"
   },
   {
     "id": 13,
@@ -196,7 +208,8 @@
         "next": 25
       }
     ],
-    "final": false
+    "final": false,
+    "image": "/assets/img/quest/13.jpg"
   },
   {
     "id": 14,
@@ -211,7 +224,8 @@
         "next": 27
       }
     ],
-    "final": false
+    "final": false,
+    "image": "/assets/img/quest/14.jpg"
   },
   {
     "id": 15,
@@ -226,7 +240,8 @@
         "next": 28
       }
     ],
-    "final": false
+    "final": false,
+    "image": "/assets/img/quest/15.jpg"
   },
   {
     "id": 16,
@@ -241,7 +256,8 @@
         "next": 30
       }
     ],
-    "final": false
+    "final": false,
+    "image": "/assets/img/quest/16.jpg"
   },
   {
     "id": 17,
@@ -256,7 +272,8 @@
         "next": 32
       }
     ],
-    "final": false
+    "final": false,
+    "image": "/assets/img/quest/17.jpg"
   },
   {
     "id": 18,
@@ -271,7 +288,8 @@
         "next": 29
       }
     ],
-    "final": false
+    "final": false,
+    "image": "/assets/img/quest/18.jpg"
   },
   {
     "id": 19,
@@ -286,7 +304,8 @@
         "next": 33
       }
     ],
-    "final": false
+    "final": false,
+    "image": "/assets/img/quest/19.jpg"
   },
   {
     "id": 20,
@@ -301,7 +320,8 @@
         "next": 35
       }
     ],
-    "final": false
+    "final": false,
+    "image": "/assets/img/quest/20.jpg"
   },
   {
     "id": 21,
@@ -316,7 +336,8 @@
         "next": 36
       }
     ],
-    "final": false
+    "final": false,
+    "image": "/assets/img/quest/21.jpg"
   },
   {
     "id": 22,
@@ -331,7 +352,8 @@
         "next": 34
       }
     ],
-    "final": false
+    "final": false,
+    "image": "/assets/img/quest/22.jpg"
   },
   {
     "id": 23,
@@ -346,7 +368,8 @@
         "next": 36
       }
     ],
-    "final": false
+    "final": false,
+    "image": "/assets/img/quest/23.jpg"
   },
   {
     "id": 24,
@@ -361,7 +384,8 @@
         "next": 38
       }
     ],
-    "final": false
+    "final": false,
+    "image": "/assets/img/quest/24.jpg"
   },
   {
     "id": 25,
@@ -376,7 +400,8 @@
         "next": 39
       }
     ],
-    "final": false
+    "final": false,
+    "image": "/assets/img/quest/25.jpg"
   },
   {
     "id": 26,
@@ -391,7 +416,8 @@
         "next": 41
       }
     ],
-    "final": false
+    "final": false,
+    "image": "/assets/img/quest/26.jpg"
   },
   {
     "id": 27,
@@ -406,7 +432,8 @@
         "next": 42
       }
     ],
-    "final": false
+    "final": false,
+    "image": "/assets/img/quest/27.jpg"
   },
   {
     "id": 28,
@@ -425,7 +452,8 @@
         "next": 42
       }
     ],
-    "final": false
+    "final": false,
+    "image": "/assets/img/quest/28.jpg"
   },
   {
     "id": 29,
@@ -440,7 +468,8 @@
         "next": 40
       }
     ],
-    "final": false
+    "final": false,
+    "image": "/assets/img/quest/29.jpg"
   },
   {
     "id": 30,
@@ -455,7 +484,8 @@
         "next": 36
       }
     ],
-    "final": false
+    "final": false,
+    "image": "/assets/img/quest/30.jpg"
   },
   {
     "id": 31,
@@ -470,7 +500,8 @@
         "next": 43
       }
     ],
-    "final": false
+    "final": false,
+    "image": "/assets/img/quest/31.jpg"
   },
   {
     "id": 32,
@@ -485,7 +516,8 @@
         "next": 41
       }
     ],
-    "final": false
+    "final": false,
+    "image": "/assets/img/quest/32.jpg"
   },
   {
     "id": 33,
@@ -500,7 +532,8 @@
         "next": 45
       }
     ],
-    "final": false
+    "final": false,
+    "image": "/assets/img/quest/33.jpg"
   },
   {
     "id": 34,
@@ -515,7 +548,8 @@
         "next": 46
       }
     ],
-    "final": false
+    "final": false,
+    "image": "/assets/img/quest/34.jpg"
   },
   {
     "id": 35,
@@ -530,7 +564,8 @@
         "next": 41
       }
     ],
-    "final": false
+    "final": false,
+    "image": "/assets/img/quest/35.jpg"
   },
   {
     "id": 36,
@@ -545,7 +580,8 @@
         "next": 42
       }
     ],
-    "final": false
+    "final": false,
+    "image": "/assets/img/quest/36.jpg"
   },
   {
     "id": 37,
@@ -560,7 +596,8 @@
         "next": 47
       }
     ],
-    "final": false
+    "final": false,
+    "image": "/assets/img/quest/37.jpg"
   },
   {
     "id": 38,
@@ -575,7 +612,8 @@
         "next": 40
       }
     ],
-    "final": false
+    "final": false,
+    "image": "/assets/img/quest/38.jpg"
   },
   {
     "id": 39,
@@ -590,7 +628,8 @@
         "next": 41
       }
     ],
-    "final": false
+    "final": false,
+    "image": "/assets/img/quest/39.jpg"
   },
   {
     "id": 40,
@@ -605,7 +644,8 @@
         "next": 42
       }
     ],
-    "final": false
+    "final": false,
+    "image": "/assets/img/quest/40.jpg"
   },
   {
     "id": 41,
@@ -620,7 +660,8 @@
         "next": 50
       }
     ],
-    "final": false
+    "final": false,
+    "image": "/assets/img/quest/41.jpg"
   },
   {
     "id": 42,
@@ -635,54 +676,63 @@
         "next": 47
       }
     ],
-    "final": false
+    "final": false,
+    "image": "/assets/img/quest/42.jpg"
   },
   {
     "id": 43,
     "text": "Казнь в подземелье. Побег сорвался. Площадь гудит. Последним вы видите перо на шлеме и холод клинка.",
     "options": [],
-    "final": true
+    "final": true,
+    "image": "/assets/img/quest/43.jpg"
   },
   {
     "id": 44,
     "text": "Цена проклятия. Кровь на алтаре. Мор отступает, но вместе с ним — ваша тень и имя. Вы угасаете.",
     "options": [],
-    "final": true
+    "final": true,
+    "image": "/assets/img/quest/44.jpg"
   },
   {
     "id": 45,
     "text": "Жертва героя. Рогатая тварь падает, заслонённый ребёнок жив. Ваше имя шепчут у огней.",
     "options": [],
-    "final": true
+    "final": true,
+    "image": "/assets/img/quest/45.jpg"
   },
   {
     "id": 46,
     "text": "Тёмный договор. Метка Тиллы горит на коже. Силы много, но вы навеки связаны шёпотом ворона.",
     "options": [],
-    "final": true
+    "final": true,
+    "image": "/assets/img/quest/46.jpg"
   },
   {
     "id": 47,
     "text": "Сорванный ритуал ценой крови. Свод пещеры обрушен, лидер мёртв. Друзья несут вас к рассвету.",
     "options": [],
-    "final": true
+    "final": true,
+    "image": "/assets/img/quest/47.jpg"
   },
   {
     "id": 48,
     "text": "Падение с моста. Доски ломаются, буря ревёт. Вы исчезаете в белой пене. Говорят, вы стали вольным странником.",
     "options": [],
-    "final": true
+    "final": true,
+    "image": "/assets/img/quest/48.jpg"
   },
   {
     "id": 49,
     "text": "Восстановление порядка. Заговор открыт; Элинор принимает присягу. Вам вручён меч капитана и земля у реки.",
     "options": [],
-    "final": true
+    "final": true,
+    "image": "/assets/img/quest/49.jpg"
   },
   {
     "id": 50,
     "text": "Серый кардинал. Канцлер пал, но власть тонкая, как паутина. Вы — рука в тени, чёрное перо в книге решений.",
     "options": [],
-    "final": true
+    "final": true,
+    "image": "/assets/img/quest/50.jpg"
   }
 ]

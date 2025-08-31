@@ -4,9 +4,27 @@
          xsi:schemaLocation="https://jakarta.ee/xml/ns/jakartaee https://jakarta.ee/xml/ns/jakartaee/web-app_6_0.xsd"
          version="6.0">
 
+    <context-param>
+        <param-name>questResource</param-name>
+        <param-value>quest.json</param-value>
+    </context-param>
+    <context-param>
+        <param-name>questStartId</param-name>
+        <param-value>1</param-value>
+    </context-param>
+
     <listener>
         <listener-class>com.javarush.apalinskiy.web.listener.AppBootstrap</listener-class>
     </listener>
+
+    <servlet>
+        <servlet-name>quest</servlet-name>
+        <servlet-class>com.javarush.apalinskiy.web.servlet.QuestServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>quest</servlet-name>
+        <url-pattern>/quest</url-pattern>
+    </servlet-mapping>
 
     <servlet>
         <servlet-name>home</servlet-name>

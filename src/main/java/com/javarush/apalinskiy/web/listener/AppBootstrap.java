@@ -3,10 +3,8 @@ package com.javarush.apalinskiy.web.listener;
 import com.javarush.apalinskiy.repositories.InMemoryUserRepository;
 import com.javarush.apalinskiy.repositories.QuestRepository;
 import com.javarush.apalinskiy.repositories.UserRepository;
-import com.javarush.apalinskiy.service.DefaultQuestService;
-import com.javarush.apalinskiy.service.DefaultUserService;
-import com.javarush.apalinskiy.service.QuestService;
-import com.javarush.apalinskiy.service.UserService;
+import com.javarush.apalinskiy.save.SaveExpander;
+import com.javarush.apalinskiy.service.*;
 import com.javarush.apalinskiy.user.Role;
 import jakarta.servlet.ServletContext;
 import jakarta.servlet.ServletContextEvent;
@@ -16,6 +14,9 @@ public class AppBootstrap implements ServletContextListener {
 
     public static final String ATTR_USER_SERVICE = "userService";
     public static final String ATTR_QUEST_SERVICE = "questService";
+    public static final String ATTR_SAVE_STATE_SERVICE = "saveStateService";
+    public static final String ATTR_SAVE_EXPANDER = "saveExpander";
+
     private static final String QUEST_RESOURCE = "quest.json";
     private static final int QUEST_START_ID = 1;
 
@@ -32,12 +33,17 @@ public class AppBootstrap implements ServletContextListener {
             }
         }
         ctx.setAttribute(ATTR_USER_SERVICE, userService);
+        final QuestService questService;
         try {
             QuestRepository repo = QuestRepository.fromClasspath(QUEST_RESOURCE, QUEST_START_ID);
-            QuestService questService = new DefaultQuestService(repo);
+            questService = new DefaultQuestService(repo);
             ctx.setAttribute(ATTR_QUEST_SERVICE, questService);
         } catch (Exception e) {
             throw new RuntimeException("Failed to load quest resource: " + QUEST_RESOURCE, e);
         }
+        SaveStateService saveStateService = new InMemorySaveStateService();
+        ctx.setAttribute(ATTR_SAVE_STATE_SERVICE, saveStateService);
+        SaveExpander expander = new SaveExpander(questService, saveStateService);
+        ctx.setAttribute(ATTR_SAVE_EXPANDER, expander);
     }
 }

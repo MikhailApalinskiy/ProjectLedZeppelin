@@ -1,0 +1,43 @@
+.header-inline-space {
+    justify-content: space-between;
+}
+
+.overwrite-panel {
+    display: grid;
+    gap: 12px;
+}
+
+@media (min-width: 640px) {
+    .overwrite-panel {
+        grid-template-columns: 1fr 1fr;
+        gap: 14px 16px;
+    }
+}
+
+.compare-block h2 {
+    margin: 0 0 6px 0;
+    font-size: 1rem;
+}
+
+.compare-block p {
+    margin: 0;
+    line-height: 1.45;
+}
+
+.confirm-actions {
+    margin-top: 14px;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.confirm-actions .btn {
+    min-width: 180px;
+}
+
+.single-linkrow {
+    margin-top: 10px;
+    display: flex;
+    justify-content: center;
+}

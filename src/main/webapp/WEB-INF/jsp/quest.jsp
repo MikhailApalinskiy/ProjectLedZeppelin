@@ -2,26 +2,7 @@
 <%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core" %>
 <%@ taglib prefix="fn" uri="http://java.sun.com/jsp/jstl/functions" %>
 
-<link rel="stylesheet" href="<c:url value='/assets/css/main.css'/>"/>
-
-<style>
-    .quest-image {
-        max-width: 100%;
-        height: auto;
-        display: block;
-        border-radius: 12px;
-        margin: 0 auto;
-        box-shadow: var(--shadow);
-    }
-
-    .answers {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 10px;
-        justify-content: center;
-    }
-</style>
-
+<c:set var="isAuth" value="${not empty sessionScope.user}"/>
 <c:choose>
     <c:when test="${node == null}">
         <c:set var="pageTitle" value="TextQuest — Ошибка"/>
@@ -34,16 +15,46 @@
     </c:otherwise>
 </c:choose>
 
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8"/>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
     <title><c:out value="${pageTitle}"/></title>
+
+    <c:url var="cssMain" value="/assets/css/main.css"/>
+    <c:url var="cssQuest" value="/assets/css/quest.css"/>
+
+    <link rel="stylesheet" href="${cssMain}"/>
+    <link rel="stylesheet" href="${cssQuest}"/>
+
 </head>
 <body>
 
-<c:url value="/quest" var="questAction"/>
-<c:url value="/assets/img/placeholder.jpg" var="placeholder"/>
+<c:url var="questAction" value="/quest"/>
+<c:url var="placeholder" value="/assets/img/placeholder.jpg"/>
+<c:url var="homeUrl" value="/"/>
+
+<c:url var="saveUrl" value="/saves">
+    <c:param name="next" value="/quest"/>
+    <c:param name="purpose" value="save"/>
+    <c:param name="node" value="${node != null ? node.id : 0}"/>
+</c:url>
+<c:url var="loadUrl" value="/loads">
+    <c:param name="next" value="/quest"/>
+    <c:param name="purpose" value="load"/>
+    <c:param name="node" value="${node != null ? node.id : 0}"/>
+</c:url>
+
+<c:url var="nextQuestUrl" value="/quest">
+    <c:param name="id" value="${node != null ? node.id : 0}"/>
+</c:url>
+<c:url var="loginUrl" value="/login">
+    <c:param name="next" value="${nextQuestUrl}"/>
+</c:url>
+<c:url var="registerUrl" value="/register">
+    <c:param name="next" value="${nextQuestUrl}"/>
+</c:url>
 
 <div class="container">
     <div class="card fade-in">
@@ -53,12 +64,22 @@
         </div>
 
         <div class="card-body">
-            <c:if test="${not empty error}">
-                <div class="alert alert-error">
-                    <div class="alert-dot"></div>
-                    <div class="alert-text"><c:out value="${error}"/></div>
-                </div>
-            </c:if>
+
+            <div class="actions" style="justify-content:flex-end; margin-bottom:10px">
+                <c:choose>
+                    <c:when test="${isAuth}">
+                        <a class="btn" href="${saveUrl}">Сохранить</a>
+                        <a class="btn" href="${loadUrl}">Загрузить</a>
+                    </c:when>
+                    <c:otherwise>
+                        <a class="btn" href="#authRequired">Сохранить</a>
+                        <a class="btn" href="#authRequired">Загрузить</a>
+                    </c:otherwise>
+                </c:choose>
+                <a class="btn btn-ghost" href="${homeUrl}">На главную</a>
+            </div>
+
+            <%@ include file="/WEB-INF/jsp/fragments/alerts.jspf" %>
 
             <c:choose>
                 <c:when test="${node == null}">
@@ -68,19 +89,17 @@
                         <a class="btn btn-primary" href="${questAction}">Начать с начала</a>
                     </div>
                 </c:when>
-
                 <c:otherwise>
                     <div class="stack">
-
                         <c:choose>
                             <c:when test="${not empty node.image}">
                                 <c:set var="rawImg" value="${node.image}"/>
                                 <c:choose>
                                     <c:when test="${fn:startsWith(rawImg, '/')}">
-                                        <c:url value="${rawImg}" var="imgSrc"/>
+                                        <c:url var="imgSrc" value="${rawImg}"/>
                                     </c:when>
                                     <c:otherwise>
-                                        <c:url value="/${rawImg}" var="imgSrc"/>
+                                        <c:url var="imgSrc" value="/${rawImg}"/>
                                     </c:otherwise>
                                 </c:choose>
                             </c:when>
@@ -121,10 +140,31 @@
                                 </form>
                             </c:otherwise>
                         </c:choose>
-
                     </div>
                 </c:otherwise>
             </c:choose>
+        </div>
+    </div>
+</div>
+
+<div id="authRequired" class="modal" role="dialog" aria-modal="true" aria-labelledby="authTitle">
+    <a class="modal__overlay" href="#"></a>
+    <div class="modal__card">
+        <header class="modal__header">
+            <h2 id="authTitle" class="user-title" style="margin:0">Требуется вход</h2>
+            <a href="#" class="modal__close btn btn-ghost" aria-label="Закрыть">×</a>
+        </header>
+        <div class="modal__body">
+            <div class="alert alert-error" role="alert">
+                <span class="alert-dot" aria-hidden="true"></span>
+                <span class="alert-text">Чтобы сохранять и загружать прогресс, войдите в аккаунт.</span>
+            </div>
+            <p class="notice">Вы можете продолжить прохождение без сохранений.</p>
+        </div>
+        <div class="modal__actions">
+            <a href="${loginUrl}" class="btn btn-primary">Войти</a>
+            <a href="${registerUrl}" class="btn">Зарегистрироваться</a>
+            <a href="#" class="btn btn-ghost">Позже</a>
         </div>
     </div>
 </div>

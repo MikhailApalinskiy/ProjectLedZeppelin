@@ -106,3 +106,23 @@
 .btn-ghost:hover {
     background: rgba(127, 127, 127, 0.08);
 }
+
+.form-actions .link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 12px 20px;
+    border-radius: 10px;
+    min-width: 160px;
+    box-sizing: border-box;
+    font: inherit;
+    font-weight: 600;
+    text-decoration: none;
+    border: 1px solid rgba(127, 127, 127, .35);
+    color: rgb(var(--fg));
+    transition: background .2s ease, border-color .2s ease, color .2s ease;
+}
+
+.form-actions .link:hover {
+    background: rgba(127, 127, 127, 0.08);
+}

@@ -1,0 +1,67 @@
+.quest-image {
+    max-width: 100%;
+    height: auto;
+    display: block;
+    border-radius: 12px;
+    margin: 0 auto;
+    box-shadow: var(--shadow);
+}
+
+.answers {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: center;
+}
+
+/* ------ CSS-only modal (via :target) ------ */
+.modal {
+    position: fixed;
+    inset: 0;
+    display: none;
+    z-index: 1000;
+}
+.modal:target { display: block; }
+
+.modal__overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,.45);
+    backdrop-filter: blur(2px);
+}
+
+.modal__card {
+    position: relative;
+    max-width: 560px;
+    margin: 8vh auto;
+    background: rgb(var(--card));
+    border: 1px solid rgba(127,127,127,.18);
+    border-radius: 14px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+}
+
+.modal__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    padding: 16px 18px;
+    border-bottom: 1px solid rgba(127,127,127,.18);
+}
+
+.modal__body {
+    padding: 16px 18px;
+}
+
+.modal__actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    padding: 0 18px 18px 18px;
+}
+
+.modal__close {
+    text-decoration: none;
+    color: inherit;
+}

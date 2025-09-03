@@ -18,6 +18,24 @@
     </listener>
 
     <servlet>
+        <servlet-name>GoSavesServlet</servlet-name>
+        <servlet-class>com.javarush.apalinskiy.web.servlet.GoSavesServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>GoSavesServlet</servlet-name>
+        <url-pattern>/saves</url-pattern>
+    </servlet-mapping>
+
+    <servlet>
+        <servlet-name>GoSavesReadServlet</servlet-name>
+        <servlet-class>com.javarush.apalinskiy.web.servlet.GoLoadsServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>GoSavesReadServlet</servlet-name>
+        <url-pattern>/loads</url-pattern>
+    </servlet-mapping>
+
+    <servlet>
         <servlet-name>quest</servlet-name>
         <servlet-class>com.javarush.apalinskiy.web.servlet.QuestServlet</servlet-class>
     </servlet>

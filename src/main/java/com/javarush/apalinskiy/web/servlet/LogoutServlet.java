@@ -20,6 +20,6 @@ public class LogoutServlet extends HttpServlet {
         if (s != null) {
             s.invalidate();
         }
-        resp.sendRedirect(req.getContextPath() + "/");
+        resp.sendRedirect(resp.encodeRedirectURL(req.getContextPath() + "/"));
     }
 }

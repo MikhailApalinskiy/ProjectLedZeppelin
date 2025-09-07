@@ -11,21 +11,29 @@ public final class SlotView implements Serializable {
     private final String title;
     private final String updatedAtText;
     private final String questId;
+    private final String questName;
 
-    private SlotView(int index, Integer nodeId, String title, String updatedAtText, String questId) {
+    private SlotView(int index,
+                     Integer nodeId,
+                     String title,
+                     String updatedAtText,
+                     String questId,
+                     String questName) {
         this.index = index;
         this.nodeId = nodeId;
         this.title = title;
         this.updatedAtText = updatedAtText;
         this.questId = questId;
+        this.questName = questName;
     }
 
-    public static SlotView empty(int index, String questId) {
-        return new SlotView(index, null, null, null, questId);
+    public static SlotView empty(int index, String questId, String questName) {
+        return new SlotView(index, null, null, null, questId, questName);
     }
 
-    public static SlotView filled(int index, int nodeId, String title, String updatedAtText, String questId) {
-        return new SlotView(index, nodeId, title, updatedAtText, questId);
+    public static SlotView filled(int index, int nodeId, String title, String updatedAtText,
+                                  String questId, String questName) {
+        return new SlotView(index, nodeId, title, updatedAtText, questId, questName);
     }
 }
 

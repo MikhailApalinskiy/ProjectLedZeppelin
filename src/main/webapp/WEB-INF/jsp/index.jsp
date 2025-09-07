@@ -10,6 +10,37 @@
 
     <c:url var="cssMain" value="/assets/css/main.css"/>
     <link rel="stylesheet" href="${cssMain}"/>
+
+    <c:set var="PATH_HOME" value="/"/>
+    <c:set var="PATH_LOGIN" value="/login"/>
+    <c:set var="PATH_REGISTER" value="/register"/>
+    <c:set var="PATH_QUEST" value="/quest"/>
+    <c:set var="PATH_QUESTS" value="/quests"/>
+    <c:set var="PATH_LOGOUT" value="/logout"/>
+    <c:set var="PATH_CREATE" value="/create_quest"/>
+    <c:set var="PATH_MY_QUESTS" value="/my/quests"/>
+    <c:set var="PATH_LOADS" value="/loads"/>
+
+    <c:set var="PARAM_NEW" value="new"/>
+    <c:set var="PARAM_NEXT" value="next"/>
+    <c:set var="PARAM_PURPOSE" value="purpose"/>
+    <c:set var="PURPOSE_LOAD" value="load"/>
+
+    <c:url var="homeUrl" value="${PATH_HOME}"/>
+    <c:url var="loginUrl" value="${PATH_LOGIN}"/>
+    <c:url var="registerUrl" value="${PATH_REGISTER}"/>
+    <c:url var="questUrl" value="${PATH_QUEST}"/>
+    <c:url var="questsUrl" value="${PATH_QUESTS}"/>
+    <c:url var="logoutUrl" value="${PATH_LOGOUT}"/>
+
+    <c:url var="createNewUrl" value="${PATH_CREATE}">
+        <c:param name="${PARAM_NEW}" value="1"/>
+    </c:url>
+
+    <c:url var="loadsUrl" value="${PATH_LOADS}">
+        <c:param name="${PARAM_NEXT}" value="${PATH_QUEST}"/>
+        <c:param name="${PARAM_PURPOSE}" value="${PURPOSE_LOAD}"/>
+    </c:url>
 </head>
 <body>
 
@@ -28,8 +59,8 @@
         <section class="card-body">
             <%@ include file="/WEB-INF/jsp/fragments/alerts.jspf" %>
 
-            <section id="aboutTitle" class="section" aria-labelledby="aboutTitle">
-                <h2 class="user-title" style="margin-bottom:6px">О проекте</h2>
+            <section class="section" aria-labelledby="aboutTitle">
+                <h2 id="aboutTitle" class="user-title">О проекте</h2>
                 <p class="notice">
                     TextQuest — платформа интерактивных текстовых приключений. Создавайте свои квесты,
                     делитесь ими с друзьями и проходите истории других авторов. Ваши выборы влияют на сюжет.
@@ -56,64 +87,58 @@
                                 </svg>
                                 Почта
                             </button>
-                            <form method="post" action="<c:url value='/logout'/>" style="display:inline">
+                            <form method="post" action="${logoutUrl}" style="display:inline">
                                 <button type="submit" class="btn btn-danger">Выйти</button>
                             </form>
                         </div>
                     </c:when>
+
                     <c:otherwise>
                         <div>
-                            <p class="user-title" style="margin:0">Гость</p>
+                            <p class="user-title">Гость</p>
                             <p class="user-sub">Вы не вошли в систему.</p>
                         </div>
                         <nav class="actions" aria-label="Авторизация">
-                            <a class="btn btn-primary" href="<c:url value='/login'/>">Войти</a>
-                            <a class="btn btn-ghost" href="<c:url value='/register'/>">Зарегистрироваться</a>
+                            <a class="btn btn-primary" href="${loginUrl}">Войти</a>
+                            <a class="btn btn-ghost" href="${registerUrl}">Зарегистрироваться</a>
                         </nav>
                     </c:otherwise>
                 </c:choose>
             </section>
 
             <section class="section" aria-labelledby="quickNavTitle">
-                <h2 id="quickNavTitle" class="user-title" style="margin-bottom:8px">Быстрые действия</h2>
+                <h2 id="quickNavTitle" class="user-title">Быстрые действия</h2>
                 <div class="linkrow" role="navigation" aria-label="Основная навигация">
-                    <a class="link" href="<c:url value='/quest'/>" title="Начать главный квест">Главный квест —
-                        начать</a>
-                    <button type="button" class="link" title="Каталог квестов (скоро)">Каталог квестов</button>
+                    <a class="link" href="${questUrl}" title="Начать главный квест">Главный квест — начать</a>
+                    <a class="link" href="${questsUrl}">Каталог квестов</a>
                     <c:if test="${isAuth}">
-                        <button type="button" class="link" title="Мои квесты (скоро)">Мои квесты</button>
+                        <a class="link" href="<c:url value='${PATH_MY_QUESTS}'/>">Мои квесты</a>
                     </c:if>
                 </div>
             </section>
 
             <c:if test="${isAuth}">
-                <c:url var="continueUrl" value="/loads">
-                    <c:param name="next" value="/quest"/>
-                    <c:param name="purpose" value="load"/>
-                </c:url>
-
                 <section class="section" aria-labelledby="continueTitle">
-                    <h2 id="continueTitle" class="user-title" style="margin-bottom:8px">Продолжить прохождение</h2>
+                    <h2 id="continueTitle" class="user-title">Продолжить прохождение</h2>
                     <p class="notice">У вас есть сохранения — вернитесь к приключениям с последней сцены.</p>
                     <div class="actions">
-                        <a class="btn btn-primary" href="${continueUrl}" title="Продолжить">Продолжить</a>
+                        <a class="btn btn-primary" href="${loadsUrl}" title="Продолжить">Продолжить</a>
                     </div>
                 </section>
 
                 <section class="section" aria-labelledby="createTitle">
-                    <h2 id="createTitle" class="user-title" style="margin-bottom:8px">Творчество автора</h2>
+                    <h2 id="createTitle" class="user-title">Творчество автора</h2>
                     <p class="notice">Создавайте ветвящийся сюжет, главы и варианты ответа. Публикуйте и собирайте
                         отзывы.</p>
                     <div class="actions">
-                        <button type="button" class="btn btn-primary" title="Создать квест (скоро)">Создать квест
-                        </button>
+                        <a class="btn btn-primary" href="${createNewUrl}" title="Создать квест">Создать квест</a>
                     </div>
                 </section>
             </c:if>
 
             <c:if test="${not isAuth}">
                 <section class="section" aria-labelledby="guestCtaTitle">
-                    <h2 id="guestCtaTitle" class="user-title" style="margin-bottom:8px">Начните приключение</h2>
+                    <h2 id="guestCtaTitle" class="user-title">Начните приключение</h2>
                     <p class="notice">Зарегистрируйтесь, чтобы сохранять прогресс и создавать собственные истории.</p>
                 </section>
             </c:if>

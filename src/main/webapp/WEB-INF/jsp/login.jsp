@@ -12,17 +12,27 @@
     <c:url var="cssAuth" value="/assets/css/auth.css"/>
     <link rel="stylesheet" href="${cssMain}"/>
     <link rel="stylesheet" href="${cssAuth}"/>
+
+    <c:set var="PATH_HOME" value="/"/>
+    <c:set var="PATH_LOGIN" value="/login"/>
+    <c:set var="PATH_REGISTER" value="/register"/>
+
+    <c:set var="PARAM_NEXT" value="next"/>
+    <c:set var="PARAM_USER_LOGIN" value="userLogin"/>
+    <c:set var="PARAM_PASSWORD" value="password"/>
+    <c:set var="PARAM_QUEST_NAME" value="questName"/>
+
+    <c:url var="homeUrl" value="${PATH_HOME}"/>
+    <c:url var="loginAction" value="${PATH_LOGIN}"/>
+    <c:url var="registerUrl" value="${PATH_REGISTER}">
+        <c:param name="${PARAM_NEXT}" value="${param[PARAM_NEXT]}"/>
+    </c:url>
 </head>
-<body>
+<body class="page-auth">
 
-<c:url var="homeUrl" value="/"/>
-<c:url var="loginAction" value="/login"/>
-<c:url var="registerUrl" value="/register">
-    <c:param name="next" value="${param.next}"/>
-</c:url>
-
-<c:if test="${not empty param.next}">
-    <c:set var="info" scope="request" value="Войдите, чтобы продолжить: ${param.next}"/>
+<c:if test="${not empty param[PARAM_QUEST_NAME]}">
+    <c:set var="info" scope="request"
+           value="Войдите, чтобы продолжить квест: ${param[PARAM_QUEST_NAME]}"/>
 </c:if>
 
 <main class="container fade-in" role="main">
@@ -31,18 +41,18 @@
             <span class="logo" aria-hidden="true"></span>
             <h1 id="loginTitle">Вход</h1>
         </header>
+
         <section class="card-body">
             <%@ include file="/WEB-INF/jsp/fragments/alerts.jspf" %>
 
             <form method="post" action="${loginAction}" class="form stack" novalidate>
-                <input type="hidden" name="next" value="<c:out value='${param.next}'/>"/>
+                <input type="hidden" name="${PARAM_NEXT}" value="<c:out value='${param[PARAM_NEXT]}'/>"/>
 
                 <div class="field">
                     <label for="login" class="label">Логин</label>
                     <input id="login"
-                           name="userLogin"
+                           name="${PARAM_USER_LOGIN}"
                            class="input"
-                           required
                            autocomplete="username"
                            autofocus
                            value="<c:out value='${requestScope.userLogin}'/>"/>
@@ -51,10 +61,9 @@
                 <div class="field">
                     <label for="password" class="label">Пароль</label>
                     <input id="password"
-                           name="password"
+                           name="${PARAM_PASSWORD}"
                            type="password"
                            class="input"
-                           required
                            autocomplete="current-password"/>
                 </div>
 

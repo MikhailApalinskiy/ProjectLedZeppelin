@@ -17,6 +17,79 @@
         <listener-class>com.javarush.apalinskiy.web.listener.AppBootstrap</listener-class>
     </listener>
 
+    <context-param>
+        <param-name>uploads.dir</param-name>
+        <param-value>C:\textquest\uploads</param-value>
+    </context-param>
+
+    <servlet>
+        <servlet-name>UploadsServlet</servlet-name>
+        <servlet-class>com.javarush.apalinskiy.web.servlet.UploadsServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>UploadsServlet</servlet-name>
+        <url-pattern>/uploads/*</url-pattern>
+    </servlet-mapping>
+
+    <servlet>
+        <servlet-name>DeleteQuestServlet</servlet-name>
+        <servlet-class>com.javarush.apalinskiy.web.servlet.DeleteQuestServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>DeleteQuestServlet</servlet-name>
+        <url-pattern>/quest/delete</url-pattern>
+    </servlet-mapping>
+
+    <servlet>
+        <servlet-name>AllCustomQuestsServlet</servlet-name>
+        <servlet-class>com.javarush.apalinskiy.web.servlet.AllCustomQuestsServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>AllCustomQuestsServlet</servlet-name>
+        <url-pattern>/quests</url-pattern>
+    </servlet-mapping>
+
+    <servlet>
+        <servlet-name>MyCustomQuestsServlet</servlet-name>
+        <servlet-class>com.javarush.apalinskiy.web.servlet.MyCustomQuestsServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>MyCustomQuestsServlet</servlet-name>
+        <url-pattern>/my/quests</url-pattern>
+    </servlet-mapping>
+
+    <servlet>
+        <servlet-name>PublishServlet</servlet-name>
+        <servlet-class>com.javarush.apalinskiy.web.servlet.PublishServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>PublishServlet</servlet-name>
+        <url-pattern>/quest/publish</url-pattern>
+    </servlet-mapping>
+
+    <servlet>
+        <servlet-name>GraphSvgServlet</servlet-name>
+        <servlet-class>com.javarush.apalinskiy.web.servlet.GraphSvgServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>GraphSvgServlet</servlet-name>
+        <url-pattern>/quest/graph_svg</url-pattern>
+    </servlet-mapping>
+
+    <servlet>
+        <servlet-name>CreateQuestServlet</servlet-name>
+        <servlet-class>com.javarush.apalinskiy.web.servlet.CreateQuestServlet</servlet-class>
+        <multipart-config>
+            <max-file-size>10485760</max-file-size>
+            <max-request-size>20971520</max-request-size>
+            <file-size-threshold>1048576</file-size-threshold>
+        </multipart-config>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>CreateQuestServlet</servlet-name>
+        <url-pattern>/create_quest</url-pattern>
+    </servlet-mapping>
+
     <servlet>
         <servlet-name>GoSavesServlet</servlet-name>
         <servlet-class>com.javarush.apalinskiy.web.servlet.GoSavesServlet</servlet-class>
@@ -56,7 +129,6 @@
     <servlet>
         <servlet-name>AuthServlet</servlet-name>
         <servlet-class>com.javarush.apalinskiy.web.servlet.AuthServlet</servlet-class>
-        <load-on-startup>1</load-on-startup>
     </servlet>
     <servlet-mapping>
         <servlet-name>AuthServlet</servlet-name>

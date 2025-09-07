@@ -2,9 +2,9 @@ package com.javarush.apalinskiy.service;
 
 import com.javarush.apalinskiy.exceptions.DuplicateIdException;
 import com.javarush.apalinskiy.exceptions.DuplicateLoginException;
-import com.javarush.apalinskiy.repositories.UserRepository;
-import com.javarush.apalinskiy.user.Role;
-import com.javarush.apalinskiy.user.User;
+import com.javarush.apalinskiy.application.ports.UserRepository;
+import com.javarush.apalinskiy.domain.user.Role;
+import com.javarush.apalinskiy.domain.user.User;
 
 import java.util.Optional;
 import java.util.UUID;

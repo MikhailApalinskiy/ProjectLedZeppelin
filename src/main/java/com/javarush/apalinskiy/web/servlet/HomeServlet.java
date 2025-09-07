@@ -1,6 +1,8 @@
 package com.javarush.apalinskiy.web.servlet;
 
 
+import com.javarush.apalinskiy.web.util.Web;
+import com.javarush.apalinskiy.web.util.WebConst;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
@@ -10,13 +12,12 @@ import java.io.IOException;
 
 public class HomeServlet extends HttpServlet {
 
-    private static final String PATH_HOME = "/WEB-INF/jsp/index.jsp";
-
     @Override
-    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp)
+            throws ServletException, IOException {
         resp.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
         resp.setHeader("Pragma", "no-cache");
-        req.getRequestDispatcher(PATH_HOME).forward(req, resp);
+        Web.forward(req, resp, WebConst.Jsp.INDEX);
     }
 
     @Override

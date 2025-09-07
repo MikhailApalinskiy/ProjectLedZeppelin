@@ -1,5 +1,6 @@
 package com.javarush.apalinskiy.web.servlet;
 
+import com.javarush.apalinskiy.web.util.WebConst;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -17,9 +18,7 @@ public class LogoutServlet extends HttpServlet {
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws IOException {
         HttpSession s = req.getSession(false);
-        if (s != null) {
-            s.invalidate();
-        }
-        resp.sendRedirect(resp.encodeRedirectURL(req.getContextPath() + "/"));
+        if (s != null) s.invalidate();
+        resp.sendRedirect(resp.encodeRedirectURL(req.getContextPath() + WebConst.Path.HOME));
     }
 }

@@ -1,29 +1,49 @@
-<%@ taglib prefix="c"  uri="http://java.sun.com/jsp/jstl/core" %>
+<%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core" %>
 
-<c:if test="${not empty flash}">
+<c:set var="K_ERROR" value="error"/>
+<c:set var="K_UNAUTH_ERROR" value="unauthError"/>
+<c:set var="K_OK" value="ok"/>
+<c:set var="K_FLASH" value="flash"/>
+<c:set var="K_INFO" value="info"/>
+
+<c:set var="A_error" value="${empty requestScope[K_ERROR]        ? param[K_ERROR]        : requestScope[K_ERROR]}"/>
+<c:set var="A_unauthError"
+       value="${empty requestScope[K_UNAUTH_ERROR] ? param[K_UNAUTH_ERROR] : requestScope[K_UNAUTH_ERROR]}"/>
+<c:set var="A_ok" value="${empty requestScope[K_OK]           ? param[K_OK]           : requestScope[K_OK]}"/>
+<c:set var="A_flash" value="${empty requestScope[K_FLASH]        ? param[K_FLASH]        : requestScope[K_FLASH]}"/>
+<c:set var="A_info" value="${empty requestScope[K_INFO]         ? param[K_INFO]         : requestScope[K_INFO]}"/>
+
+<c:if test="${not empty A_error}">
+    <div class="alert alert-error" role="alert">
+        <span class="alert-dot" aria-hidden="true"></span>
+        <span class="alert-text"><c:out value="${A_error}"/></span>
+    </div>
+</c:if>
+
+<c:if test="${not empty A_unauthError}">
+    <div class="alert alert-error" role="alert">
+        <span class="alert-dot" aria-hidden="true"></span>
+        <span class="alert-text"><c:out value="${A_unauthError}"/></span>
+    </div>
+</c:if>
+
+<c:if test="${not empty A_ok}">
     <div class="alert alert-ok" role="status">
         <span class="alert-dot" aria-hidden="true"></span>
-        <span class="alert-text"><c:out value="${flash}"/></span>
+        <span class="alert-text"><c:out value="${A_ok}"/></span>
     </div>
 </c:if>
 
-<c:if test="${not empty error}">
-    <div class="alert alert-error" role="alert">
+<c:if test="${not empty A_flash}">
+    <div class="alert alert-ok" role="status">
         <span class="alert-dot" aria-hidden="true"></span>
-        <span class="alert-text"><c:out value="${error}"/></span>
+        <span class="alert-text"><c:out value="${A_flash}"/></span>
     </div>
 </c:if>
 
-<c:if test="${not empty unauthError}">
-    <div class="alert alert-error" role="alert">
+<c:if test="${not empty A_info}">
+    <div class="alert alert-info" role="status">
         <span class="alert-dot" aria-hidden="true"></span>
-        <span class="alert-text"><c:out value="${unauthError}"/></span>
-    </div>
-</c:if>
-
-<c:if test="${not empty info}">
-    <div class="alert" role="status">
-        <span class="alert-dot" aria-hidden="true"></span>
-        <span class="alert-text"><c:out value="${info}"/></span>
+        <span class="alert-text"><c:out value="${A_info}"/></span>
     </div>
 </c:if>

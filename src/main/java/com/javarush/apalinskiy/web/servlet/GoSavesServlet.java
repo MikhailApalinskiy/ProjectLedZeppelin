@@ -1,5 +1,8 @@
 package com.javarush.apalinskiy.web.servlet;
 
+import com.javarush.apalinskiy.application.save.SaveStateService;
+import com.javarush.apalinskiy.web.util.Web;
+import com.javarush.apalinskiy.web.util.WebConst;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -9,68 +12,60 @@ import java.util.Optional;
 
 public class GoSavesServlet extends AbstractSlotsServlet {
 
-    private static final String PATH = "/saves";
-    private static final String JSP = "/WEB-INF/jsp/saves.jsp";
-    private static final String JSP_CONFIRM = "/WEB-INF/jsp/confirm-overwrite.jsp";
-
     @Override
     protected String path() {
-        return PATH;
+        return WebConst.Path.SAVES;
     }
 
     @Override
     protected String listJsp() {
-        return JSP;
+        return WebConst.Jsp.SAVES;
     }
 
     @Override
     protected String confirmJsp() {
-        return JSP_CONFIRM;
+        return WebConst.Jsp.CONFIRM;
     }
 
     @Override
     protected void handleGo(HttpServletRequest req, HttpServletResponse resp,
-                            String userId, int slot, String next)
+                            String userId, String questId, int slot, String next)
             throws IOException, ServletException {
-        int nodeId = parseInt(req.getParameter(P_NODE));
-        if (nodeId <= 0 || questService.getById(nodeId) == null) nodeId = startId();
-        Optional<Integer> existing = saveState.getSlot(userId, slot);
+        int nodeId = Web.parseIntOrDefault(req.getParameter(WebConst.Param.NODE), 0);
+        Optional<SaveStateService.GlobalSlot> existing = saveState.getGlobalSlot(userId, slot);
         if (existing.isPresent()) {
-            int oldId = existing.get();
+            SaveStateService.GlobalSlot g = existing.get();
             req.setAttribute("slotIndex", slot);
             req.setAttribute("newNodeId", nodeId);
-            req.setAttribute("newNodeTitle", titleFor(nodeId));
-            req.setAttribute("oldNodeId", oldId);
-            req.setAttribute("oldNodeTitle", titleFor(oldId));
-            req.setAttribute("next", next);
-            req.setAttribute("purpose", Optional.ofNullable(req.getParameter(P_PURPOSE)).orElse("save"));
+            req.setAttribute("newNodeTitle", titleFor(nodeId, questId));
+            req.setAttribute("oldNodeId", g.nodeId());
+            req.setAttribute("oldNodeTitle", g.title());
+            req.setAttribute(WebConst.Param.NEXT, next);
+            req.setAttribute(WebConst.Param.PURPOSE,
+                    Optional.ofNullable(req.getParameter(WebConst.Param.PURPOSE)).orElse("save"));
             req.getRequestDispatcher(confirmJsp()).forward(req, resp);
             return;
         }
-        saveState.setSlot(userId, slot, nodeId);
-        resp.sendRedirect(resp.encodeRedirectURL(buildQuestUrl(req, next, nodeId)));
+        String qid = (questId == null || questId.isBlank()) ? "main" : questId;
+        String qname = resolveQuestName(qid);
+        String title = titleFor(nodeId, qid);
+        saveState.setGlobalSlot(userId, slot, qid, qname, nodeId, title);
+        req.getSession().setAttribute(WebConst.Attr.FLASH,
+                "The save is recorded in the slot №" + (slot + 1) + ".");
+        resp.sendRedirect(resp.encodeRedirectURL(Web.buildQuestUrlFromNext(req, next, nodeId)));
     }
 
     @Override
     protected void handleConfirm(HttpServletRequest req, HttpServletResponse resp,
-                                 String userId, int slot, String next)
+                                 String userId, String questId, int slot, String next)
             throws IOException {
-        int nodeId = parseInt(req.getParameter(P_NODE));
-        if (nodeId <= 0 || questService.getById(nodeId) == null) {
-            nodeId = startId();
-        }
-        saveState.setSlot(userId, slot, nodeId);
-        req.getSession().setAttribute("flash", "Слот №" + (slot + 1) + " перезаписан.");
-        resp.sendRedirect(resp.encodeRedirectURL(buildQuestUrl(req, next, nodeId)));
-    }
-
-    @Override
-    protected void handleDelete(HttpServletRequest req, HttpServletResponse resp,
-                                String userId, int slot)
-            throws IOException {
-        saveState.clearSlot(userId, slot);
-        req.getSession().setAttribute("flash", "Слот №" + (slot + 1) + " удалён.");
-        String back = backToList(req, path());
-        resp.sendRedirect(resp.encodeRedirectURL(back));
+        int nodeId = Web.parseIntOrDefault(req.getParameter(WebConst.Param.NODE), 0);
+        String qid = (questId == null || questId.isBlank()) ? "main" : questId;
+        String qname = resolveQuestName(qid);
+        String title = titleFor(nodeId, qid);
+        saveState.setGlobalSlot(userId, slot, qid, qname, nodeId, title);
+        req.getSession().setAttribute(WebConst.Attr.FLASH,
+                "Slot №" + (slot + 1) + " is overwritten. Saved.");
+        resp.sendRedirect(resp.encodeRedirectURL(Web.buildQuestUrlFromNext(req, next, nodeId)));
     }
 }

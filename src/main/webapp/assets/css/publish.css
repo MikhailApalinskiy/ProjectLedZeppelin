@@ -1,0 +1,42 @@
+body.page-publish .container {
+    max-width: 760px;
+}
+
+body.page-publish .input {
+    width: 100%;
+    padding: 12px 14px;
+    border-radius: 12px;
+    border: 1px solid rgba(127, 127, 127, .28);
+    background: rgba(var(--card), 1);
+    color: rgb(var(--fg));
+    font: inherit;
+    box-sizing: border-box;
+    transition: border-color .2s ease, box-shadow .2s ease, background .2s ease;
+}
+
+body.page-publish .input::placeholder {
+    color: rgba(127, 127, 127, .6);
+    font-style: italic;
+}
+
+body.page-publish .input:focus {
+    outline: none;
+    border-color: rgba(var(--ring), .55);
+    box-shadow: 0 0 0 3px rgba(var(--ring), .25);
+    background: rgba(var(--card), .96);
+}
+
+body.page-publish .btn-primary {
+    font-size: 1.05rem;
+    font-weight: 600;
+    text-decoration: none;
+    padding: 12px 20px;
+    border-radius: 10px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+body.page-publish .btn-primary:hover {
+    background-color: var(--primaryHover, #163a74);
+}

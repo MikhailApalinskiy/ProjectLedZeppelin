@@ -1,5 +1,8 @@
 package com.javarush.apalinskiy.web.servlet;
 
+import com.javarush.apalinskiy.application.save.SaveStateService;
+import com.javarush.apalinskiy.web.util.Web;
+import com.javarush.apalinskiy.web.util.WebConst;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
@@ -8,44 +11,36 @@ import java.util.Optional;
 
 public class GoLoadsServlet extends AbstractSlotsServlet {
 
-    private static final String PATH = "/loads";
-    private static final String JSP = "/WEB-INF/jsp/loads.jsp";
-
     @Override
     protected String path() {
-        return PATH;
+        return WebConst.Path.LOADS;
     }
 
     @Override
     protected String listJsp() {
-        return JSP;
+        return WebConst.Jsp.LOADS;
     }
 
     @Override
     protected void handleGo(HttpServletRequest req, HttpServletResponse resp,
-                            String userId, int slot, String next)
+                            String userId, String questIdIgnored, int slot, String next)
             throws IOException {
-        Optional<Integer> opt = saveState.getSlot(userId, slot);
+        Optional<SaveStateService.GlobalSlot> opt = saveState.getGlobalSlot(userId, slot);
         if (opt.isEmpty()) {
-            String back = backToList(req, path());
-            resp.sendRedirect(resp.encodeRedirectURL(back));
+            Web.redirectKeep(req, resp, path(), WebConst.ParamGroup.SLOT_NAV);
             return;
         }
-        int nodeId = opt.get();
-        if (questService.getById(nodeId) == null) {
-            nodeId = startId();
-            saveState.setSlot(userId, slot, nodeId);
-        }
-        String target = buildQuestUrl(req, next, nodeId);
+        SaveStateService.GlobalSlot g = opt.get();
+        String qname = (g.questName() != null && !g.questName().isBlank())
+                ? g.questName()
+                : ("main".equals(g.questId()) ? "Main quest" : "Custom quest");
+        String title = (g.title() != null && !g.title().isBlank())
+                ? g.title()
+                : ("Node #" + g.nodeId());
+        req.getSession().setAttribute(WebConst.Attr.FLASH,
+                "Slot № " + (slot + 1) + " is loaded" + " — " + qname + " • " + title + ".");
+        String qid = (g.questId() == null || g.questId().isBlank() || "main".equals(g.questId())) ? null : g.questId();
+        String target = Web.questUrl(req, g.nodeId(), qid);
         resp.sendRedirect(resp.encodeRedirectURL(target));
-    }
-
-    @Override
-    protected void handleDelete(HttpServletRequest req, HttpServletResponse resp,
-                                String userId, int slot)
-            throws IOException {
-        saveState.clearSlot(userId, slot);
-        String back = backToList(req, path());
-        resp.sendRedirect(resp.encodeRedirectURL(back));
     }
 }

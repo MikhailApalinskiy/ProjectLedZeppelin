@@ -1,0 +1,132 @@
+.page-quests .container {
+    max-width: 1000px;
+}
+
+.page-quests .ql-title {
+    margin: 0;
+    font-size: 22px;
+    line-height: 1.25;
+    letter-spacing: .2px;
+}
+
+.page-quests .ql-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 14px;
+}
+
+.page-quests .ql-card {
+    background: rgba(21, 25, 34, .9);
+    border: 1px solid rgba(127, 127, 127, .18);
+    border-radius: 14px;
+    padding: 14px;
+    display: grid;
+    gap: 10px;
+    transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease;
+    will-change: transform;
+}
+
+.page-quests .ql-card:hover {
+    transform: translateY(-2px);
+    border-color: rgba(127, 127, 127, .28);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, .25),
+    0 1px 0 rgba(255, 255, 255, .03) inset;
+}
+
+.page-quests .ql-card-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    justify-content: space-between;
+}
+
+.page-quests .ql-name {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: .2px;
+}
+
+.page-quests .ql-badge {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 999px;
+    border: 1px solid rgba(127, 127, 127, .26);
+    font-size: 12px;
+    line-height: 1;
+    color: rgb(var(--muted, 167, 175, 192));
+    background: rgba(255, 255, 255, .04);
+    white-space: nowrap;
+}
+
+.page-quests .ql-badge.ok {
+    border-color: rgba(64, 185, 120, .35);
+    background: rgba(64, 185, 120, .12);
+    color: #8fe0b6;
+}
+
+.page-quests .ql-badge.muted {
+    border-color: rgba(127, 127, 127, .26);
+    background: rgba(255, 255, 255, .04);
+}
+
+.page-quests .ql-meta {
+    margin: 0;
+    font-size: 13px;
+    color: rgb(var(--muted, 167, 175, 192));
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: baseline;
+}
+
+.page-quests .ql-meta .ql-dot {
+    opacity: .5;
+}
+
+.page-quests .ql-meta .ql-meta-item strong {
+    color: rgb(var(--fg, 231, 233, 238));
+    font-weight: 600;
+}
+
+.page-quests .ql-dates {
+    margin: 0;
+    font-size: 12px;
+    color: rgb(var(--muted, 167, 175, 192));
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 14px;
+}
+
+.page-quests .ql-dates .ql-date {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    opacity: .9;
+}
+
+.page-quests .ql-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+@media (min-width: 520px) {
+    .page-quests .ql-row {
+        grid-template-columns: auto auto 1fr;
+        align-items: stretch;
+    }
+}
+
+.page-quests .ql-delform {
+    display: inline-flex;
+}
+
+.page-quests .header-actions .btn.btn-ghost {
+    opacity: .85;
+}
+
+.page-quests .header-actions .btn.btn-ghost:hover {
+    opacity: 1;
+}

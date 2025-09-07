@@ -1,6 +1,16 @@
 <%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
 <%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core" %>
 <%@ taglib prefix="fn" uri="http://java.sun.com/jsp/jstl/functions" %>
+
+<c:set var="PATH_HOME" value="/"/>
+<c:set var="PATH_REGISTER" value="/register"/>
+<c:set var="PATH_LOGIN" value="/login"/>
+
+<c:set var="PATH_CSS_MAIN" value="/assets/css/main.css"/>
+<c:set var="PATH_CSS_AUTH" value="/assets/css/auth.css"/>
+
+<c:set var="NEXT_VALUE" value="${param.next}"/>
+
 <!doctype html>
 <html lang="ru">
 <head>
@@ -8,21 +18,22 @@
     <meta name="viewport" content="width=device-width, initial-scale=1"/>
     <title>Регистрация — TextQuest</title>
 
-    <c:url var="cssMain" value="/assets/css/main.css"/>
-    <c:url var="cssAuth" value="/assets/css/auth.css"/>
+    <c:url var="cssMain" value="${PATH_CSS_MAIN}"/>
+    <c:url var="cssAuth" value="${PATH_CSS_AUTH}"/>
     <link rel="stylesheet" href="${cssMain}"/>
     <link rel="stylesheet" href="${cssAuth}"/>
 </head>
-<body>
+<body class="page-auth">
 
-<c:url var="homeUrl" value="/"/>
-<c:url var="registerAction" value="/register"/>
-<c:url var="loginUrl" value="/login">
-    <c:param name="next" value="${param.next}"/>
+<c:url var="homeUrl" value="${PATH_HOME}"/>
+<c:url var="registerAction" value="${PATH_REGISTER}"/>
+<c:url var="loginUrl" value="${PATH_LOGIN}">
+    <c:param name="next" value="${NEXT_VALUE}"/>
 </c:url>
 
-<c:if test="${not empty param.next}">
-    <c:set var="info" scope="request" value="Зарегистрируйтесь, чтобы продолжить: ${param.next}"/>
+<c:if test="${not empty NEXT_VALUE}">
+    <c:set var="info" scope="request"
+           value="Зарегистрируйтесь, чтобы продолжить: ${NEXT_VALUE}"/>
 </c:if>
 
 <main class="container fade-in" role="main">
@@ -31,18 +42,18 @@
             <span class="logo" aria-hidden="true"></span>
             <h1 id="registerTitle">Регистрация</h1>
         </header>
+
         <section class="card-body">
             <%@ include file="/WEB-INF/jsp/fragments/alerts.jspf" %>
 
             <form method="post" action="${registerAction}" class="form stack" novalidate>
-                <input type="hidden" name="next" value="<c:out value='${param.next}'/>"/>
+                <input type="hidden" name="next" value="<c:out value='${NEXT_VALUE}'/>"/>
 
                 <div class="field">
                     <label for="userName" class="label">Имя</label>
                     <input id="userName"
                            name="userName"
                            class="input"
-                           required
                            autocomplete="name"
                            autofocus
                            value="<c:out value='${requestScope.userName}'/>"/>
@@ -53,7 +64,6 @@
                     <input id="userLogin"
                            name="userLogin"
                            class="input"
-                           required
                            autocomplete="username"
                            value="<c:out value='${requestScope.userLogin}'/>"/>
                 </div>
@@ -64,9 +74,7 @@
                            name="password"
                            type="password"
                            class="input"
-                           required
-                           autocomplete="new-password"
-                           minlength="6"/>
+                           autocomplete="new-password"/>
                 </div>
 
                 <div class="form-actions">

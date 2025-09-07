@@ -1,7 +1,7 @@
 package com.javarush.apalinskiy.service;
 
-import com.javarush.apalinskiy.user.Role;
-import com.javarush.apalinskiy.user.User;
+import com.javarush.apalinskiy.domain.user.Role;
+import com.javarush.apalinskiy.domain.user.User;
 
 import java.util.Optional;
 

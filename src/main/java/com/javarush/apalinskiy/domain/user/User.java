@@ -4,7 +4,9 @@ import lombok.Getter;
 import org.apache.commons.lang3.StringUtils;
 
 import java.time.Instant;
+import java.util.Date;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.UUID;
 
 @Getter
@@ -21,7 +23,7 @@ public class User {
             throw new IllegalArgumentException("Username or login or password are required");
         }
         this.role = (role == null) ? Role.USER : role;
-        this.userId = userId;
+        this.userId = Objects.requireNonNull(userId, "userId");
         this.userName = userName.trim();
         this.userLogin = userLogin.trim().toLowerCase(Locale.ROOT);
         this.password = password;
@@ -35,6 +37,26 @@ public class User {
     public User withId(String id) {
         return new User(this.getRole(), this.getUserName(), this.getUserLogin(),
                 this.getPassword(), this.getCreatedAt(), id);
+    }
+
+    public User withUserName(String newName) {
+        return new User(this.getRole(), newName, this.getUserLogin(),
+                this.getPassword(), this.getCreatedAt(), this.getUserId());
+    }
+
+    public User withPassword(String newPassword) {
+        return new User(this.getRole(), this.getUserName(), this.getUserLogin(),
+                newPassword, this.getCreatedAt(), this.getUserId());
+    }
+
+    public User withLogin(String newLogin) {
+        return new User(this.getRole(), this.getUserName(), newLogin,
+                this.getPassword(), this.getCreatedAt(), this.getUserId());
+    }
+
+    @SuppressWarnings("unused")
+    public Date getCreatedAtDate() {
+        return Date.from(createdAt);
     }
 
     @Override

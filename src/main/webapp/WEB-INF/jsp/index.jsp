@@ -20,12 +20,19 @@
     <c:set var="PATH_CREATE" value="/create_quest"/>
     <c:set var="PATH_MY_QUESTS" value="/my/quests"/>
     <c:set var="PATH_LOADS" value="/loads"/>
-
+    <c:set var="PATH_USERS" value="/users"/>
     <c:set var="PARAM_NEW" value="new"/>
     <c:set var="PARAM_NEXT" value="next"/>
     <c:set var="PARAM_PURPOSE" value="purpose"/>
     <c:set var="PURPOSE_LOAD" value="load"/>
+    <c:set var="PATH_PROFILE" value="/profile"/>
+    <c:set var="PATH_NOTIFICATIONS" value="/notifications"/>
+    <c:set var="PATH_FRIENDS" value="${pageContext.request.contextPath}/friends"/>
 
+    <c:url var="friendsUrl" value="/friends"/>
+    <c:url var="notifyUrl" value="${PATH_NOTIFICATIONS}"/>
+    <c:url var="usersUrl" value="${PATH_USERS}"/>
+    <c:url var="profileUrl" value="${PATH_PROFILE}"/>
     <c:url var="homeUrl" value="${PATH_HOME}"/>
     <c:url var="loginUrl" value="${PATH_LOGIN}"/>
     <c:url var="registerUrl" value="${PATH_REGISTER}"/>
@@ -77,16 +84,24 @@
                             </div>
                         </div>
                         <div class="actions">
-                            <button type="button" class="btn btn-ghost" title="Профиль (скоро)">Профиль</button>
-                            <button type="button" class="btn" title="Друзья (скоро)">Друзья</button>
-                            <button type="button" class="btn" title="Почта (скоро)">
-                                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                                    <path d="M3 6h18a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1zm0 0 9 7 9-7"
-                                          fill="none" stroke="currentColor" stroke-width="2"
-                                          stroke-linecap="round" stroke-linejoin="round"/>
-                                </svg>
-                                Почта
-                            </button>
+                            <a class="btn btn-ghost" href="${profileUrl}" title="Профиль">Профиль</a>
+                            <a class="btn" href="${usersUrl}" title="Все пользователи">Все пользователи</a>
+                            <a class="btn" href="${friendsUrl}" title="Друзья">Друзья</a>
+                            <a class="btn" href="${notifyUrl}"
+                               title="Уведомления<c:if test='${unreadCount > 0}'> (${unreadCount})</c:if>">
+                                <span class="icon-wrap" aria-hidden="true">
+                                    <svg class="icon" viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+                                        <path d="M12 22a2 2 0 0 0 2-2H10a2 2 0 0 0 2 2zm7-6V11a7 7 0 1 0-14 0v5l-2 2v1h18v-1l-2-2z"
+                                              fill="none" stroke="currentColor" stroke-width="2"
+                                              stroke-linecap="round" stroke-linejoin="round"/>
+                                    </svg>
+                                    <c:if test="${unreadCount > 0}">
+                                        <span class="notif-dot" aria-hidden="true"></span>
+                                    </c:if>
+                                </span>
+                                Уведомления
+                            </a>
+
                             <form method="post" action="${logoutUrl}" style="display:inline">
                                 <button type="submit" class="btn btn-danger">Выйти</button>
                             </form>

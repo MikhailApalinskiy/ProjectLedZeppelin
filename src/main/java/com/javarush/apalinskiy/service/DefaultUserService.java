@@ -5,7 +5,10 @@ import com.javarush.apalinskiy.exceptions.DuplicateLoginException;
 import com.javarush.apalinskiy.application.ports.UserRepository;
 import com.javarush.apalinskiy.domain.user.Role;
 import com.javarush.apalinskiy.domain.user.User;
+import org.apache.commons.lang3.StringUtils;
 
+import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -41,5 +44,53 @@ public class DefaultUserService implements UserService {
     @Override
     public Optional<User> findByLogin(String login) {
         return users.findByLogin(login);
+    }
+
+    @Override
+    public Optional<User> findById(String userId) {
+        return users.findById(userId);
+    }
+
+    @Override
+    public List<User> findAll() {
+        return users.findAll();
+    }
+
+    @Override
+    public User updateProfile(String userId, String newDisplayName) {
+        if (StringUtils.isBlank(newDisplayName)) {
+            throw new IllegalArgumentException("Display name must not be blank");
+        }
+        User current = users.findById(userId).orElseThrow(() ->
+                new NoSuchElementException("User not found: " + userId));
+        User updated = current.withUserName(newDisplayName);
+        users.update(updated);
+        return updated;
+    }
+
+    @Override
+    public void changePassword(String userId, String currentPassword, String newPassword) {
+        if (StringUtils.isBlank(newPassword) || newPassword.length() < 6) {
+            throw new IllegalArgumentException("New password must be at least 6 characters");
+        }
+        User current = users.findById(userId).orElseThrow(() ->
+                new NoSuchElementException("User not found: " + userId));
+        if (!current.getPassword().equals(currentPassword)) {
+            throw new SecurityException("Current password is incorrect");
+        }
+        User updated = current.withPassword(newPassword);
+        users.update(updated);
+    }
+
+    @Override
+    public User changeLogin(String userId, String newLogin) {
+        if (StringUtils.isBlank(newLogin)) {
+            throw new IllegalArgumentException("Login must not be blank");
+        }
+        User current = users.findById(userId).orElseThrow(() ->
+                new NoSuchElementException("User not found: " + userId));
+        User updated = current.withLogin(newLogin);
+        users.update(updated);
+        return updated;
     }
 }

@@ -1,0 +1,136 @@
+.container {
+    max-width: 1120px;
+}
+
+.grid {
+    display: grid;
+    gap: 24px;
+}
+
+.card {
+    background: rgba(127, 127, 127, .06);
+    border: 1px solid rgba(127, 127, 127, .28);
+    border-radius: 16px;
+    padding: 22px;
+}
+
+.notify-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.notify-header__left {
+    display: grid;
+    gap: 6px;
+}
+
+.notify-title {
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 32px;
+    height: 24px;
+    padding: 0 10px;
+    border-radius: 999px;
+    font-weight: 700;
+    font-size: 12px;
+    color: #fff;
+    background: rgb(59, 130, 246);
+    box-shadow: 0 6px 14px rgba(59, 130, 246, .25);
+}
+
+.toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.notify-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 12px;
+}
+
+.notify-item {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 16px;
+    align-items: center;
+    padding: 16px 18px;
+    border: 1px solid rgba(127, 127, 127, .18);
+    border-radius: 12px;
+    background: rgba(127, 127, 127, .06);
+}
+
+.notify-item__main {
+    display: grid;
+    gap: 6px;
+}
+
+.notify-item__title {
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.notify-item__body {
+    line-height: 1.45;
+}
+
+.notify-item__side {
+    display: grid;
+    justify-items: end;
+    gap: 8px;
+    min-width: 180px;
+}
+
+.is-unread {
+    background: linear-gradient(180deg, rgba(59, 130, 246, .08), rgba(59, 130, 246, .05)), rgba(127, 127, 127, .06);
+    border-color: rgba(59, 130, 246, .28);
+}
+
+.dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 9999px;
+    background: #ef4444;
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, .16);
+}
+
+.empty {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 6px 0 2px;
+}
+
+.icon {
+    width: 18px;
+    height: 18px;
+    stroke: none;
+    fill: currentColor;
+    opacity: .9;
+}
+
+@media (max-width: 760px) {
+    .notify-item {
+        grid-template-columns: 1fr;
+    }
+
+    .notify-item__side {
+        justify-items: start;
+        min-width: auto;
+    }
+}

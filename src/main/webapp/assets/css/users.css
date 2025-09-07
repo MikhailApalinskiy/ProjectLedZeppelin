@@ -1,0 +1,181 @@
+.container {
+    max-width: 1000px;
+    margin: 32px auto;
+    padding: 0 16px;
+}
+
+.card {
+    background: rgba(127, 127, 127, .06);
+    border: 1px solid rgba(127, 127, 127, .28);
+    border-radius: 14px;
+    padding: 18px;
+}
+
+.header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.header__title {
+    margin: 0 0 6px;
+}
+
+.header__sub {
+    margin: 0;
+}
+
+.muted {
+    color: #757575;
+}
+
+.actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.actions--row {
+    gap: 8px;
+    align-items: center;
+}
+
+.search-form {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.search-input {
+    flex: 1;
+    min-width: 260px;
+}
+
+.input {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid rgba(127, 127, 127, .28);
+    background: #fff;
+    outline: 2px solid transparent;
+    transition: .15s;
+}
+
+.input:focus {
+    border-color: rgba(30, 136, 229, .55);
+    outline-color: rgba(30, 136, 229, .12);
+}
+
+.input::placeholder {
+    color: #9a9a9a;
+}
+
+table.list {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+table.list th, table.list td {
+    padding: 10px 12px;
+    border-bottom: 1px solid rgba(127, 127, 127, .25);
+    text-align: left;
+    vertical-align: middle;
+}
+
+table.list th {
+    font-weight: 700;
+}
+
+.col-num {
+    width: 64px;
+}
+
+.col-role {
+    width: 140px;
+}
+
+.col-date {
+    width: 210px;
+}
+
+.col-actions {
+    width: 240px;
+}
+
+.pill {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(127, 127, 127, .35);
+}
+
+.role {
+    font-weight: 600;
+}
+
+.list.users-table {
+    font-size: 14px;
+    line-height: 1.4;
+}
+
+.list.users-table th,
+.list.users-table td,
+.list.users-table .pill,
+.list.users-table .role,
+.list.users-table .muted,
+.list.users-table .actions .btn,
+.list.users-table a {
+    font-size: inherit;
+    line-height: inherit;
+}
+
+.list.users-table code {
+    font-family: inherit;
+    font-size: inherit;
+    line-height: inherit;
+    background: transparent;
+    padding: 0;
+}
+
+.td-actions {
+    white-space: nowrap;
+    text-align: left;
+}
+
+.actions.actions--row {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 8px;
+    flex-wrap: nowrap;
+}
+
+.actions.actions--row > * {
+    flex: 0 0 auto;
+}
+
+.actions--row .btn, .actions--row a.btn {
+    white-space: nowrap;
+}
+
+@media (max-width: 680px) {
+    .header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .col-actions {
+        width: auto;
+    }
+
+    .actions.actions--row {
+        display: flex;
+        flex-wrap: wrap;
+    }
+
+    .td-actions {
+        white-space: normal;
+    }
+}

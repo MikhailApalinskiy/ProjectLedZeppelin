@@ -4,10 +4,18 @@ import com.javarush.apalinskiy.application.ports.CustomQuestRepository;
 import com.javarush.apalinskiy.application.ports.UserRepository;
 import com.javarush.apalinskiy.application.quests.*;
 import com.javarush.apalinskiy.application.save.SaveStateService;
+import com.javarush.apalinskiy.friends.DefaultFriendService;
+import com.javarush.apalinskiy.friends.FriendRepository;
+import com.javarush.apalinskiy.friends.FriendService;
+import com.javarush.apalinskiy.friends.InMemoryFriendRepository;
 import com.javarush.apalinskiy.infra.catalog.InMemoryCustomQuestRepository;
 import com.javarush.apalinskiy.infra.quest.InMemoryQuestStore;
 import com.javarush.apalinskiy.infra.save.InMemorySaveStateService;
 import com.javarush.apalinskiy.infra.users.InMemoryUserRepository;
+import com.javarush.apalinskiy.mail.DefaultNotificationService;
+import com.javarush.apalinskiy.mail.InMemoryNotificationRepository;
+import com.javarush.apalinskiy.mail.NotificationRepository;
+import com.javarush.apalinskiy.mail.NotificationService;
 import com.javarush.apalinskiy.service.*;
 import com.javarush.apalinskiy.domain.user.Role;
 import com.javarush.apalinskiy.web.util.WebConst;
@@ -57,6 +65,14 @@ public class AppBootstrap implements ServletContextListener {
         ctx.setAttribute(WebConst.Ctx.AUTHORING_SERVICE, authoring);
         SaveStateService saveStateService = new InMemorySaveStateService();
         ctx.setAttribute(WebConst.Ctx.SAVE_STATE_SERVICE, saveStateService);
+        NotificationRepository notifyRepo = new InMemoryNotificationRepository();
+        ctx.setAttribute(WebConst.Ctx.NOTIFY_REPO, notifyRepo);
+        NotificationService notifyService = new DefaultNotificationService(notifyRepo, userService);
+        ctx.setAttribute(WebConst.Ctx.NOTIFY_SERVICE, notifyService);
+        FriendRepository friendRepo = new InMemoryFriendRepository();
+        ctx.setAttribute(WebConst.Ctx.FRIEND_REPOSITORY, friendRepo);
+        FriendService friendService = new DefaultFriendService(friendRepo, userService, notifyService);
+        ctx.setAttribute(WebConst.Ctx.FRIEND_SERVICE, friendService);
     }
 
     @Override

@@ -15,6 +15,9 @@ public final class WebConst {
     }
 
     public static final class Param {
+        public static final String CURRENT_PASSWORD = "currentPassword";
+        public static final String NEW_PASSWORD = "newPassword";
+        public static final String CONFIRM_PASSWORD = "confirmPassword";
         public static final String TEXT = "text";
         public static final String OP = "op";
         public static final String SLOT = "slot";
@@ -66,18 +69,26 @@ public final class WebConst {
     }
 
     public static final class Ctx {
+        public static final String FRIEND_REPOSITORY = "friendRepository";
+        public static final String NOTIFY_REPO = "notifyRepo";
+        public static final String NOTIFY_SERVICE = "notifyService";
         public static final String USER_SERVICE = "userService";
         public static final String QUEST_SERVICE = "questService";
         public static final String SAVE_STATE_SERVICE = "saveStateService";
         public static final String PROD_REPOSITORY = "prodQuestRepository";
         public static final String EDITOR_REPOSITORY = "editorQuestRepository";
         public static final String AUTHORING_SERVICE = "authoringService";
+        public static final String FRIEND_SERVICE = "friendService";
 
         private Ctx() {
         }
     }
 
     public static final class Path {
+        public static final String FRIENDS = "/friends";
+        public static final String NOTIFICATIONS = "/notifications";
+        public static final String USERS = "/users";
+        public static final String PROFILE = "/profile";
         public static final String GRAPH_SVG = "/quest/graph_svg";
         public static final String HOME = "/";
         public static final String QUEST = "/quest";
@@ -96,6 +107,10 @@ public final class WebConst {
     }
 
     public static final class Jsp {
+        public static final String FRIENDS = "/WEB-INF/jsp/friends.jsp";
+        public static final String NOTIFICATIONS = "/WEB-INF/jsp/notifications.jsp";
+        public static final String USERS = "/WEB-INF/jsp/users.jsp";
+        public static final String PROFILE = "/WEB-INF/jsp/profile.jsp";
         public static final String INDEX = "/WEB-INF/jsp/index.jsp";
         public static final String QUEST = "/WEB-INF/jsp/quest.jsp";
         public static final String SAVES = "/WEB-INF/jsp/saves.jsp";

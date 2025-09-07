@@ -23,6 +23,42 @@
     </context-param>
 
     <servlet>
+        <servlet-name>friendsServlet</servlet-name>
+        <servlet-class>com.javarush.apalinskiy.web.servlet.FriendsServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>friendsServlet</servlet-name>
+        <url-pattern>/friends</url-pattern>
+    </servlet-mapping>
+
+    <servlet>
+        <servlet-name>notificationsServlet</servlet-name>
+        <servlet-class>com.javarush.apalinskiy.web.servlet.NotificationsServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>notificationsServlet</servlet-name>
+        <url-pattern>/notifications</url-pattern>
+    </servlet-mapping>
+
+    <servlet>
+        <servlet-name>UsersServlet</servlet-name>
+        <servlet-class>com.javarush.apalinskiy.web.servlet.UsersServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>UsersServlet</servlet-name>
+        <url-pattern>/users</url-pattern>
+    </servlet-mapping>
+
+    <servlet>
+        <servlet-name>ProfileServlet</servlet-name>
+        <servlet-class>com.javarush.apalinskiy.web.servlet.ProfileServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>ProfileServlet</servlet-name>
+        <url-pattern>/profile</url-pattern>
+    </servlet-mapping>
+
+    <servlet>
         <servlet-name>UploadsServlet</servlet-name>
         <servlet-class>com.javarush.apalinskiy.web.servlet.UploadsServlet</servlet-class>
     </servlet>
@@ -152,6 +188,15 @@
         <servlet-name>default</servlet-name>
         <url-pattern>/assets/*</url-pattern>
     </servlet-mapping>
+
+    <filter>
+        <filter-name>notificationsBadgeFilter</filter-name>
+        <filter-class>com.javarush.apalinskiy.web.filter.NotificationsBadgeFilter</filter-class>
+    </filter>
+    <filter-mapping>
+        <filter-name>notificationsBadgeFilter</filter-name>
+        <url-pattern>/*</url-pattern>
+    </filter-mapping>
 
     <filter>
         <filter-name>EncodingFilter</filter-name>

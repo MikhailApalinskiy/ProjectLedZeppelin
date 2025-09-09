@@ -58,6 +58,9 @@ public class DefaultNotificationService implements NotificationService {
                         "The admin changed the profile",
                         "The administrator has updated your profile settings: " + what + ".");
             }
+            case FRIEND_REMOVED -> add(e.targetUserId(), e.type(),
+                    "Friend removed",
+                    "User <b>" + actorName + "</b> removed you from friends.");
         }
     }
 

@@ -123,11 +123,6 @@ public class InMemoryCustomQuestRepository implements CustomQuestRepository {
     }
 
     @Override
-    public boolean hasPendingEdit(String questId) {
-        return stagedEdit.containsKey(questId);
-    }
-
-    @Override
     public void approveEdit(String questId) {
         PendingEdit pe = stagedEdit.remove(questId);
         if (pe == null) {

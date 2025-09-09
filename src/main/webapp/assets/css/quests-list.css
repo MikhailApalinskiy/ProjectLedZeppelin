@@ -130,3 +130,80 @@
 .page-quests .header-actions .btn.btn-ghost:hover {
     opacity: 1;
 }
+
+.page-quests form[role="search"] {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin: 6px 0 12px;
+}
+
+:root {
+    --search-h: 44px;
+}
+
+.page-quests form[role="search"] .input {
+    flex: 1 1 320px;
+    min-width: 260px;
+
+    height: var(--search-h);
+    padding: 0 14px 0 40px;
+    border-radius: 12px;
+
+    border: 1px solid rgba(127, 127, 127, .28);
+    background: rgba(127, 127, 127, .06) url("data:image/svg+xml;utf8,\
+<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='gray' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'>\
+<circle cx='11' cy='11' r='7'/><line x1='21' y1='21' x2='16.65' y2='16.65'/></svg>") no-repeat 12px center / 18px 18px;
+
+    outline: 2px solid transparent;
+    transition: border-color .15s ease, outline-color .15s ease, box-shadow .15s ease, background-color .15s ease;
+}
+
+.page-quests form[role="search"] .input::placeholder {
+    color: rgba(127, 127, 127, .75);
+}
+
+.page-quests form[role="search"] .input:focus {
+    border-color: rgba(var(--ring), .55);
+    outline-color: rgba(var(--ring), .28);
+    box-shadow: 0 0 0 2px rgba(var(--ring), .14);
+    background-color: rgba(127, 127, 127, .08);
+}
+
+.page-quests form[role="search"] .btn {
+    height: var(--search-h);
+    padding: 0 14px;
+    border-radius: 12px;
+}
+
+@media (max-width: 520px) {
+    .page-quests form[role="search"] .input {
+        flex: 1 1 100%;
+        min-width: 100%;
+    }
+
+    .page-quests form[role="search"] .btn {
+        flex: 0 0 auto;
+    }
+}
+
+@media (prefers-color-scheme: dark) {
+    .page-quests form[role="search"] .input {
+        border-color: rgba(127, 127, 127, .22);
+        background-color: rgba(255, 255, 255, .04);
+    }
+
+    .page-quests form[role="search"] .input:focus {
+        background-color: rgba(255, 255, 255, .06);
+    }
+}
+
+.page-quests form[role="search"] .input {
+    color: #fff;
+    caret-color: #fff;
+}
+
+.page-quests form[role="search"] .input::placeholder {
+    color: rgba(255, 255, 255, .75);
+}

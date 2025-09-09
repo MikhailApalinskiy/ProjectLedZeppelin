@@ -58,7 +58,7 @@ public class AdminUserEditServlet extends HttpServlet {
         String name = Web.trimOrNull(req.getParameter(WebConst.Param.USER_NAME));
         String login = Web.trimOrNull(req.getParameter(WebConst.Param.USER_LOGIN));
         String roleStr = Web.trimOrNull(req.getParameter(WebConst.Param.ROLE));
-        String newPwd = Web.trimOrNull(req.getParameter(WebConst.Param.PASSWORD)); // опционально
+        String newPwd = Web.trimOrNull(req.getParameter(WebConst.Param.PASSWORD));
         if (id == null) {
             Web.redirectErr(req, resp, WebConst.Path.USERS, "Missing user id");
             return;

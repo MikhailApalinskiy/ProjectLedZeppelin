@@ -17,11 +17,19 @@ public class HomeServlet extends HttpServlet {
             throws ServletException, IOException {
         resp.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
         resp.setHeader("Pragma", "no-cache");
-        Web.forward(req, resp, WebConst.Jsp.INDEX);
+        String contextPath = req.getContextPath();
+        String requestUri = req.getRequestURI();
+        String rest = requestUri.substring(contextPath.length());
+        if (rest.equals("/") || rest.isEmpty()) {
+            Web.forward(req, resp, WebConst.Jsp.INDEX);
+        } else {
+            resp.sendError(HttpServletResponse.SC_NOT_FOUND);
+        }
     }
 
     @Override
-    protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+    protected void doPost(HttpServletRequest req, HttpServletResponse resp)
+            throws IOException {
         resp.sendError(HttpServletResponse.SC_METHOD_NOT_ALLOWED);
     }
 }

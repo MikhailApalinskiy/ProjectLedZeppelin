@@ -98,5 +98,4 @@ public class DefaultFriendService implements FriendService {
     public List<FriendRequest> outgoing(String userId) {
         return repo.outgoing(userId);
     }
-
 }

@@ -20,6 +20,9 @@
 
     <c:set var="PATH_HOME" value="/"/>
     <c:set var="PATH_FRIENDS" value="/friends"/>
+    <c:set var="PATH_USER_PUBLIC" value="/user"/>
+    <c:set var="PATH_USER_QUESTS" value="/user/quests"/>
+
     <c:set var="PARAM_ACTION" value="action"/>
     <c:set var="PARAM_ID" value="id"/>
     <c:set var="PARAM_FROM_ID" value="fromId"/>
@@ -27,6 +30,7 @@
     <c:set var="ACT_DECL" value="decline"/>
     <c:set var="ACT_CANCEL" value="cancel"/>
     <c:set var="ACT_REMOVE" value="remove"/>
+
     <c:url var="homeUrl" value="${PATH_HOME}"/>
     <c:url var="friendsUrl" value="${PATH_FRIENDS}"/>
 
@@ -179,11 +183,24 @@
                                     <div class="muted"><code class="code"><c:out value="${f.userId}"/></code></div>
                                 </div>
                             </div>
-                            <form method="post" action="${friendsUrl}" class="friend-card__actions">
-                                <input type="hidden" name="${PARAM_ACTION}" value="${ACT_REMOVE}"/>
-                                <input type="hidden" name="${PARAM_ID}" value="${f.userId}"/>
-                                <button class="btn" type="submit">Удалить из друзей</button>
-                            </form>
+
+                            <div class="friend-card__actions actions actions--row">
+                                <c:url var="friendProfileUrl" value="${PATH_USER_PUBLIC}">
+                                    <c:param name="id" value="${f.userId}"/>
+                                </c:url>
+                                <a class="btn btn-primary" href="${friendProfileUrl}">Профиль</a>
+
+                                <c:url var="friendQuestsUrl" value="${PATH_USER_QUESTS}">
+                                    <c:param name="id" value="${f.userId}"/>
+                                </c:url>
+                                <a class="btn" href="${friendQuestsUrl}">Квесты</a>
+
+                                <form method="post" action="${friendsUrl}">
+                                    <input type="hidden" name="${PARAM_ACTION}" value="${ACT_REMOVE}"/>
+                                    <input type="hidden" name="${PARAM_ID}" value="${f.userId}"/>
+                                    <button class="btn btn-ghost" type="submit">Удалить</button>
+                                </form>
+                            </div>
                         </li>
                     </c:forEach>
                 </ul>

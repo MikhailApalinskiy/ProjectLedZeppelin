@@ -2,6 +2,8 @@ package com.javarush.apalinskiy.friends;
 
 import com.javarush.apalinskiy.domain.user.User;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 public interface FriendService {
@@ -21,4 +23,18 @@ public interface FriendService {
     List<FriendRequest> incoming(String userId);
 
     List<FriendRequest> outgoing(String userId);
+
+    default List<String> listFriendIds(String userId) {
+        List<User> friends = listFriends(userId);
+        if (friends == null || friends.isEmpty()) {
+            return Collections.emptyList();
+        }
+        List<String> ids = new ArrayList<>(friends.size());
+        for (User u : friends) {
+            if (u != null && u.getUserId() != null && !u.getUserId().isBlank()) {
+                ids.add(u.getUserId());
+            }
+        }
+        return ids;
+    }
 }

@@ -1,51 +1,24 @@
 package com.javarush.apalinskiy.web.servlet;
 
-import com.javarush.apalinskiy.application.quests.QuestAuthoringService;
 import com.javarush.apalinskiy.domain.user.Role;
 import com.javarush.apalinskiy.domain.user.User;
-import com.javarush.apalinskiy.mail.NotificationEvent;
-import com.javarush.apalinskiy.mail.NotificationService;
-import com.javarush.apalinskiy.mail.NotificationType;
 import com.javarush.apalinskiy.quest.CustomQuest;
-import com.javarush.apalinskiy.service.UserService;
 import com.javarush.apalinskiy.web.util.Web;
 import com.javarush.apalinskiy.web.util.WebConst;
-import jakarta.servlet.ServletConfig;
-import jakarta.servlet.ServletContext;
 import jakarta.servlet.ServletException;
-import jakarta.servlet.UnavailableException;
-import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 
 import java.io.IOException;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-public class PublishServlet extends HttpServlet {
-
-    private QuestAuthoringService authoring;
-    private NotificationService notify;
-    private UserService users;
-
-    @Override
-    public void init(ServletConfig config) throws ServletException {
-        super.init(config);
-        try {
-            ServletContext ctx = config.getServletContext();
-            this.authoring = Web.ctxBean(ctx, WebConst.Ctx.AUTHORING_SERVICE, QuestAuthoringService.class);
-            this.notify = Web.ctxBean(ctx, WebConst.Ctx.NOTIFY_SERVICE, NotificationService.class);
-            this.users = Web.ctxBean(ctx, WebConst.Ctx.USER_SERVICE, UserService.class);
-        } catch (IllegalStateException e) {
-            throw new UnavailableException("Required services not found");
-        }
-    }
+public class PublishServlet extends BaseQuestAdminServlet {
 
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-        List<String> errs = authoring.validateCurrentDraft();
+        var errs = authoring.validateCurrentDraft();
         if (!errs.isEmpty()) {
             String msg = "You can't go to the publication: " + String.join(" ", errs);
             Web.redirectErr(req, resp, WebConst.Path.GRAPH_SVG, msg);
@@ -69,19 +42,7 @@ public class PublishServlet extends HttpServlet {
                 String ownerLogin = cqOpt.map(CustomQuest::getOwnerLogin).orElse(null);
                 authoring.updateExisting(editingId, isAdmin);
                 if (isAdmin && ownerLogin != null && !ownerLogin.equals(owner)) {
-                    String targetUserId = users.findByLogin(ownerLogin).map(User::getUserId).orElse(null);
-                    if (targetUserId != null) {
-                        Map<String, String> data = Map.of(
-                                "questName", questName,
-                                "what", "Admin updated your quest"
-                        );
-                        notify.notify(NotificationEvent.of(
-                                NotificationType.QUEST_ADMIN_CHANGED,
-                                user.getUserId(),
-                                targetUserId,
-                                data
-                        ));
-                    }
+                    notifyQuestAdminChanged(user, ownerLogin, questName);
                 }
                 Web.redirectOk(req, resp, WebConst.Path.HOME,
                         isAdmin ? "Changes saved" : "Changes submitted for moderation");
@@ -103,6 +64,8 @@ public class PublishServlet extends HttpServlet {
             }
             if (isAdmin) {
                 authoring.publish(owner, questName);
+                incCreatedByUserId(user.getUserId());
+                notifyFriendsPublishedByUserId(user.getUserId(), questName);
                 Web.redirectOk(req, resp, WebConst.Path.HOME, "The quest has been published");
             } else {
                 authoring.submitNewForModeration(owner, questName);

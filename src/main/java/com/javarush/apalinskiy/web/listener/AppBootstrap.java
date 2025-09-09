@@ -18,6 +18,8 @@ import com.javarush.apalinskiy.mail.NotificationRepository;
 import com.javarush.apalinskiy.mail.NotificationService;
 import com.javarush.apalinskiy.service.*;
 import com.javarush.apalinskiy.domain.user.Role;
+import com.javarush.apalinskiy.stats.InMemoryUserStatsService;
+import com.javarush.apalinskiy.stats.UserStatsService;
 import com.javarush.apalinskiy.web.util.WebConst;
 import jakarta.servlet.ServletContext;
 import jakarta.servlet.ServletContextEvent;
@@ -73,10 +75,11 @@ public class AppBootstrap implements ServletContextListener {
         ctx.setAttribute(WebConst.Ctx.FRIEND_REPOSITORY, friendRepo);
         FriendService friendService = new DefaultFriendService(friendRepo, userService, notifyService);
         ctx.setAttribute(WebConst.Ctx.FRIEND_SERVICE, friendService);
+        UserStatsService userStats = new InMemoryUserStatsService();
+        ctx.setAttribute(WebConst.Ctx.USER_STATS_SERVICE, userStats);
     }
 
     @Override
     public void contextDestroyed(ServletContextEvent sce) {
-        // no-op
     }
 }

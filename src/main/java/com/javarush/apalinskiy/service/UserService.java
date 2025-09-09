@@ -23,8 +23,6 @@ public interface UserService {
 
     List<User> findAll();
 
-    User changeLogin(String userId, String newLogin);
-
     User adminUpdate(String userId, Role role, String userName, String userLogin, String newPasswordOrNull)
             throws DuplicateLoginException, NoSuchElementException, IllegalArgumentException;
 }

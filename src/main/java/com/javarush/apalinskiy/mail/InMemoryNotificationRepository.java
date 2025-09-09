@@ -48,12 +48,6 @@ public class InMemoryNotificationRepository implements NotificationRepository {
     }
 
     @Override
-    public Optional<Notification> find(String userId, String id) {
-        Map<String, Notification> m = byUser.getOrDefault(userId, Map.of());
-        return Optional.ofNullable(m.get(id));
-    }
-
-    @Override
     public void markRead(String userId, String id) {
         byUser.computeIfPresent(userId, (uid, m) -> {
             Notification n = m.get(id);

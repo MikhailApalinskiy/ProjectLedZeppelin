@@ -83,8 +83,6 @@ public interface CustomQuestRepository {
 
     List<PendingEdit> listPendingEdits();
 
-    boolean hasPendingEdit(String questId);
-
     void approveEdit(String questId);
 
     void rejectEdit(String questId);

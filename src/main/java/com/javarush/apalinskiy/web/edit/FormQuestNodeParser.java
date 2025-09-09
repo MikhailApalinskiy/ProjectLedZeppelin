@@ -85,13 +85,17 @@ public class FormQuestNodeParser {
     private static boolean hasAnyOptions(String optionsTextarea, HttpServletRequest req) {
         if (!isBlank(optionsTextarea)) {
             for (String line : NEWLINE.split(optionsTextarea)) {
-                if (!line.trim().isEmpty()) return true;
+                if (!line.trim().isEmpty()) {
+                    return true;
+                }
             }
         }
         for (int i = 1; i <= MAX_OPTS; i++) {
             String ch = req.getParameter("opt_choice_" + i);
             String nx = req.getParameter("opt_next_" + i);
-            if (!isBlank(ch) || !isBlank(nx)) return true;
+            if (!isBlank(ch) || !isBlank(nx)) {
+                return true;
+            }
         }
         return false;
     }

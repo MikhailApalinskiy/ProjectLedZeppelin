@@ -41,7 +41,9 @@ public class CreateQuestServlet extends HttpServlet {
         if (req.getParameter(WebConst.Param.NEW) != null) {
             authoring.clearEditorDraft();
             HttpSession s = req.getSession(false);
-            if (s != null) s.removeAttribute("editingQuestId");
+            if (s != null) {
+                s.removeAttribute("editingQuestId");
+            }
             Web.redirectOk(req, resp, WebConst.Path.CREATE, "An empty draft of the quest has been created");
             return;
         }
@@ -74,7 +76,9 @@ public class CreateQuestServlet extends HttpServlet {
                                 if (o == null || o.next() == null) {
                                     continue;
                                 }
-                                if (!sb.isEmpty()) sb.append('\n');
+                                if (!sb.isEmpty()) {
+                                    sb.append('\n');
+                                }
                                 sb.append(o.choice()).append(" -> ").append(o.next());
                             }
                             req.setAttribute("form_options", sb.toString());

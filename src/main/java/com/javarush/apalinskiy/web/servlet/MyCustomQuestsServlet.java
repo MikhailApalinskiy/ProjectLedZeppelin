@@ -16,6 +16,7 @@ import java.io.IOException;
 import java.util.*;
 
 public class MyCustomQuestsServlet extends HttpServlet {
+
     private QuestAuthoringService authoring;
 
     @Override
@@ -39,9 +40,10 @@ public class MyCustomQuestsServlet extends HttpServlet {
         Web.pullFlash(req, WebConst.Attr.FLASH);
         Web.pullFlash(req, WebConst.Attr.ERROR);
         List<CustomQuest> items = authoring.listOwnerFromCatalog(user.getUserLogin());
-        Web.attachQuestLists(req, items);
+        Web.filterAndAttachQuests(req, items);
         req.setAttribute("pageTitleKey", "my.quests");
         req.setAttribute("showOwnerActions", Boolean.TRUE);
+        req.setAttribute("selfUrl", req.getContextPath() + req.getServletPath());
         Web.forward(req, resp, WebConst.Jsp.QUESTS_LIST);
     }
 }

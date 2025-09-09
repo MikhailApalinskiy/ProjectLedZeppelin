@@ -1,44 +1,21 @@
 package com.javarush.apalinskiy.web.servlet;
 
 import com.javarush.apalinskiy.application.ports.CustomQuestRepository;
-import com.javarush.apalinskiy.application.quests.QuestAuthoringService;
 import com.javarush.apalinskiy.domain.user.User;
 import com.javarush.apalinskiy.mail.NotificationEvent;
-import com.javarush.apalinskiy.mail.NotificationService;
 import com.javarush.apalinskiy.mail.NotificationType;
 import com.javarush.apalinskiy.quest.CustomQuest;
-import com.javarush.apalinskiy.service.UserService;
 import com.javarush.apalinskiy.web.util.Web;
 import com.javarush.apalinskiy.web.util.WebConst;
-import jakarta.servlet.ServletConfig;
-import jakarta.servlet.ServletContext;
 import jakarta.servlet.ServletException;
-import jakarta.servlet.UnavailableException;
-import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.Map;
 
-public class AdminQuestsModerationServlet extends HttpServlet {
-
-    private QuestAuthoringService authoring;
-    private NotificationService notify;
-    private UserService users;
-
-    @Override
-    public void init(ServletConfig config) throws ServletException {
-        super.init(config);
-        ServletContext ctx = config.getServletContext();
-        try {
-            this.authoring = Web.ctxBean(ctx, WebConst.Ctx.AUTHORING_SERVICE, QuestAuthoringService.class);
-            this.notify = Web.ctxBean(ctx, WebConst.Ctx.NOTIFY_SERVICE, NotificationService.class);
-            this.users = Web.ctxBean(ctx, WebConst.Ctx.USER_SERVICE, UserService.class);
-        } catch (IllegalStateException e) {
-            throw new UnavailableException(e.getMessage());
-        }
-    }
+public class AdminQuestsModerationServlet extends BaseQuestAdminServlet {
 
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp)
@@ -66,7 +43,9 @@ public class AdminQuestsModerationServlet extends HttpServlet {
                     String questName = (pn != null && pn.getName() != null) ? pn.getName() : "Quest";
                     String ownerLogin = (pn != null) ? pn.getOwnerLogin() : null;
                     String newId = authoring.approveCreate(id);
+                    incCreatedByLogin(ownerLogin);
                     notifyModeration(actorId, ownerLogin, questName, "approved", newId);
+                    notifyFriendsPublishedByLogin(ownerLogin, questName);
                     req.getSession().setAttribute(WebConst.Attr.FLASH,
                             "The quest has been published (id=" + newId + ").");
                 }
@@ -106,13 +85,6 @@ public class AdminQuestsModerationServlet extends HttpServlet {
         }
     }
 
-    private String resolveUserIdByLogin(String login) {
-        if (login == null || login.isBlank()) {
-            return null;
-        }
-        return users.findByLogin(login).map(User::getUserId).orElse(null);
-    }
-
     private CustomQuestRepository.PendingNew findPendingNew(String pendingId) {
         return authoring.listPendingNew().stream()
                 .filter(x -> pendingId.equals(x.getPendingId()))
@@ -126,16 +98,12 @@ public class AdminQuestsModerationServlet extends HttpServlet {
     }
 
     private String safeQuestNameForEdit(String questId, CustomQuestRepository.PendingEdit pe) {
-        if (pe != null && pe.getName() != null) {
-            return pe.getName();
-        }
+        if (pe != null && pe.getName() != null) return pe.getName();
         return authoring.getFromCatalog(questId).map(CustomQuest::getName).orElse("Quest");
     }
 
     private String safeOwnerLoginForEdit(String questId, CustomQuestRepository.PendingEdit pe) {
-        if (pe != null && pe.getOwnerLogin() != null) {
-            return pe.getOwnerLogin();
-        }
+        if (pe != null && pe.getOwnerLogin() != null) return pe.getOwnerLogin();
         return authoring.getFromCatalog(questId).map(CustomQuest::getOwnerLogin).orElse(null);
     }
 
@@ -148,7 +116,7 @@ public class AdminQuestsModerationServlet extends HttpServlet {
         if (targetUserId == null) {
             return;
         }
-        Map<String, String> data = new java.util.HashMap<>();
+        Map<String, String> data = new HashMap<>();
         data.put("questName", questName);
         data.put("result", result);
         if (questIdOpt != null) {

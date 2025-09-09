@@ -24,6 +24,7 @@ public class FriendRequest {
         return new FriendRequest(UUID.randomUUID().toString(), fromId, toId, Instant.now());
     }
 
+    @SuppressWarnings("unused")
     public Date getCreatedAtDate() {
         return Date.from(createdAt);
     }

@@ -6,7 +6,9 @@ import com.javarush.apalinskiy.application.quests.QuestAuthoringService;
 import com.javarush.apalinskiy.application.quests.QuestService;
 import com.javarush.apalinskiy.application.dto.ChoiceError;
 import com.javarush.apalinskiy.application.dto.ChooseResult;
+import com.javarush.apalinskiy.domain.user.User;
 import com.javarush.apalinskiy.quest.CustomQuest;
+import com.javarush.apalinskiy.stats.UserStatsService;
 import com.javarush.apalinskiy.web.util.Web;
 import com.javarush.apalinskiy.web.util.WebConst;
 import jakarta.servlet.ServletConfig;
@@ -24,6 +26,7 @@ public class QuestServlet extends HttpServlet {
 
     private transient QuestService prodService;
     private transient QuestAuthoringService authoring;
+    private transient UserStatsService userStats;
 
     @Override
     public void init(ServletConfig config) throws ServletException {
@@ -38,13 +41,22 @@ public class QuestServlet extends HttpServlet {
         if (a instanceof QuestAuthoringService as) {
             this.authoring = as;
         }
+        try {
+            this.userStats = Web.ctxBean(ctx, WebConst.Ctx.USER_STATS_SERVICE, UserStatsService.class);
+        } catch (IllegalStateException ignore) {
+            this.userStats = null;
+        }
     }
 
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp)
             throws ServletException, IOException {
-        String customId = Web.trimOrNull(req.getParameter(WebConst.Param.CUSTOM));
-        TempService svc = resolveService(customId);
+        String customId = Web.normalizedCustomParam(req);
+        if (Web.isMissingCustomId(customId, authoring)) {
+            resp.sendError(HttpServletResponse.SC_NOT_FOUND, "Custom quest not found or was deleted");
+            return;
+        }
+        TempService svc = (customId == null) ? TempService.from(prodService) : resolveCustomService(customId);
         Integer id = Web.firstIntParam(req, WebConst.Param.ID, WebConst.Param.NODE);
         QuestNode node = (id == null) ? svc.getStart() : svc.getById(id);
         if (node == null) {
@@ -60,8 +72,12 @@ public class QuestServlet extends HttpServlet {
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp)
             throws ServletException, IOException {
-        String customId = Web.trimOrNull(req.getParameter(WebConst.Param.CUSTOM));
-        TempService svc = resolveService(customId);
+        String customId = Web.normalizedCustomParam(req);
+        if (Web.isMissingCustomId(customId, authoring)) {
+            resp.sendError(HttpServletResponse.SC_NOT_FOUND, "Custom quest not found or was deleted");
+            return;
+        }
+        TempService svc = (customId == null) ? TempService.from(prodService) : resolveCustomService(customId);
         Integer fromId = Web.parseIntOrNull(req.getParameter(WebConst.Param.FROM_ID));
         if (fromId == null) {
             forwardQuest(req, resp, svc.getStart(), svc.version(), WebConst.Msg.BAD_FROM_ID);
@@ -70,8 +86,20 @@ public class QuestServlet extends HttpServlet {
         String answer = req.getParameter(WebConst.Param.ANSWER);
         ChooseResult result = svc.choose(fromId, answer);
         if (result.isOk()) {
-            int nextId = result.getNext().getId();
-            resp.sendRedirect(resp.encodeRedirectURL(Web.questUrl(req, nextId, customId)));
+            QuestNode next = result.getNext();
+            if (next != null && next.isFin() && userStats != null) {
+                User u = (User) req.getSession().getAttribute(WebConst.Attr.USER);
+                if (u != null) {
+                    String questKey = (customId == null) ? "main" : customId;
+                    Integer finalId = (customId == null) ? next.getId() : null;
+                    userStats.onQuestCompleted(u.getUserId(), questKey, finalId);
+                }
+            }
+            if (next == null) {
+                resp.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Next node is null");
+                return;
+            }
+            resp.sendRedirect(resp.encodeRedirectURL(Web.questUrl(req, next.getId(), customId)));
         } else {
             QuestNode node = svc.getById(fromId);
             if (node == null) {
@@ -82,18 +110,12 @@ public class QuestServlet extends HttpServlet {
         }
     }
 
-    private TempService resolveService(String customId) throws ServletException {
-        if (customId == null) {
-            return TempService.from(prodService);
-        }
+    private TempService resolveCustomService(String customId) throws ServletException {
         if (authoring == null) {
             throw new UnavailableException("Authoring service is not available");
         }
-        Optional<CustomQuest> opt = authoring.getFromCatalog(customId);
-        if (opt.isEmpty()) {
-            return TempService.from(prodService);
-        }
-        CustomQuest q = opt.get();
+        CustomQuest q = authoring.getFromCatalog(customId).orElseThrow(
+                () -> new UnavailableException("Custom quest is missing"));
         QuestNavigator nav = QuestNavigator.from(q.getNodes(), q.getStartId());
         return TempService.from(nav, "custom:" + q.getId());
     }

@@ -17,6 +17,7 @@ import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.stream.Collectors;
 
 public class Web {
 
@@ -253,6 +254,27 @@ public class Web {
         return String.join("\n", lines);
     }
 
+    public static String normalizeCustom(String custom) {
+        if (custom == null || custom.isBlank()) {
+            return null;
+        }
+        return "main".equalsIgnoreCase(custom) ? null : custom;
+    }
+
+    public static String normalizedCustomParam(HttpServletRequest req) {
+        return normalizeCustom(req.getParameter(WebConst.Param.CUSTOM));
+    }
+
+    public static boolean isMissingCustomId(String customId, QuestAuthoringService authoring) {
+        if (customId == null) {
+            return false;
+        }
+        if (authoring == null) {
+            return true;
+        }
+        return authoring.getFromCatalog(customId).isEmpty();
+    }
+
     public static List<String> wrapByWords(String s) {
         String[] words = s.split("\\s+");
         List<String> lines = new ArrayList<>();
@@ -315,6 +337,28 @@ public class Web {
         return passwordChanged
                 || !Objects.equals(before.getRole(), after.getRole())
                 || !Objects.equals(before.getUserLogin(), after.getUserLogin());
+    }
+
+    public static List<CustomQuest> filterQuestsByName(HttpServletRequest req,
+                                                       List<CustomQuest> items,
+                                                       String paramName) {
+        String q = trimOrNull(req.getParameter(paramName));
+        req.setAttribute("q", q);
+        if (q == null) {
+            return items;
+        }
+        final String qLower = q.toLowerCase(Locale.ROOT);
+        return items.stream()
+                .filter(it -> {
+                    String name = (it == null) ? null : it.getName();
+                    return name != null && name.toLowerCase(Locale.ROOT).contains(qLower);
+                })
+                .collect(Collectors.toList());
+    }
+
+    public static void filterAndAttachQuests(HttpServletRequest req, List<CustomQuest> items) {
+        List<CustomQuest> filtered = filterQuestsByName(req, items, "q");
+        attachQuestLists(req, filtered);
     }
 
     public static Map<String, String> buildMachineReadableDiff(User before, User after, boolean passwordChanged) {

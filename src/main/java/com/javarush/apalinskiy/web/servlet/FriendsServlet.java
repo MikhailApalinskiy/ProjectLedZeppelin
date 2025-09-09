@@ -2,6 +2,9 @@ package com.javarush.apalinskiy.web.servlet;
 
 import com.javarush.apalinskiy.domain.user.User;
 import com.javarush.apalinskiy.friends.FriendService;
+import com.javarush.apalinskiy.mail.NotificationEvent;
+import com.javarush.apalinskiy.mail.NotificationService;
+import com.javarush.apalinskiy.mail.NotificationType;
 import com.javarush.apalinskiy.web.util.Web;
 import com.javarush.apalinskiy.web.util.WebConst;
 import jakarta.servlet.ServletConfig;
@@ -12,20 +15,22 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
 import java.io.IOException;
-import java.io.Serial;
 
 public class FriendsServlet extends HttpServlet {
 
-    @Serial
-    private static final long serialVersionUID = 1L;
-
     private FriendService service;
+    private NotificationService notify;
 
     @Override
     public void init(ServletConfig config) throws ServletException {
         super.init(config);
         ServletContext ctx = config.getServletContext();
         this.service = Web.ctxBean(ctx, WebConst.Ctx.FRIEND_SERVICE, FriendService.class);
+        try {
+            this.notify = Web.ctxBean(ctx, WebConst.Ctx.NOTIFY_SERVICE, NotificationService.class);
+        } catch (IllegalStateException ignore) {
+            this.notify = null;
+        }
     }
 
     @Override
@@ -94,6 +99,17 @@ public class FriendsServlet extends HttpServlet {
                         return;
                     }
                     service.remove(me.getUserId(), friendId);
+                    try {
+                        if (notify != null) {
+                            notify.notify(NotificationEvent.of(
+                                    NotificationType.FRIEND_REMOVED,
+                                    me.getUserId(),
+                                    friendId,
+                                    java.util.Map.of()
+                            ));
+                        }
+                    } catch (Exception ignore) {
+                    }
                     Web.redirectOk(req, resp, WebConst.Path.FRIENDS, "The user has been removed from friends");
                 }
                 default -> Web.redirectErr(req, resp, WebConst.Path.FRIENDS, "Unknown action");

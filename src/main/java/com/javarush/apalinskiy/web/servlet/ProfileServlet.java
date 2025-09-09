@@ -2,9 +2,12 @@ package com.javarush.apalinskiy.web.servlet;
 
 import com.javarush.apalinskiy.domain.user.User;
 import com.javarush.apalinskiy.service.UserService;
+import com.javarush.apalinskiy.stats.UserStats;
+import com.javarush.apalinskiy.stats.UserStatsService;
 import com.javarush.apalinskiy.web.util.Web;
 import com.javarush.apalinskiy.web.util.WebConst;
 import jakarta.servlet.ServletConfig;
+import jakarta.servlet.ServletContext;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
@@ -15,11 +18,18 @@ import java.io.IOException;
 public class ProfileServlet extends HttpServlet {
 
     private UserService userService;
+    private UserStatsService userStats;
 
     @Override
     public void init(ServletConfig config) throws ServletException {
         super.init(config);
-        this.userService = Web.ctxBean(config.getServletContext(), WebConst.Ctx.USER_SERVICE, UserService.class);
+        ServletContext ctx = config.getServletContext();
+        this.userService = Web.ctxBean(ctx, WebConst.Ctx.USER_SERVICE, UserService.class);
+        try {
+            this.userStats = Web.ctxBean(ctx, WebConst.Ctx.USER_STATS_SERVICE, UserStatsService.class);
+        } catch (IllegalStateException ignore) {
+            this.userStats = null;
+        }
     }
 
     @Override
@@ -31,6 +41,10 @@ public class ProfileServlet extends HttpServlet {
         User user = (User) req.getSession().getAttribute(WebConst.Attr.USER);
         if (user != null) {
             req.setAttribute(WebConst.Attr.USER, user);
+            if (userStats != null) {
+                UserStats s = userStats.statsOf(user.getUserId());
+                req.setAttribute("stats", s);
+            }
         }
         Web.forward(req, resp, WebConst.Jsp.PROFILE);
     }

@@ -77,15 +77,6 @@ public class QuestAuthoringService {
         editorRepo.reload(Collections.emptyList(), 0, false);
     }
 
-
-
-    public void updateExisting(String questId) {
-        Objects.requireNonNull(questId, "questId");
-        catalogRepo.get(questId).orElseThrow(() -> new IllegalArgumentException("Quest not found: " + questId));
-        Draft d = buildDraftOrThrow();
-        catalogRepo.update(questId, d.start, d.nodes, true, d.version);
-    }
-
     public void publish(String ownerLogin, String questName) {
         publishNew(ownerLogin, questName);
     }
@@ -180,10 +171,6 @@ public class QuestAuthoringService {
 
     public void rejectEdit(String questId) {
         catalogRepo.rejectEdit(questId);
-    }
-
-    public List<CustomQuest> listPublishedFromCatalog() {
-        return catalogRepo.listPublished();
     }
 
     private static String computeVersion(List<QuestNode> nodes, int start) {

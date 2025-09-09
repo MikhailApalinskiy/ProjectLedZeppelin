@@ -32,7 +32,7 @@ public class SaveState {
     private final SaveSlot[] globalSlots;
 
     private Instant updatedAt = Instant.now();
-    private int version = 3; // bumped
+    private int version = 3;
 
     public SaveState(String userId) {
         this(userId, 10);

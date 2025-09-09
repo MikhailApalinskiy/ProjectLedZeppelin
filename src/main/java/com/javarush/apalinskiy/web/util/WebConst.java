@@ -70,6 +70,7 @@ public final class WebConst {
     }
 
     public static final class Ctx {
+        public static final String USER_STATS_SERVICE = "userStatsService";
         public static final String FRIEND_REPOSITORY = "friendRepository";
         public static final String NOTIFY_REPO = "notifyRepo";
         public static final String NOTIFY_SERVICE = "notifyService";
@@ -108,6 +109,8 @@ public final class WebConst {
     }
 
     public static final class Jsp {
+        public static final String USER_PUBLIC = "/WEB-INF/jsp/user_public.jsp";
+        public static final String USER_QUESTS = "/WEB-INF/jsp/user_quests.jsp";
         public static final String QUESTS_MOD_PREVIEW = "/WEB-INF/jsp/quests_mod_preview.jsp";
         public static final String QUESTS_MOD = "/WEB-INF/jsp/quests_moderation.jsp";
         public static final String USER_EDIT = "/WEB-INF/jsp/user_edit.jsp";

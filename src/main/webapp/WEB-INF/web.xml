@@ -22,7 +22,23 @@
         <param-value>C:\textquest\uploads</param-value>
     </context-param>
 
+    <servlet>
+        <servlet-name>UserPublicProfileServlet</servlet-name>
+        <servlet-class>com.javarush.apalinskiy.web.servlet.UserPublicProfileServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>UserPublicProfileServlet</servlet-name>
+        <url-pattern>/user</url-pattern>
+    </servlet-mapping>
 
+    <servlet>
+        <servlet-name>UserPublishedQuestsServlet</servlet-name>
+        <servlet-class>com.javarush.apalinskiy.web.servlet.UserPublishedQuestsServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>UserPublishedQuestsServlet</servlet-name>
+        <url-pattern>/user/quests</url-pattern>
+    </servlet-mapping>
 
     <servlet>
         <servlet-name>AdminModerationGraphServlet</servlet-name>
@@ -248,4 +264,9 @@
         <filter-name>EncodingFilter</filter-name>
         <url-pattern>/*</url-pattern>
     </filter-mapping>
+
+    <error-page>
+        <error-code>404</error-code>
+        <location>/WEB-INF/jsp/error_404.jsp</location>
+    </error-page>
 </web-app>

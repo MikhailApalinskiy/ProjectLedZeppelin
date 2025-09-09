@@ -81,18 +81,6 @@ public class DefaultUserService implements UserService {
     }
 
     @Override
-    public User changeLogin(String userId, String newLogin) {
-        if (StringUtils.isBlank(newLogin)) {
-            throw new IllegalArgumentException("Login must not be blank");
-        }
-        User current = users.findById(userId).orElseThrow(() ->
-                new NoSuchElementException("User not found: " + userId));
-        User updated = current.withLogin(newLogin);
-        users.update(updated);
-        return updated;
-    }
-
-    @Override
     public User adminUpdate(String userId, Role role, String userName, String userLogin, String newPasswordOrNull) {
         User current = users.findById(userId)
                 .orElseThrow(() -> new NoSuchElementException("User not found: " + userId));

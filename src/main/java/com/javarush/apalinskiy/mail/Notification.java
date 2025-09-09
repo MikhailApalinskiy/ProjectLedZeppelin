@@ -35,6 +35,7 @@ public class Notification {
         return new Notification(id, userId, type, title, body, createdAt, true);
     }
 
+    @SuppressWarnings("unused")
     public Date getCreatedAtDate() {
         return Date.from(createdAt);
     }

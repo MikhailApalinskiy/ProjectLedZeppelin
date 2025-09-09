@@ -7,7 +7,7 @@
     <meta charset="UTF-8"/>
     <title>Пользователи — TextQuest</title>
 
-    <c:url var="cssMain" value="/assets/css/main.css"/>
+    <c:url var="cssMain"  value="/assets/css/main.css"/>
     <c:url var="cssUsers" value="/assets/css/users.css"/>
     <link rel="stylesheet" href="${cssMain}"/>
     <link rel="stylesheet" href="${cssUsers}"/>
@@ -17,12 +17,19 @@
 <body>
 <div class="container">
 
-    <c:set var="CTX" value="${pageContext.request.contextPath}"/>
-    <c:set var="PATH_HOME" value="/"/>
-    <c:set var="PATH_USERS" value="/users"/>
-    <c:set var="PATH_EDIT_USER" value="/user/edit"/>
+    <c:set var="CTX"              value="${pageContext.request.contextPath}"/>
+    <c:set var="PATH_HOME"        value="/"/>
+    <c:set var="PATH_USERS"       value="/users"/>
+    <c:set var="PATH_EDIT_USER"   value="/user/edit"/>
+    <c:set var="PATH_FRIENDS"     value="/friends"/>
+    <c:set var="PARAM_Q"          value="q"/>
+    <c:set var="PARAM_ID"         value="id"/>
+    <c:set var="PARAM_ACTION"     value="action"/>
+    <c:set var="ACTION_REQUEST"   value="request"/>
+    <c:set var="ROLE_ADMIN"       value="ADMIN"/>
+    <c:set var="DATE_PATTERN"     value="yyyy-MM-dd HH:mm:ss"/>
 
-    <c:url var="homeUrl" value="${PATH_HOME}"/>
+    <c:url var="homeUrl"  value="${PATH_HOME}"/>
     <c:url var="usersUrl" value="${PATH_USERS}"/>
 
     <%@ include file="/WEB-INF/jsp/fragments/alerts.jspf" %>
@@ -33,7 +40,7 @@
             <p class="muted header__sub">Список всех зарегистрированных пользователей.</p>
         </div>
         <nav class="actions">
-            <button type="button" class="btn btn-primary" onclick="location.href='${homeUrl}'">
+            <button type="button" class="btn btn-primary btn-lg" onclick="location.href='${homeUrl}'">
                 На главную
             </button>
         </nav>
@@ -42,14 +49,14 @@
     <section class="card">
         <form method="get" action="${usersUrl}" class="search-form" role="search" aria-label="Поиск пользователей">
             <input type="text"
-                   name="q"
-                   value="${param.q}"
+                   name="${PARAM_Q}"
+                   value="${param[PARAM_Q]}"
                    placeholder="Поиск по нику или ID"
                    class="input search-input"
                    autocomplete="off"/>
             <div class="actions">
                 <button type="submit" class="btn btn-primary">Искать</button>
-                <c:if test="${not empty param.q}">
+                <c:if test="${not empty param[PARAM_Q]}">
                     <a class="btn btn-ghost" href="${usersUrl}">Сбросить</a>
                 </c:if>
             </div>
@@ -57,8 +64,8 @@
     </section>
 
     <section class="card">
-        <c:set var="isAuth" value="${not empty sessionScope.user}"/>
-        <c:set var="isAdmin" value="${isAuth and sessionScope.user.role eq 'ADMIN'}"/>
+        <c:set var="isAuth"  value="${not empty sessionScope.user}"/>
+        <c:set var="isAdmin" value="${isAuth and sessionScope.user.role eq ROLE_ADMIN}"/>
 
         <c:choose>
             <c:when test="${empty users}">
@@ -79,8 +86,8 @@
                     </thead>
                     <tbody>
                     <c:forEach var="u" items="${users}" varStatus="st">
-                        <c:set var="isSelf" value="${isAuth and sessionScope.user.userId eq u.userId}"/>
-                        <c:set var="canAddFriend" value="${isAuth and not isSelf}"/>
+                        <c:set var="isSelf"        value="${isAuth and sessionScope.user.userId eq u.userId}"/>
+                        <c:set var="canAddFriend"  value="${isAuth and not isSelf}"/>
 
                         <tr>
                             <td><span class="pill">${st.index + 1}</span></td>
@@ -88,23 +95,24 @@
                             <td><code><c:out value="${u.userLogin}"/></code></td>
                             <td><code><c:out value="${u.userId}"/></code></td>
                             <td class="role"><c:out value="${u.role}"/></td>
-                            <td><fmt:formatDate value="${u.createdAtDate}" pattern="yyyy-MM-dd HH:mm:ss"/></td>
+                            <td><fmt:formatDate value="${u.createdAtDate}" pattern="${DATE_PATTERN}"/></td>
                             <td class="col-actions td-actions">
                                 <div class="actions actions--row">
                                     <c:if test="${canAddFriend}">
-                                        <form method="post" action="${pageContext.request.contextPath}/friends"
-                                              style="display:inline">
-                                            <input type="hidden" name="action" value="request"/>
-                                            <input type="hidden" name="id" value="${u.userId}"/>
+                                        <form method="post" action="${CTX}${PATH_FRIENDS}" style="display:inline">
+                                            <input type="hidden" name="${PARAM_ACTION}" value="${ACTION_REQUEST}"/>
+                                            <input type="hidden" name="${PARAM_ID}"     value="${u.userId}"/>
                                             <button type="submit" class="btn">Добавить в друзья</button>
                                         </form>
                                     </c:if>
+
                                     <c:if test="${isAdmin and not isSelf}">
                                         <c:url var="editUrl" value="${PATH_EDIT_USER}">
-                                            <c:param name="id" value="${u.userId}"/>
+                                            <c:param name="${PARAM_ID}" value="${u.userId}"/>
                                         </c:url>
                                         <a class="btn btn-ghost" href="${editUrl}">Редактировать</a>
                                     </c:if>
+
                                     <c:if test="${not canAddFriend and not (isAdmin and not isSelf)}">
                                         <span class="muted">—</span>
                                     </c:if>

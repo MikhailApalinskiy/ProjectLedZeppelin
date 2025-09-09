@@ -5,12 +5,10 @@ import com.javarush.apalinskiy.exceptions.DuplicateLoginException;
 import com.javarush.apalinskiy.application.ports.UserRepository;
 import com.javarush.apalinskiy.domain.user.Role;
 import com.javarush.apalinskiy.domain.user.User;
+import com.javarush.apalinskiy.web.util.Web;
 import org.apache.commons.lang3.StringUtils;
 
-import java.util.List;
-import java.util.NoSuchElementException;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 
 public class DefaultUserService implements UserService {
     private static final int MAX_ID_RETRIES = 3;
@@ -90,6 +88,32 @@ public class DefaultUserService implements UserService {
         User current = users.findById(userId).orElseThrow(() ->
                 new NoSuchElementException("User not found: " + userId));
         User updated = current.withLogin(newLogin);
+        users.update(updated);
+        return updated;
+    }
+
+    @Override
+    public User adminUpdate(String userId, Role role, String userName, String userLogin, String newPasswordOrNull) {
+        User current = users.findById(userId)
+                .orElseThrow(() -> new NoSuchElementException("User not found: " + userId));
+        String name = Web.trimOrNull(userName);
+        String login = Web.trimOrNull(userLogin);
+        if (name == null || login == null) {
+            throw new IllegalArgumentException("Name and login are required");
+        }
+        User updated = current
+                .withRole(role == null ? current.getRole() : role)
+                .withUserName(name)
+                .withLogin(login.toLowerCase(Locale.ROOT));
+        if (newPasswordOrNull != null && !newPasswordOrNull.isBlank()) {
+            if (newPasswordOrNull.equals(current.getPassword())) {
+                throw new IllegalArgumentException("New password must differ from current");
+            }
+            if (newPasswordOrNull.length() < 6) {
+                throw new IllegalArgumentException("Password too short");
+            }
+            updated = updated.withPassword(newPasswordOrNull);
+        }
         users.update(updated);
         return updated;
     }

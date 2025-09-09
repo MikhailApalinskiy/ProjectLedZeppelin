@@ -111,18 +111,35 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    padding: 12px 20px;
+    height: var(--btn-h, 44px);
+    padding: 0 20px;
     border-radius: 10px;
+
     min-width: 160px;
     box-sizing: border-box;
     font: inherit;
     font-weight: 600;
+    line-height: 1;
     text-decoration: none;
+    background: transparent;
     border: 1px solid rgba(127, 127, 127, .35);
     color: rgb(var(--fg));
+
     transition: background .2s ease, border-color .2s ease, color .2s ease;
 }
 
 .form-actions .link:hover {
-    background: rgba(127, 127, 127, 0.08);
+    background: rgba(127, 127, 127, .08);
+}
+
+.btn {
+    border: 1px solid transparent;
+}
+
+.btn-ghost {
+    border-color: rgba(127, 127, 127, 0.35);
+}
+
+.btn-primary {
+    border-color: transparent;
 }

@@ -1,3 +1,15 @@
+.title {
+    margin: 0;
+}
+
+.mb-1 {
+    margin-bottom: 4px;
+}
+
+.m-0 {
+    margin: 0;
+}
+
 body.page-graph .badge {
     display: inline-block;
     padding: 6px 10px;
@@ -5,6 +17,11 @@ body.page-graph .badge {
     border-radius: 10px;
     color: rgb(var(--muted));
     font-weight: 600;
+}
+
+body.page-graph .svg-wrap {
+    width: 100%;
+    overflow: auto;
 }
 
 body.page-graph svg {
@@ -48,24 +65,35 @@ body.page-graph .node.start {
     stroke-width: 3;
 }
 
-body.page-graph .label,
-body.page-graph .snippet {
+body.page-graph .node-id,
+body.page-graph .node-text {
     fill: rgb(var(--fg));
     font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
 }
 
-body.page-graph .label {
+body.page-graph .node-id {
     font-size: 12px;
     font-weight: 700;
 }
 
-body.page-graph .snippet {
+body.page-graph .node-text {
     font-size: 11px;
     fill: rgb(var(--muted));
 }
 
-.node-thumb-border {
+body.page-graph .node-thumb-border {
     fill: none;
     stroke: rgba(0, 0, 0, .25);
     stroke-width: 1;
+}
+
+body.page-graph .card-header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+body.page-graph .actions .btn.btn-ghost {
+    text-decoration: none;
 }

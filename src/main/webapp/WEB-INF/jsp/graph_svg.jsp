@@ -102,19 +102,46 @@
                             </c:url>
 
                             <a href="${editLink}">
-                                <rect class="${cls}" x="${n.x}" y="${n.y}" rx="10" ry="10" width="${nodeW}"
-                                      height="${nodeH}"/>
-                                <text class="label id-label" x="${n.x + nodeW/2}" y="${n.y + 18}" text-anchor="middle">
-                                    #<c:out value="${n.id}"/><c:if test="${n.fin}"> ⓕ</c:if>
-                                </text>
-                                <c:forEach var="line" items="${n.labelLines}" varStatus="st">
-                                    <text class="snippet"
-                                          x="${n.x + nodeW/2}"
-                                          y="${n.y + 18 + (st.index + 1) * 14}"
+                                <g>
+                                    <rect class="${cls}" x="${n.x}" y="${n.y}" rx="10" ry="10" width="${nodeW}"
+                                          height="${nodeH}"/>
+
+                                    <c:if test="${not empty n.image}">
+                                        <c:set var="thumbX" value="${n.x + nodeW - 38}"/>
+                                        <c:set var="thumbY" value="${n.y + 6}"/>
+                                        <c:set var="clipId" value="thumbClip_${n.id}"/>
+                                        <defs>
+                                            <clipPath id="${clipId}">
+                                                <rect x="${thumbX}" y="${thumbY}" width="32" height="32" rx="6" ry="6"/>
+                                            </clipPath>
+                                        </defs>
+                                        <image
+                                                href="${pageContext.request.contextPath}${n.image}"
+                                                x="${thumbX}" y="${thumbY}"
+                                                width="32" height="32"
+                                                preserveAspectRatio="xMidYMid slice"
+                                                clip-path="url(#${clipId})"/>
+                                        <rect
+                                                x="${thumbX}" y="${thumbY}"
+                                                width="32" height="32"
+                                                rx="6" ry="6"
+                                                class="node-thumb-border"/>
+                                    </c:if>
+
+                                    <text class="label id-label" x="${n.x + nodeW/2}" y="${n.y + 18}"
                                           text-anchor="middle">
-                                        <c:out value="${line}"/>
+                                        #<c:out value="${n.id}"/><c:if test="${n.fin}"> ⓕ</c:if>
                                     </text>
-                                </c:forEach>
+
+                                    <c:forEach var="line" items="${n.labelLines}" varStatus="st">
+                                        <text class="snippet"
+                                              x="${n.x + nodeW/2}"
+                                              y="${n.y + 18 + (st.index + 1) * 14}"
+                                              text-anchor="middle">
+                                            <c:out value="${line}"/>
+                                        </text>
+                                    </c:forEach>
+                                </g>
                             </a>
                         </c:forEach>
                     </svg>

@@ -28,7 +28,9 @@
     <c:set var="PATH_PROFILE" value="/profile"/>
     <c:set var="PATH_NOTIFICATIONS" value="/notifications"/>
     <c:set var="PATH_FRIENDS" value="${pageContext.request.contextPath}/friends"/>
+    <c:set var="PATH_QUESTS_MOD" value="/quests/moderation"/>
 
+    <c:url var="modUrl" value="${PATH_QUESTS_MOD}"/>
     <c:url var="friendsUrl" value="/friends"/>
     <c:url var="notifyUrl" value="${PATH_NOTIFICATIONS}"/>
     <c:url var="usersUrl" value="${PATH_USERS}"/>
@@ -53,6 +55,7 @@
 
 <c:set var="user" value="${sessionScope.user}"/>
 <c:set var="isAuth" value="${not empty user}"/>
+<c:set var="isAdmin" value="${isAuth and user.role eq 'ADMIN'}"/>
 <c:set var="userName" value="${isAuth ? user.userName : ''}"/>
 <c:set var="avatar" value="${empty userName ? '?' : fn:toUpperCase(fn:substring(userName,0,1))}"/>
 
@@ -101,8 +104,10 @@
                                 </span>
                                 Уведомления
                             </a>
-
-                            <form method="post" action="${logoutUrl}" style="display:inline">
+                            <c:if test="${isAdmin}">
+                                <a class="btn btn-primary" href="${modUrl}" title="Модерация квестов">Модерация</a>
+                            </c:if>
+                            <form method="post" action="${logoutUrl}" class="inline-form logout-form">
                                 <button type="submit" class="btn btn-danger">Выйти</button>
                             </form>
                         </div>

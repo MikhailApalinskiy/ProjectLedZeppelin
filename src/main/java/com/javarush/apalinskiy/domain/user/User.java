@@ -49,6 +49,11 @@ public class User {
                 newPassword, this.getCreatedAt(), this.getUserId());
     }
 
+    public User withRole(Role newRole) {
+        return new User(newRole == null ? this.getRole() : newRole, this.getUserName(), this.getUserLogin(),
+                this.getPassword(), this.getCreatedAt(), this.getUserId());
+    }
+
     public User withLogin(String newLogin) {
         return new User(this.getRole(), this.getUserName(), newLogin,
                 this.getPassword(), this.getCreatedAt(), this.getUserId());

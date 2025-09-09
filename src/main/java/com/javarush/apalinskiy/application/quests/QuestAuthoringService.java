@@ -77,6 +77,8 @@ public class QuestAuthoringService {
         editorRepo.reload(Collections.emptyList(), 0, false);
     }
 
+
+
     public void updateExisting(String questId) {
         Objects.requireNonNull(questId, "questId");
         catalogRepo.get(questId).orElseThrow(() -> new IllegalArgumentException("Quest not found: " + questId));
@@ -135,6 +137,53 @@ public class QuestAuthoringService {
             }
         }
         return errors;
+    }
+
+    public void submitNewForModeration(String ownerLogin, String questName) {
+        Objects.requireNonNull(ownerLogin, "ownerLogin");
+        String name = (questName == null || questName.isBlank()) ? "Untitled Quest" : questName.trim();
+        Draft d = buildDraftOrThrow();
+        catalogRepo.stageCreate(ownerLogin, name, d.start, d.nodes, d.version);
+        editorRepo.reload(Collections.emptyList(), 0, false);
+    }
+
+    public void updateExisting(String questId, boolean asAdmin) {
+        Objects.requireNonNull(questId, "questId");
+        catalogRepo.get(questId).orElseThrow(() -> new IllegalArgumentException("Quest not found: " + questId));
+        Draft d = buildDraftOrThrow();
+        if (asAdmin) {
+            catalogRepo.update(questId, d.start, d.nodes, true, d.version);
+        } else {
+            catalogRepo.stageEdit(questId, d.start, d.nodes, d.version);
+        }
+    }
+
+    public List<CustomQuestRepository.PendingNew> listPendingNew() {
+        return catalogRepo.listPendingNew();
+    }
+
+    public List<CustomQuestRepository.PendingEdit> listPendingEdits() {
+        return catalogRepo.listPendingEdits();
+    }
+
+    public String approveCreate(String pendingId) {
+        return catalogRepo.approveCreate(pendingId);
+    }
+
+    public void rejectCreate(String pendingId) {
+        catalogRepo.rejectCreate(pendingId);
+    }
+
+    public void approveEdit(String questId) {
+        catalogRepo.approveEdit(questId);
+    }
+
+    public void rejectEdit(String questId) {
+        catalogRepo.rejectEdit(questId);
+    }
+
+    public List<CustomQuest> listPublishedFromCatalog() {
+        return catalogRepo.listPublished();
     }
 
     private static String computeVersion(List<QuestNode> nodes, int start) {

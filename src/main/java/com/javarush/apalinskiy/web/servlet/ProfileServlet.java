@@ -13,6 +13,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 
 public class ProfileServlet extends HttpServlet {
+
     private UserService userService;
 
     @Override

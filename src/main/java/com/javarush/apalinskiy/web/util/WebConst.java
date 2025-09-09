@@ -15,6 +15,7 @@ public final class WebConst {
     }
 
     public static final class Param {
+        public static final String ROLE = "role";
         public static final String CURRENT_PASSWORD = "currentPassword";
         public static final String NEW_PASSWORD = "newPassword";
         public static final String CONFIRM_PASSWORD = "confirmPassword";
@@ -85,6 +86,8 @@ public final class WebConst {
     }
 
     public static final class Path {
+        public static final String QUESTS_MOD = "/quests/moderation";
+        public static final String USER_EDIT = "/user/edit";
         public static final String FRIENDS = "/friends";
         public static final String NOTIFICATIONS = "/notifications";
         public static final String USERS = "/users";
@@ -96,17 +99,18 @@ public final class WebConst {
         public static final String LOADS = "/loads";
         public static final String LOGIN = "/login";
         public static final String REGISTER = "/register";
-        public static final String LOGOUT = "/logout";
         public static final String CREATE = "/create_quest";
         public static final String PUBLISH = "/quest/publish";
         public static final String MY_QUESTS = "/my/quests";
-        public static final String QUESTS = "/quests";
 
         private Path() {
         }
     }
 
     public static final class Jsp {
+        public static final String QUESTS_MOD_PREVIEW = "/WEB-INF/jsp/quests_mod_preview.jsp";
+        public static final String QUESTS_MOD = "/WEB-INF/jsp/quests_moderation.jsp";
+        public static final String USER_EDIT = "/WEB-INF/jsp/user_edit.jsp";
         public static final String FRIENDS = "/WEB-INF/jsp/friends.jsp";
         public static final String NOTIFICATIONS = "/WEB-INF/jsp/notifications.jsp";
         public static final String USERS = "/WEB-INF/jsp/users.jsp";

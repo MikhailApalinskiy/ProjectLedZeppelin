@@ -4,6 +4,8 @@ import com.javarush.apalinskiy.domain.user.User;
 import com.javarush.apalinskiy.friends.FriendService;
 import com.javarush.apalinskiy.web.util.Web;
 import com.javarush.apalinskiy.web.util.WebConst;
+import jakarta.servlet.ServletConfig;
+import jakarta.servlet.ServletContext;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
@@ -20,8 +22,10 @@ public class FriendsServlet extends HttpServlet {
     private FriendService service;
 
     @Override
-    public void init() {
-        this.service = Web.ctxBean(getServletContext(), WebConst.Ctx.FRIEND_SERVICE, FriendService.class);
+    public void init(ServletConfig config) throws ServletException {
+        super.init(config);
+        ServletContext ctx = config.getServletContext();
+        this.service = Web.ctxBean(ctx, WebConst.Ctx.FRIEND_SERVICE, FriendService.class);
     }
 
     @Override

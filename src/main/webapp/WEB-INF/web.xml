@@ -22,6 +22,35 @@
         <param-value>C:\textquest\uploads</param-value>
     </context-param>
 
+
+
+    <servlet>
+        <servlet-name>AdminModerationGraphServlet</servlet-name>
+        <servlet-class>com.javarush.apalinskiy.web.servlet.AdminModerationGraphServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>AdminModerationGraphServlet</servlet-name>
+        <url-pattern>/quests/moderation/preview</url-pattern>
+    </servlet-mapping>
+
+    <servlet>
+        <servlet-name>AdminQuestsModerationServlet</servlet-name>
+        <servlet-class>com.javarush.apalinskiy.web.servlet.AdminQuestsModerationServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>AdminQuestsModerationServlet</servlet-name>
+        <url-pattern>/quests/moderation</url-pattern>
+    </servlet-mapping>
+
+    <servlet>
+        <servlet-name>AdminUserEditServlet</servlet-name>
+        <servlet-class>com.javarush.apalinskiy.web.servlet.AdminUserEditServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>AdminUserEditServlet</servlet-name>
+        <url-pattern>/user/edit</url-pattern>
+    </servlet-mapping>
+
     <servlet>
         <servlet-name>friendsServlet</servlet-name>
         <servlet-class>com.javarush.apalinskiy.web.servlet.FriendsServlet</servlet-class>
@@ -188,6 +217,19 @@
         <servlet-name>default</servlet-name>
         <url-pattern>/assets/*</url-pattern>
     </servlet-mapping>
+
+    <filter>
+        <filter-name>AdminOnlyFilter</filter-name>
+        <filter-class>com.javarush.apalinskiy.web.filter.AdminOnlyFilter</filter-class>
+    </filter>
+    <filter-mapping>
+        <filter-name>AdminOnlyFilter</filter-name>
+        <url-pattern>/user/edit</url-pattern>
+    </filter-mapping>
+    <filter-mapping>
+        <filter-name>AdminOnlyFilter</filter-name>
+        <url-pattern>/quests/moderation</url-pattern>
+    </filter-mapping>
 
     <filter>
         <filter-name>notificationsBadgeFilter</filter-name>

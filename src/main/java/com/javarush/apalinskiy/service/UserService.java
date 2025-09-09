@@ -2,8 +2,10 @@ package com.javarush.apalinskiy.service;
 
 import com.javarush.apalinskiy.domain.user.Role;
 import com.javarush.apalinskiy.domain.user.User;
+import com.javarush.apalinskiy.exceptions.DuplicateLoginException;
 
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.Optional;
 
 public interface UserService {
@@ -22,4 +24,7 @@ public interface UserService {
     List<User> findAll();
 
     User changeLogin(String userId, String newLogin);
+
+    User adminUpdate(String userId, Role role, String userName, String userLogin, String newPasswordOrNull)
+            throws DuplicateLoginException, NoSuchElementException, IllegalArgumentException;
 }

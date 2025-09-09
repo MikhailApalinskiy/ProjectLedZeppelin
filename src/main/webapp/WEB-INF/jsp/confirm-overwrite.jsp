@@ -21,7 +21,7 @@
 <c:set var="P_CUSTOM" value="custom"/>
 <c:set var="P_SLOT" value="slot"/>
 <c:set var="P_OP" value="op"/>
-
+<c:set var="customResolved" value="${not empty param.custom ? param.custom : requestScope.custom}"/>
 <c:set var="OP_CONFIRM" value="confirm"/>
 <c:set var="OP_CANCEL" value="cancel"/>
 
@@ -30,8 +30,8 @@
     <c:param name="${P_NEXT}" value="${next}"/>
     <c:param name="${P_PURPOSE}" value="${purpose}"/>
     <c:param name="${P_NODE}" value="${newNodeId}"/>
-    <c:if test="${not empty custom}">
-        <c:param name="${P_CUSTOM}" value="${custom}"/>
+    <c:if test="${not empty customResolved}">
+        <c:param name="${P_CUSTOM}" value="${customResolved}"/>
     </c:if>
 </c:url>
 
@@ -65,8 +65,8 @@
                     <input type="hidden" name="${P_NODE}" value="${newNodeId}"/>
                     <input type="hidden" name="${P_NEXT}" value="${next}"/>
                     <input type="hidden" name="${P_PURPOSE}" value="${purpose}"/>
-                    <c:if test="${not empty custom}">
-                        <input type="hidden" name="${P_CUSTOM}" value="${custom}"/>
+                    <c:if test="${not empty customResolved}">
+                        <input type="hidden" name="${P_CUSTOM}" value="${customResolved}"/>
                     </c:if>
                     <button type="submit" class="btn btn-primary">Перезаписать</button>
                 </form>
@@ -77,8 +77,8 @@
                     <input type="hidden" name="${P_NEXT}" value="${next}"/>
                     <input type="hidden" name="${P_PURPOSE}" value="${purpose}"/>
                     <input type="hidden" name="${P_NODE}" value="${newNodeId}"/>
-                    <c:if test="${not empty custom}">
-                        <input type="hidden" name="${P_CUSTOM}" value="${custom}"/>
+                    <c:if test="${not empty customResolved}">
+                        <input type="hidden" name="${P_CUSTOM}" value="${customResolved}"/>
                     </c:if>
                     <button type="submit" class="btn btn-ghost">Отмена</button>
                 </form>

@@ -10,6 +10,7 @@
     --card: 255, 255, 255;
     --ring: 59, 130, 246;
     --shadow: 0 8px 26px rgba(0, 0, 0, .06);
+    --btn-h: 44px;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -28,11 +29,11 @@
 }
 
 * {
-    box-sizing: border-box
+    box-sizing: border-box;
 }
 
 html {
-    scroll-behavior: smooth
+    scroll-behavior: smooth;
 }
 
 body {
@@ -112,19 +113,19 @@ body {
 
 h1 {
     margin: 0;
-    font-size: clamp(20px, 2.6vw, 28px)
+    font-size: clamp(20px, 2.6vw, 28px);
 }
 
 h2 {
     margin: 0 0 8px 0;
-    font-size: clamp(16px, 2.2vw, 20px)
+    font-size: clamp(16px, 2.2vw, 20px);
 }
 
 .notice {
     margin: 0 0 14px 0;
     color: rgb(var(--muted));
     font-size: 14px;
-    max-width: 72ch
+    max-width: 72ch;
 }
 
 .panel {
@@ -135,6 +136,7 @@ h2 {
     border: 1px solid rgba(127, 127, 127, .14);
     padding: 14px;
     border-radius: 12px;
+    overflow: visible;
 }
 
 @media (min-width: 820px) {
@@ -164,33 +166,52 @@ h2 {
 
 .user-title {
     margin: 0;
-    font-weight: 600
+    font-weight: 600;
 }
 
 .user-sub {
     margin: 2px 0 0 0;
     font-size: 13px;
-    color: rgb(var(--muted))
+    color: rgb(var(--muted));
 }
 
 .actions {
     display: flex;
-    flex-wrap: wrap;
-    gap: 10px
+    align-items: center;
+    gap: 10px;
+    flex-wrap: nowrap;
+    padding-right: 12px;
 }
 
-.btn {
+.inline-form {
+    display: inline-block;
+    margin: 0;
+}
+
+.logout-form {
+    margin-left: auto;
+}
+
+.btn, .inline-form .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    height: var(--btn-h);
+    padding: 0 14px;
+    border-radius: 12px;
+    font-weight: 600;
+    font-size: 15px;
+    line-height: 1;
+    letter-spacing: .2px;
+    text-decoration: none;
     appearance: none;
     border: none;
-    cursor: pointer;
-    padding: 10px 14px;
-    border-radius: 10px;
-    font-weight: 600;
-    letter-spacing: .2px;
-    background: rgba(127, 127, 127, .12);
-    color: #fff; /* белый текст по умолчанию */
-    transition: transform .08s ease, box-shadow .18s ease, background .18s ease, outline-color .18s ease;
     outline: 2px solid transparent;
+    cursor: pointer;
+    background: rgba(127, 127, 127, .12);
+    color: #fff;
+    transition: transform .08s ease, box-shadow .18s ease, background .18s ease, outline-color .18s ease;
 }
 
 .btn:active {
@@ -219,6 +240,10 @@ h2 {
     background: rgb(var(--danger-hover));
 }
 
+.logout-form .btn-danger {
+    padding: 0 12px;
+}
+
 .btn-ghost {
     background: transparent;
     border: 1px solid rgba(127, 127, 127, .3);
@@ -232,8 +257,16 @@ h2 {
     margin-right: .5em;
 }
 
-.btn[disabled],
-.btn[aria-disabled="true"] {
+.btn .icon {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+    margin-right: 6px;
+    stroke: currentColor;
+    fill: none;
+}
+
+.btn[disabled], .btn[aria-disabled="true"] {
     opacity: .6;
     cursor: not-allowed;
     pointer-events: none;
@@ -243,7 +276,7 @@ h2 {
     display: flex;
     gap: 10px;
     flex-wrap: wrap;
-    margin-top: 10px
+    margin-top: 10px;
 }
 
 .link {
@@ -262,49 +295,31 @@ h2 {
 }
 
 .fade-in {
-    animation: fade .25s ease-out both
+    animation: fade .25s ease-out both;
 }
 
 @keyframes fade {
     from {
         opacity: 0;
-        transform: translateY(4px)
+        transform: translateY(4px);
     }
     to {
         opacity: 1;
-        transform: none
+        transform: none;
     }
 }
 
 .stack {
     display: grid;
-    gap: 14px
+    gap: 14px;
 }
 
 .section {
-    margin: 16px 0
+    margin: 16px 0;
 }
 
 .max-ch {
-    max-width: 72ch
-}
-
-.btn .icon {
-    width: 18px;
-    height: 18px;
-    flex-shrink: 0;
-    display: inline-block;
-    vertical-align: middle;
-    margin-right: 6px;
-    stroke: currentColor;
-    fill: none;
-}
-
-.btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
+    max-width: 72ch;
 }
 
 .alert {
@@ -317,8 +332,7 @@ h2 {
     border: 1px solid transparent;
     background: rgba(17, 24, 39, .55);
     color: rgb(var(--fg, 231, 233, 238));
-    box-shadow: 0 10px 24px rgba(0, 0, 0, .25),
-    inset 0 1px 0 rgba(255, 255, 255, .02);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, .25), inset 0 1px 0 rgba(255, 255, 255, .02);
     backdrop-filter: blur(2px);
     -webkit-backdrop-filter: blur(2px);
 }
@@ -338,8 +352,7 @@ h2 {
 }
 
 .alert-error {
-    background: linear-gradient(180deg, rgba(153, 27, 27, .14), rgba(153, 27, 27, .08)),
-    rgba(17, 24, 39, .55);
+    background: linear-gradient(180deg, rgba(153, 27, 27, .14), rgba(153, 27, 27, .08)), rgba(17, 24, 39, .55);
     border-color: rgba(239, 68, 68, .35);
     color: #fecaca;
 }
@@ -349,8 +362,7 @@ h2 {
 }
 
 .alert-ok {
-    background: linear-gradient(180deg, rgba(6, 95, 70, .14), rgba(6, 95, 70, .08)),
-    rgba(17, 24, 39, .55);
+    background: linear-gradient(180deg, rgba(6, 95, 70, .14), rgba(6, 95, 70, .08)), rgba(17, 24, 39, .55);
     border-color: rgba(16, 185, 129, .35);
     color: #bbf7d0;
 }
@@ -360,8 +372,7 @@ h2 {
 }
 
 .alert-info {
-    background: linear-gradient(180deg, rgba(30, 64, 175, .14), rgba(30, 64, 175, .08)),
-    rgba(17, 24, 39, .55);
+    background: linear-gradient(180deg, rgba(30, 64, 175, .14), rgba(30, 64, 175, .08)), rgba(17, 24, 39, .55);
     border-color: rgba(59, 130, 246, .35);
     color: #bfdbfe;
 }
@@ -399,7 +410,6 @@ h2 {
     height: 1.2em;
 }
 
-
 .notif-dot {
     position: absolute;
     top: -2px;
@@ -415,4 +425,35 @@ h2 {
     .notif-dot {
         box-shadow: 0 0 0 2px rgba(20, 24, 28, 1);
     }
+}
+
+@media (max-width: 1120px) {
+    :root {
+        --btn-h: 42px;
+    }
+
+    .btn, .inline-form .btn {
+        padding: 0 12px;
+    }
+}
+
+@media (max-width: 960px) {
+    :root {
+        --btn-h: 40px;
+    }
+
+    .btn, .inline-form .btn {
+        padding: 0 10px;
+    }
+}
+
+.btn.btn-danger {
+    background: rgb(var(--danger));
+    color: #fff;
+    box-shadow: 0 6px 14px rgba(var(--danger), .28);
+}
+
+.btn.btn-danger:hover,
+.btn.btn-danger:focus-visible {
+    background: rgb(var(--danger-hover));
 }

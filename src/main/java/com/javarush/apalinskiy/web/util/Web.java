@@ -1,8 +1,12 @@
 package com.javarush.apalinskiy.web.util;
 
 import com.javarush.apalinskiy.application.quests.QuestAuthoringService;
+import com.javarush.apalinskiy.domain.quest.Option;
 import com.javarush.apalinskiy.domain.quest.QuestNode;
+import com.javarush.apalinskiy.domain.user.User;
 import com.javarush.apalinskiy.quest.CustomQuest;
+import com.javarush.apalinskiy.web.view.EdgeSeg;
+import com.javarush.apalinskiy.web.view.NodePos;
 import jakarta.servlet.ServletContext;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -90,17 +94,22 @@ public class Web {
 
     public static String buildQuestUrlFromNext(HttpServletRequest req, String next, int nodeId) {
         String base = req.getContextPath() + ((next == null || next.isBlank()) ? WebConst.Path.QUEST : next);
-        return addParamsEncoded(base, Map.of(WebConst.Param.ID, String.valueOf(nodeId)));
+        String custom = trimOrNull(req.getParameter(WebConst.Param.CUSTOM));
+        if (custom == null) {
+            Object attr = req.getAttribute(WebConst.Param.CUSTOM);
+            if (attr instanceof String s && !s.isBlank()) {
+                custom = s;
+            }
+        }
+        if ("main".equalsIgnoreCase(custom)) {
+            custom = null;
+        }
+        return appendQuestParams(base, nodeId, custom);
     }
 
     public static String questUrl(HttpServletRequest req, int id, String customIdOrNull) {
         String base = req.getContextPath() + WebConst.Path.QUEST;
-        Map<String, String> p = new LinkedHashMap<>();
-        p.put(WebConst.Param.ID, String.valueOf(id));
-        if (customIdOrNull != null && !customIdOrNull.isBlank()) {
-            p.put(WebConst.Param.CUSTOM, customIdOrNull);
-        }
-        return addParamsEncoded(base, p);
+        return appendQuestParams(base, id, customIdOrNull);
     }
 
     public static void forward(HttpServletRequest req, HttpServletResponse resp, String jsp)
@@ -183,11 +192,6 @@ public class Web {
         }
         req.setAttribute("createdMap", createdMap);
         req.setAttribute("updatedMap", updatedMap);
-    }
-
-    public static void redirectWith(HttpServletResponse resp, String path, String key, String msg) throws IOException {
-        String encoded = urlEncode(Objects.toString(msg, ""));
-        resp.sendRedirect(resp.encodeRedirectURL(path + "?" + key + "=" + encoded));
     }
 
     public static <T> T ctxBean(ServletContext ctx, String key, Class<T> type) {
@@ -302,5 +306,221 @@ public class Web {
             }
         }
         redirect(req, resp, pathRelative, p);
+    }
+
+    public static boolean sensitiveChanged(User before, User after, boolean passwordChanged) {
+        if (before == null) {
+            return passwordChanged;
+        }
+        return passwordChanged
+                || !Objects.equals(before.getRole(), after.getRole())
+                || !Objects.equals(before.getUserLogin(), after.getUserLogin());
+    }
+
+    public static Map<String, String> buildMachineReadableDiff(User before, User after, boolean passwordChanged) {
+        Map<String, String> data = new LinkedHashMap<>();
+        data.put("what", buildAdminChangeSummary(before, after, passwordChanged));
+        if (before != null) {
+            if (!Objects.equals(before.getRole(), after.getRole())) {
+                data.put("role.before", String.valueOf(before.getRole()));
+                data.put("role.after", String.valueOf(after.getRole()));
+            }
+            if (!Objects.equals(before.getUserLogin(), after.getUserLogin())) {
+                data.put("login.before", before.getUserLogin());
+                data.put("login.after", after.getUserLogin());
+            }
+            if (!Objects.equals(before.getUserName(), after.getUserName())) {
+                data.put("name.before", before.getUserName());
+                data.put("name.after", after.getUserName());
+            }
+        } else {
+            data.put("info", "profile-initialized-by-admin");
+        }
+        if (passwordChanged) {
+            data.put("password.changed", "true");
+        }
+        return data;
+    }
+
+    public static String buildAdminChangeSummary(User before, User after, boolean passwordChanged) {
+        List<String> parts = new ArrayList<>();
+        if (before == null) {
+            parts.add("Profile fields were updated");
+            if (passwordChanged) parts.add("password: changed");
+            return String.join("; ", parts);
+        }
+        if (!Objects.equals(before.getRole(), after.getRole())) {
+            parts.add("role: " + before.getRole() + " → " + after.getRole());
+        }
+        if (!Objects.equals(before.getUserLogin(), after.getUserLogin())) {
+            parts.add("login: " + before.getUserLogin() + " → " + after.getUserLogin());
+        }
+        if (!Objects.equals(before.getUserName(), after.getUserName())) {
+            parts.add("name: " + before.getUserName() + " → " + after.getUserName());
+        }
+        if (passwordChanged) {
+            parts.add("password: changed");
+        }
+        if (parts.isEmpty()) {
+            return "No visible changes";
+        }
+        String joined = String.join("; ", parts);
+        return Web.shortTitle(joined);
+    }
+
+    private static String appendQuestParams(String base, int nodeId, String customIdOrNull) {
+        Map<String, String> p = new LinkedHashMap<>();
+        p.put(WebConst.Param.ID, String.valueOf(nodeId));
+        if (customIdOrNull != null && !customIdOrNull.isBlank()) {
+            p.put(WebConst.Param.CUSTOM, customIdOrNull);
+        }
+        return addParamsEncoded(base, p);
+    }
+
+    public static void buildQuestSvgModel(HttpServletRequest req, List<QuestNode> nodes, int startId, boolean includeImages) {
+        buildQuestSvgModel(req, nodes, startId, includeImages, 180, 80, 80, 120, 40);
+    }
+
+    public static void buildQuestSvgModel(HttpServletRequest req,
+                                          List<QuestNode> nodes,
+                                          int startId,
+                                          boolean includeImages,
+                                          int nodeW, int nodeH,
+                                          int hGap, int vGap,
+                                          int padding) {
+        if (nodes == null || nodes.isEmpty() || isEffectivelyEmpty(nodes)) {
+            req.setAttribute("width", 800);
+            req.setAttribute("height", 300);
+            req.setAttribute("nodeW", nodeW);
+            req.setAttribute("nodeH", nodeH);
+            req.setAttribute("positions", List.<NodePos>of());
+            req.setAttribute("edges", List.<EdgeSeg>of());
+            req.setAttribute("isEmpty", Boolean.TRUE);
+            return;
+        }
+        Map<Integer, QuestNode> byId = new HashMap<>();
+        for (QuestNode n : nodes) {
+            if (n != null) byId.put(n.getId(), n);
+        }
+        Map<Integer, Integer> dist = new HashMap<>();
+        Deque<Integer> dq = new ArrayDeque<>();
+        if (byId.containsKey(startId)) {
+            dist.put(startId, 0);
+            dq.add(startId);
+        }
+        while (!dq.isEmpty()) {
+            int v = dq.pollFirst();
+            QuestNode qn = byId.get(v);
+            if (qn == null || qn.isFin()) {
+                continue;
+            }
+            for (Option o : qn.getOptions()) {
+                Integer to = (o == null) ? null : o.next();
+                if (to == null || !byId.containsKey(to)) {
+                    continue;
+                }
+                if (!dist.containsKey(to)) {
+                    dist.put(to, dist.get(v) + 1);
+                    dq.addLast(to);
+                }
+            }
+        }
+        Map<Integer, List<Integer>> layers = new TreeMap<>();
+        for (var e : dist.entrySet()) {
+            layers.computeIfAbsent(e.getValue(), k -> new ArrayList<>()).add(e.getKey());
+        }
+        List<Integer> unreachable = new ArrayList<>();
+        for (QuestNode n : nodes) {
+            if (n != null && !dist.containsKey(n.getId())) {
+                unreachable.add(n.getId());
+            }
+        }
+        int lastLayerIndex = layers.isEmpty() ? 0 : Collections.max(layers.keySet()) + 1;
+        if (!unreachable.isEmpty()) {
+            layers.put(lastLayerIndex, unreachable);
+        }
+        for (List<Integer> l : layers.values()) {
+            l.sort(Integer::compare);
+        }
+        int colsMax = 1;
+        for (List<Integer> l : layers.values()) {
+            colsMax = Math.max(colsMax, l.size());
+        }
+        int width = padding * 2 + colsMax * nodeW + Math.max(0, colsMax - 1) * hGap;
+        int height = padding * 2 + layers.size() * nodeH + Math.max(0, layers.size() - 1) * vGap;
+        Map<Integer, NodePos> pos = new HashMap<>();
+        int row = 0;
+        for (List<Integer> l : layers.values()) {
+            int count = l.size();
+            if (count == 0) {
+                row++;
+                continue;
+            }
+            int rowWidth = count * nodeW + (count - 1) * hGap;
+            int x0 = (width - rowWidth) / 2;
+            int y = padding + row * (nodeH + vGap);
+            for (int i = 0; i < count; i++) {
+                int id = l.get(i);
+                QuestNode qn = byId.get(id);
+                String snippet = makeSnippet(qn == null ? null : qn.getText());
+                List<String> labelLines = Arrays.asList(snippet.split("\n", -1));
+                String img = (includeImages && qn != null) ? qn.getImage() : null;
+                pos.put(
+                        id,
+                        new NodePos(
+                                id,
+                                x0 + i * (nodeW + hGap),
+                                y,
+                                qn != null && qn.isFin(),
+                                id == startId,
+                                labelLines,
+                                img
+                        )
+                );
+            }
+            row++;
+        }
+        List<EdgeSeg> edges = new ArrayList<>();
+        double pad = 12.0;
+        for (QuestNode from : nodes) {
+            if (from == null || from.isFin()) {
+                continue;
+            }
+            NodePos npFrom = pos.get(from.getId());
+            if (npFrom == null) {
+                continue;
+            }
+            double cx1 = npFrom.getX() + nodeW / 2.0;
+            double cy1 = npFrom.getY() + nodeH / 2.0;
+            for (Option o : from.getOptions()) {
+                Integer to = (o == null) ? null : o.next();
+                if (to == null) {
+                    continue;
+                }
+                NodePos npTo = pos.get(to);
+                if (npTo == null) {
+                    continue;
+                }
+                double cx2 = npTo.getX() + nodeW / 2.0;
+                double cy2 = npTo.getY() + nodeH / 2.0;
+                double dx = cx2 - cx1, dy = cy2 - cy1, len = Math.hypot(dx, dy);
+                if (len == 0) {
+                    len = 1;
+                }
+                double nx = dx / len, ny = dy / len;
+                double sx = cx1 + nx * (nodeW / 2.0 - pad);
+                double sy = cy1 + ny * (nodeH / 2.0 - pad);
+                double tx = cx2 - nx * (nodeW / 2.0 - pad);
+                double ty = cy2 - ny * (nodeH / 2.0 - pad);
+                edges.add(new EdgeSeg(from.getId(), to, o.choice(), sx, sy, tx, ty));
+            }
+        }
+        req.setAttribute("width", width);
+        req.setAttribute("height", height);
+        req.setAttribute("nodeW", nodeW);
+        req.setAttribute("nodeH", nodeH);
+        req.setAttribute("positions", pos.values());
+        req.setAttribute("edges", edges);
+        req.setAttribute("isEmpty", Boolean.FALSE);
     }
 }

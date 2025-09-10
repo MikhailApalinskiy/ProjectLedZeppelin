@@ -1,12 +1,12 @@
 package com.javarush.apalinskiy.web.servlet;
 
-import com.javarush.apalinskiy.application.ports.CustomQuestRepository;
+import com.javarush.apalinskiy.repository.quest.CustomQuestRepository;
 import com.javarush.apalinskiy.domain.user.User;
-import com.javarush.apalinskiy.mail.NotificationEvent;
-import com.javarush.apalinskiy.mail.NotificationType;
-import com.javarush.apalinskiy.quest.CustomQuest;
+import com.javarush.apalinskiy.domain.notify.NotificationEvent;
+import com.javarush.apalinskiy.domain.notify.NotificationType;
+import com.javarush.apalinskiy.domain.quest.custom.CustomQuest;
 import com.javarush.apalinskiy.web.util.Web;
-import com.javarush.apalinskiy.web.util.WebConst;
+import com.javarush.apalinskiy.app.WebConst;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;

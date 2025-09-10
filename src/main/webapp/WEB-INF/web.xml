@@ -24,7 +24,7 @@
     </session-config>
 
     <listener>
-        <listener-class>com.javarush.apalinskiy.web.listener.AppBootstrap</listener-class>
+        <listener-class>com.javarush.apalinskiy.app.AppBootstrap</listener-class>
     </listener>
 
     <context-param>

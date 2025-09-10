@@ -2,7 +2,7 @@ package com.javarush.apalinskiy.web.servlet;
 
 
 import com.javarush.apalinskiy.web.util.Web;
-import com.javarush.apalinskiy.web.util.WebConst;
+import com.javarush.apalinskiy.app.WebConst;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;

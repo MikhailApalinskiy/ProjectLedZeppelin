@@ -1,12 +1,12 @@
 package com.javarush.apalinskiy.web.servlet;
 
-import com.javarush.apalinskiy.application.quests.QuestAuthoringService;
-import com.javarush.apalinskiy.application.quests.QuestService;
-import com.javarush.apalinskiy.application.save.SaveStateService;
+import com.javarush.apalinskiy.service.quest.QuestAuthoringService;
+import com.javarush.apalinskiy.service.quest.QuestService;
+import com.javarush.apalinskiy.service.save.SaveStateService;
 import com.javarush.apalinskiy.domain.quest.QuestNode;
 import com.javarush.apalinskiy.domain.user.User;
 import com.javarush.apalinskiy.web.util.Web;
-import com.javarush.apalinskiy.web.util.WebConst;
+import com.javarush.apalinskiy.app.WebConst;
 import com.javarush.apalinskiy.web.view.SlotView;
 import jakarta.servlet.ServletConfig;
 import jakarta.servlet.ServletContext;

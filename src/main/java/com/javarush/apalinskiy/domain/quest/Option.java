@@ -2,6 +2,7 @@ package com.javarush.apalinskiy.domain.quest;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.javarush.apalinskiy.domain.quest.choice.ChoiceNormalizer;
 import lombok.Getter;
 
 @JsonIgnoreProperties(ignoreUnknown = true)

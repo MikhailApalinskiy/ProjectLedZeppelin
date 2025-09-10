@@ -1,16 +1,16 @@
 package com.javarush.apalinskiy.web.servlet;
 
-import com.javarush.apalinskiy.domain.quest.graph.QuestNavigator;
+import com.javarush.apalinskiy.domain.quest.index.QuestNavigator;
 import com.javarush.apalinskiy.domain.quest.QuestNode;
-import com.javarush.apalinskiy.application.quests.QuestAuthoringService;
-import com.javarush.apalinskiy.application.quests.QuestService;
-import com.javarush.apalinskiy.application.dto.ChoiceError;
-import com.javarush.apalinskiy.application.dto.ChooseResult;
+import com.javarush.apalinskiy.service.quest.QuestAuthoringService;
+import com.javarush.apalinskiy.service.quest.QuestService;
+import com.javarush.apalinskiy.domain.quest.choice.ChoiceError;
+import com.javarush.apalinskiy.domain.quest.choice.ChooseResult;
 import com.javarush.apalinskiy.domain.user.User;
-import com.javarush.apalinskiy.quest.CustomQuest;
-import com.javarush.apalinskiy.stats.UserStatsService;
+import com.javarush.apalinskiy.domain.quest.custom.CustomQuest;
+import com.javarush.apalinskiy.service.user.UserStatsService;
 import com.javarush.apalinskiy.web.util.Web;
-import com.javarush.apalinskiy.web.util.WebConst;
+import com.javarush.apalinskiy.app.WebConst;
 import jakarta.servlet.ServletConfig;
 import jakarta.servlet.ServletContext;
 import jakarta.servlet.ServletException;

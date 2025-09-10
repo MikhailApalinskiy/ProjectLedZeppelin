@@ -1,10 +1,11 @@
 package com.javarush.apalinskiy.web.util;
 
-import com.javarush.apalinskiy.application.quests.QuestAuthoringService;
+import com.javarush.apalinskiy.app.WebConst;
+import com.javarush.apalinskiy.service.quest.QuestAuthoringService;
 import com.javarush.apalinskiy.domain.quest.Option;
 import com.javarush.apalinskiy.domain.quest.QuestNode;
 import com.javarush.apalinskiy.domain.user.User;
-import com.javarush.apalinskiy.quest.CustomQuest;
+import com.javarush.apalinskiy.domain.quest.custom.CustomQuest;
 import com.javarush.apalinskiy.web.view.EdgeSeg;
 import com.javarush.apalinskiy.web.view.NodePos;
 import jakarta.servlet.ServletContext;

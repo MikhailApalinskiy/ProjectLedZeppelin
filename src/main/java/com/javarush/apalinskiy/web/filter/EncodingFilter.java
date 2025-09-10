@@ -1,6 +1,6 @@
 package com.javarush.apalinskiy.web.filter;
 
-import com.javarush.apalinskiy.web.util.WebConst;
+import com.javarush.apalinskiy.app.WebConst;
 import jakarta.servlet.*;
 
 import java.io.IOException;

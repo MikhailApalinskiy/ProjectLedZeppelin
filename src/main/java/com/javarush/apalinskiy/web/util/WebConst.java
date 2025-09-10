@@ -158,7 +158,7 @@ public final class WebConst {
     }
 
     public static final class InitParam {
-        public static final String UPLOADS_DIR = "uploads.dir";
+        public static final String CTX_UPLOADS_DIR = "uploads.base.dir";
 
         private InitParam() {
         }

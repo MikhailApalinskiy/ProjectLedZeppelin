@@ -21,6 +21,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
+import static com.javarush.apalinskiy.web.util.Uploads.resolveBaseDir;
+
 public class CreateQuestServlet extends HttpServlet {
 
     private QuestAuthoringService authoring;
@@ -191,12 +193,7 @@ public class CreateQuestServlet extends HttpServlet {
         if (!ct.startsWith("image/")) {
             throw new ServletException("Only image files are allowed");
         }
-        String dir = getServletContext().getInitParameter(WebConst.InitParam.UPLOADS_DIR);
-        if (dir == null || dir.isBlank()) {
-            dir = System.getProperty("java.io.tmpdir") + "/textquest-uploads";
-        }
-        Path uploadsDir = Paths.get(dir).normalize();
-        Files.createDirectories(uploadsDir);
+        Path uploadsDir = resolveBaseDir(getServletContext());
         String submitted = Optional.ofNullable(part.getSubmittedFileName()).orElse("image");
         String baseName = Paths.get(submitted).getFileName().toString().replaceAll("[^a-zA-Z0-9._-]", "_");
         String ext = "";

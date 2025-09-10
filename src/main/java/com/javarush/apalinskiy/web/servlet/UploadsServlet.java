@@ -1,6 +1,5 @@
 package com.javarush.apalinskiy.web.servlet;
 
-import com.javarush.apalinskiy.web.util.WebConst;
 import jakarta.servlet.ServletConfig;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServlet;
@@ -13,6 +12,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
+import static com.javarush.apalinskiy.web.util.Uploads.resolveBaseDir;
+
 public class UploadsServlet extends HttpServlet {
 
     private Path baseDir;
@@ -20,16 +21,7 @@ public class UploadsServlet extends HttpServlet {
     @Override
     public void init(ServletConfig config) throws ServletException {
         super.init(config);
-        String dir = config.getServletContext().getInitParameter(WebConst.InitParam.UPLOADS_DIR);
-        if (dir == null || dir.isBlank()) {
-            dir = System.getProperty("java.io.tmpdir") + "/textquest-uploads";
-        }
-        baseDir = Paths.get(dir).normalize();
-        try {
-            Files.createDirectories(baseDir);
-        } catch (IOException e) {
-            throw new ServletException("Cannot create uploads dir: " + baseDir, e);
-        }
+        this.baseDir = resolveBaseDir(config.getServletContext());
     }
 
     @Override

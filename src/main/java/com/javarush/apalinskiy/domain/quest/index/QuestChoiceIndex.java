@@ -19,7 +19,9 @@ public final class QuestChoiceIndex {
         for (QuestNode from : nodes) {
             for (Option o : from.getOptions()) {
                 Integer next = o.next();
-                if (next == null) continue;
+                if (next == null) {
+                    continue;
+                }
                 String key = key(from.getId(), o.normalizedChoice());
                 Integer prev = m.put(key, next);
                 if (prev != null) {

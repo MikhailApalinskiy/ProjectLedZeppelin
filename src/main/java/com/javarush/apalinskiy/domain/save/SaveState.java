@@ -49,7 +49,9 @@ public class SaveState {
     }
 
     public SaveSlot getGlobalSlot(int slot) {
-        if (slot < 0 || slot >= globalSlots.length) return null;
+        if (slot < 0 || slot >= globalSlots.length) {
+            return null;
+        }
         return globalSlots[slot];
     }
 
@@ -68,7 +70,9 @@ public class SaveState {
     }
 
     public void clearGlobalSlot(int slot) {
-        if (slot < 0 || slot >= globalSlots.length) return;
+        if (slot < 0 || slot >= globalSlots.length) {
+            return;
+        }
         globalSlots[slot] = null;
         touch();
     }

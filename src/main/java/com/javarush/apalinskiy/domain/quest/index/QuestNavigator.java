@@ -33,7 +33,6 @@ public final class QuestNavigator {
     private static QuestNavigator build(List<QuestNode> nodes, int startId, boolean strict) {
         Objects.requireNonNull(nodes, "nodes");
         QuestIdIndex idIdx = QuestIdIndex.from(nodes);
-
         if (strict) {
             for (QuestNode from : nodes) {
                 for (Option o : from.getOptions()) {
@@ -44,7 +43,6 @@ public final class QuestNavigator {
                 }
             }
         }
-
         QuestChoiceIndex choiceIdx = QuestChoiceIndex.from(nodes);
         return new QuestNavigator(idIdx, choiceIdx, startId);
     }

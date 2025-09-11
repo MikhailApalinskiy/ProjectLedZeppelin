@@ -1,4 +1,0 @@
-[
-  { "id": 1, "text": "Start", "options": [ {"choice":"Go","next":2} ], "final": false },
-  { "id": 2, "text": "End", "final": true }
-]

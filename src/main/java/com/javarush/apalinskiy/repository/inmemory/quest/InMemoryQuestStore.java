@@ -141,7 +141,7 @@ public class InMemoryQuestStore implements QuestDraftStore {
             }
         }
         newNodes.add(node);
-        int newStartId = (this.startId == 0) ? node.getId() : this.startId; // <-- ключевая строка
+        int newStartId = (this.startId == 0) ? node.getId() : this.startId;
         rebuild(newNodes, newStartId);
     }
 

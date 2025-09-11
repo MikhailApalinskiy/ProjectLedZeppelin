@@ -41,7 +41,9 @@ public class InMemoryNotificationRepository implements NotificationRepository {
     @Override
     public void markAllRead(String userId) {
         Map<String, Notification> m = byUser.get(userId);
-        if (m == null) return;
+        if (m == null) {
+            return;
+        }
         m.replaceAll((id, n) -> n.isRead() ? n : n.markRead());
     }
 
@@ -54,7 +56,9 @@ public class InMemoryNotificationRepository implements NotificationRepository {
     public void markRead(String userId, String id) {
         byUser.computeIfPresent(userId, (uid, m) -> {
             Notification n = m.get(id);
-            if (n != null && !n.isRead()) m.put(id, n.markRead());
+            if (n != null && !n.isRead()) {
+                m.put(id, n.markRead());
+            }
             return m;
         });
     }

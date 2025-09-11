@@ -20,13 +20,17 @@ public class InMemoryUserStatsService implements UserStatsService {
 
     @Override
     public void incCreated(String userId) {
-        if (userId == null || userId.isBlank()) return;
+        if (userId == null || userId.isBlank()) {
+            return;
+        }
         byUser.computeIfAbsent(userId, k -> new Entry()).created.incrementAndGet();
     }
 
     @Override
     public void onQuestCompleted(String userId, String questKey, Integer finalNodeId) {
-        if (userId == null || userId.isBlank()) return;
+        if (userId == null || userId.isBlank()) {
+            return;
+        }
         Entry e = byUser.computeIfAbsent(userId, k -> new Entry());
         e.completed.incrementAndGet();
         if ("main".equals(questKey) && finalNodeId != null) {
@@ -37,7 +41,9 @@ public class InMemoryUserStatsService implements UserStatsService {
     @Override
     public UserStats statsOf(String userId) {
         Entry e = byUser.get(userId);
-        if (e == null) return new UserStats(0, 0, 0);
+        if (e == null) {
+            return new UserStats(0, 0, 0);
+        }
         return new UserStats(e.created.get(), e.completed.get(), e.mainFinals.size());
     }
 }

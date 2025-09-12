@@ -16,11 +16,15 @@ import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.*;
 
 public class AdminUserEditServlet extends HttpServlet {
+
+    private static final Logger log = LoggerFactory.getLogger(AdminUserEditServlet.class);
 
     private UserService users;
     private NotificationService notify;
@@ -31,6 +35,7 @@ public class AdminUserEditServlet extends HttpServlet {
         ServletContext ctx = config.getServletContext();
         this.users = Web.ctxBean(ctx, WebConst.Ctx.USER_SERVICE, UserService.class);
         this.notify = Web.ctxBean(ctx, WebConst.Ctx.NOTIFY_SERVICE, NotificationService.class);
+        log.debug("AdminUserEditServlet initialized");
     }
 
     @Override
@@ -39,16 +44,19 @@ public class AdminUserEditServlet extends HttpServlet {
         Web.pullFlash(req, WebConst.Attr.ERROR);
         String id = Web.trimOrNull(req.getParameter(WebConst.Param.ID));
         if (id == null) {
+            log.warn("GET user edit: missing id");
             Web.redirectErr(req, resp, WebConst.Path.USERS, "Missing user id");
             return;
         }
         User target = users.findById(id).orElse(null);
         if (target == null) {
+            log.warn("GET user edit: target not found id={}", id);
             Web.redirectErr(req, resp, WebConst.Path.USERS, "User not found");
             return;
         }
         req.setAttribute("editUser", target);
         req.setAttribute("roles", List.of(Role.USER, Role.ADMIN));
+        log.info("GET user edit opened targetId={} login='{}'", target.getUserId(), target.getUserLogin());
         Web.forward(req, resp, WebConst.Jsp.USER_EDIT);
     }
 
@@ -60,6 +68,7 @@ public class AdminUserEditServlet extends HttpServlet {
         String roleStr = Web.trimOrNull(req.getParameter(WebConst.Param.ROLE));
         String newPwd = Web.trimOrNull(req.getParameter(WebConst.Param.PASSWORD));
         if (id == null) {
+            log.warn("POST user edit: missing id");
             Web.redirectErr(req, resp, WebConst.Path.USERS, "Missing user id");
             return;
         }
@@ -72,6 +81,7 @@ public class AdminUserEditServlet extends HttpServlet {
             if (s != null && me != null && me.getUserId().equals(updated.getUserId())) {
                 boolean sensitiveChanged = Web.sensitiveChanged(beforeOpt.orElse(null), updated, newPwd != null);
                 if (sensitiveChanged) {
+                    log.debug("Session renewed after self-update userId={}", updated.getUserId());
                     Web.renewSessionAndPut(req, WebConst.Attr.USER, updated);
                 } else {
                     s.setAttribute(WebConst.Attr.USER, updated);
@@ -88,14 +98,22 @@ public class AdminUserEditServlet extends HttpServlet {
                         data
                 ));
             }
+            log.info("POST user edit: updated by={} targetId={} role={} login='{}' name='{}' pwdChanged={}",
+                    (beforeOpt.isPresent() ? req.getSession(false) != null &&
+                            (req.getSession(false).getAttribute(WebConst.Attr.USER)) != null
+                            ? ((User) req.getSession(false).getAttribute(WebConst.Attr.USER)).getUserId() : null : null),
+                    updated.getUserId(), updated.getRole(), updated.getUserLogin(), updated.getUserName(),
+                    (newPwd != null && !newPwd.isBlank()));
             Web.redirectOk(req, resp,
                     WebConst.Path.USER_EDIT + "?" + WebConst.Param.ID + "=" + id,
                     "The user has been updated");
         } catch (DuplicateLoginException e) {
+            log.warn("POST user edit: duplicate login id={} login='{}'", id, login);
             Web.redirectErr(req, resp,
                     WebConst.Path.USER_EDIT + "?" + WebConst.Param.ID + "=" + id,
                     "The username is already occupied");
         } catch (IllegalArgumentException | NoSuchElementException e) {
+            log.warn("POST user edit: invalid input or user not found id={} msg={}", id, e.getMessage());
             Web.redirectErr(req, resp,
                     WebConst.Path.USER_EDIT + "?" + WebConst.Param.ID + "=" + id,
                     e.getMessage());

@@ -7,10 +7,14 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 
 public class HomeServlet extends HttpServlet {
+
+    private static final Logger log = LoggerFactory.getLogger(HomeServlet.class);
 
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp)
@@ -21,8 +25,10 @@ public class HomeServlet extends HttpServlet {
         String requestUri = req.getRequestURI();
         String rest = requestUri.substring(contextPath.length());
         if (rest.equals("/") || rest.isEmpty()) {
+            log.debug("Home page requested uri={}", requestUri);
             Web.forward(req, resp, WebConst.Jsp.INDEX);
         } else {
+            log.warn("Not found uri={} rest={}", requestUri, rest);
             resp.sendError(HttpServletResponse.SC_NOT_FOUND);
         }
     }
@@ -30,6 +36,7 @@ public class HomeServlet extends HttpServlet {
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp)
             throws IOException {
+        log.warn("POST not allowed on home uri={}", req.getRequestURI());
         resp.sendError(HttpServletResponse.SC_METHOD_NOT_ALLOWED);
     }
 }

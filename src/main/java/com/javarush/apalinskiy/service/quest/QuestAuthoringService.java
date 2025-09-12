@@ -8,6 +8,8 @@ import com.javarush.apalinskiy.domain.quest.custom.CustomQuest;
 import com.javarush.apalinskiy.domain.quest.QuestNode;
 import com.javarush.apalinskiy.repository.quest.CustomQuestRepository;
 import lombok.Getter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -16,6 +18,8 @@ import java.util.stream.Collectors;
 
 @Getter
 public class QuestAuthoringService {
+
+    private static final Logger log = LoggerFactory.getLogger(QuestAuthoringService.class);
 
     private final QuestDraftStore editorRepo;
     private final QuestStore prodRepo;
@@ -36,25 +40,34 @@ public class QuestAuthoringService {
     }
 
     public boolean deleteNode(int id) {
-        return editorRepo.deleteNode(id);
+        boolean ok = editorRepo.deleteNode(id);
+        log.debug("deleteNode id={} ok={}", id, ok);
+        return ok;
     }
 
     public void saveNode(QuestNode node) {
         editorRepo.replaceNode(node);
+        log.debug("saveNode id={}", node.getId());
     }
 
     public void setStart(int startId) {
         editorRepo.setStartId(startId);
+        log.debug("setStart startId={}", startId);
     }
 
     public void clearEditorDraft() {
         editorRepo.clearDraft(0);
+        log.debug("clearEditorDraft done");
     }
 
     public void loadToEditor(String questId) {
         CustomQuest q = catalogRepo.get(Objects.requireNonNull(questId, "questId"))
-                .orElseThrow(() -> new IllegalArgumentException("Quest not found: " + questId));
+                .orElseThrow(() -> {
+                    log.warn("loadToEditor failed: quest not found questId={}", questId);
+                    return new IllegalArgumentException("Quest not found: " + questId);
+                });
         editorRepo.reload(q.getNodes(), q.getStartId(), false);
+        log.info("Editor loaded questId={} name='{}' nodes={} startId={}", questId, q.getName(), q.getNodes().size(), q.getStartId());
     }
 
     public Optional<CustomQuest> getFromCatalog(String id) {
@@ -62,11 +75,15 @@ public class QuestAuthoringService {
     }
 
     public List<CustomQuest> listAllFromCatalog() {
-        return catalogRepo.listAll();
+        List<CustomQuest> list = catalogRepo.listAll();
+        log.debug("listAllFromCatalog size={}", list.size());
+        return list;
     }
 
     public List<CustomQuest> listOwnerFromCatalog(String ownerLogin) {
-        return catalogRepo.listByOwner(ownerLogin);
+        List<CustomQuest> list = catalogRepo.listByOwner(ownerLogin);
+        log.debug("listOwnerFromCatalog owner={} size={}", ownerLogin, list.size());
+        return list;
     }
 
     public void publishNew(String ownerLogin, String questName) {
@@ -74,6 +91,8 @@ public class QuestAuthoringService {
         String name = (questName == null || questName.isBlank()) ? "Untitled Quest" : questName.trim();
         Draft d = buildDraftOrThrow();
         catalogRepo.create(ownerLogin, name, d.start, d.nodes, true, d.version);
+        log.info("Quest published owner={} name='{}' nodes={} startId={} version={}",
+                ownerLogin, name, d.nodes.size(), d.start, d.version);
         editorRepo.reload(Collections.emptyList(), 0, false);
     }
 
@@ -82,14 +101,23 @@ public class QuestAuthoringService {
     }
 
     public boolean deleteFromCatalogIfOwner(String questId, String ownerLogin) {
-        Objects.requireNonNull(questId, "questId");
-        Objects.requireNonNull(ownerLogin, "ownerLogin");
-        return catalogRepo.deleteIfOwner(questId, ownerLogin);
+        boolean ok = catalogRepo.deleteIfOwner(questId, ownerLogin);
+        if (ok) {
+            log.info("Quest deleted by owner questId={} owner={}", questId, ownerLogin);
+        } else {
+            log.warn("Delete by owner skipped questId={} owner={} (not found / not owner)", questId, ownerLogin);
+        }
+        return ok;
     }
 
     public boolean deleteFromCatalogAsAdmin(String questId) {
-        Objects.requireNonNull(questId, "questId");
-        return catalogRepo.delete(questId);
+        boolean ok = catalogRepo.delete(questId);
+        if (ok) {
+            log.info("Quest deleted by admin questId={}", questId);
+        } else {
+            log.warn("Delete by admin skipped questId={} (not found)", questId);
+        }
+        return ok;
     }
 
     public List<String> validateCurrentDraft() {
@@ -135,42 +163,60 @@ public class QuestAuthoringService {
         String name = (questName == null || questName.isBlank()) ? "Untitled Quest" : questName.trim();
         Draft d = buildDraftOrThrow();
         catalogRepo.stageCreate(ownerLogin, name, d.start, d.nodes, d.version);
+        log.info("Quest submitted for moderation owner={} name='{}' nodes={} startId={} version={}",
+                ownerLogin, name, d.nodes.size(), d.start, d.version);
         editorRepo.reload(Collections.emptyList(), 0, false);
     }
 
     public void updateExisting(String questId, boolean asAdmin) {
         Objects.requireNonNull(questId, "questId");
-        catalogRepo.get(questId).orElseThrow(() -> new IllegalArgumentException("Quest not found: " + questId));
+        catalogRepo.get(questId).orElseThrow(() -> {
+            log.warn("updateExisting failed: quest not found questId={}", questId);
+            return new IllegalArgumentException("Quest not found: " + questId);
+        });
         Draft d = buildDraftOrThrow();
         if (asAdmin) {
             catalogRepo.update(questId, d.start, d.nodes, true, d.version);
+            log.info("Quest updated by admin questId={} nodes={} startId={} version={}",
+                    questId, d.nodes.size(), d.start, d.version);
         } else {
             catalogRepo.stageEdit(questId, d.start, d.nodes, d.version);
+            log.info("Quest edit staged questId={} nodes={} startId={} version={}",
+                    questId, d.nodes.size(), d.start, d.version);
         }
     }
 
     public List<CustomQuestRepository.PendingNew> listPendingNew() {
-        return catalogRepo.listPendingNew();
+        List<CustomQuestRepository.PendingNew> list = catalogRepo.listPendingNew();
+        log.debug("listPendingNew size={}", list.size());
+        return list;
     }
 
     public List<CustomQuestRepository.PendingEdit> listPendingEdits() {
-        return catalogRepo.listPendingEdits();
+        List<CustomQuestRepository.PendingEdit> list = catalogRepo.listPendingEdits();
+        log.debug("listPendingEdits size={}", list.size());
+        return list;
     }
 
     public String approveCreate(String pendingId) {
-        return catalogRepo.approveCreate(pendingId);
+        String id = catalogRepo.approveCreate(pendingId);
+        log.info("Approved NEW pendingId={} -> questId={}", pendingId, id);
+        return id;
     }
 
     public void rejectCreate(String pendingId) {
         catalogRepo.rejectCreate(pendingId);
+        log.info("Rejected NEW pendingId={}", pendingId);
     }
 
     public void approveEdit(String questId) {
         catalogRepo.approveEdit(questId);
+        log.info("Approved EDIT questId={}", questId);
     }
 
     public void rejectEdit(String questId) {
         catalogRepo.rejectEdit(questId);
+        log.info("Rejected EDIT questId={}", questId);
     }
 
     private static String computeVersion(List<QuestNode> nodes, int start) {
@@ -190,6 +236,7 @@ public class QuestAuthoringService {
                     });
             return "sha256:" + HexFormat.of().formatHex(md.digest());
         } catch (Exception e) {
+            log.warn("computeVersion failed, returning 'sha256:unknown'", e);
             return "sha256:unknown";
         }
     }
@@ -210,12 +257,14 @@ public class QuestAuthoringService {
     private Draft buildDraftOrThrow() {
         List<String> errors = validateCurrentDraft();
         if (!errors.isEmpty()) {
+            log.warn("Draft validation failed errors={}", String.join(" ", errors));
             throw new IllegalStateException(String.join(" ", errors));
         }
         List<QuestNode> nodes = editorRepo.nodes();
         int start = editorRepo.startId();
         QuestNavigator.from(nodes, start);
         String version = computeVersion(nodes, start);
+        log.debug("Draft built nodes={} startId={} version={}", nodes.size(), start, version);
         return new Draft(nodes, start, version);
     }
 }

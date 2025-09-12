@@ -10,19 +10,27 @@ import com.javarush.apalinskiy.app.WebConst;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public class AdminQuestsModerationServlet extends BaseQuestAdminServlet {
+
+    private static final Logger log = LoggerFactory.getLogger(AdminQuestsModerationServlet.class);
 
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp)
             throws ServletException, IOException {
         Web.pullFlash(req, WebConst.Attr.FLASH);
+        List<CustomQuestRepository.PendingNew> newList = authoring.listPendingNew();
+        List<CustomQuestRepository.PendingEdit> editList = authoring.listPendingEdits();
         req.setAttribute("pendingNew", authoring.listPendingNew());
         req.setAttribute("pendingEdit", authoring.listPendingEdits());
+        log.info("Moderation list opened pendingNew={} pendingEdit={}", newList.size(), editList.size());
         Web.forward(req, resp, WebConst.Jsp.QUESTS_MOD);
     }
 
@@ -31,6 +39,7 @@ public class AdminQuestsModerationServlet extends BaseQuestAdminServlet {
         final String action = Web.trimOrNull(req.getParameter("action"));
         final String id = Web.trimOrNull(req.getParameter("id"));
         if (action == null || id == null) {
+            log.warn("Moderation POST missing params action={} id={}", action, id);
             resp.sendError(HttpServletResponse.SC_BAD_REQUEST, "Missing parameters");
             return;
         }
@@ -48,6 +57,8 @@ public class AdminQuestsModerationServlet extends BaseQuestAdminServlet {
                     notifyFriendsPublishedByLogin(ownerLogin, questName);
                     req.getSession().setAttribute(WebConst.Attr.FLASH,
                             "The quest has been published (id=" + newId + ").");
+                    log.info("approveCreate done actorId={} owner={} name='{}' newId={}",
+                            actorId, ownerLogin, questName, newId);
                 }
                 case "rejectCreate" -> {
                     CustomQuestRepository.PendingNew pn = findPendingNew(id);
@@ -56,6 +67,8 @@ public class AdminQuestsModerationServlet extends BaseQuestAdminServlet {
                     authoring.rejectCreate(id);
                     notifyModeration(actorId, ownerLogin, questName, "rejected", null);
                     req.getSession().setAttribute(WebConst.Attr.FLASH, "New publication rejected.");
+                    log.info("rejectCreate done actorId={} owner={} name='{}'",
+                            actorId, ownerLogin, questName);
                 }
                 case "approveEdit" -> {
                     CustomQuestRepository.PendingEdit pe = findPendingEdit(id);
@@ -64,6 +77,8 @@ public class AdminQuestsModerationServlet extends BaseQuestAdminServlet {
                     authoring.approveEdit(id);
                     notifyModeration(actorId, ownerLogin, questName, "approved", null);
                     req.getSession().setAttribute(WebConst.Attr.FLASH, "Edits approved and applied.");
+                    log.info("approveEdit done actorId={} owner={} name='{}' questId={}",
+                            actorId, ownerLogin, questName, id);
                 }
                 case "rejectEdit" -> {
                     CustomQuestRepository.PendingEdit pe = findPendingEdit(id);
@@ -72,14 +87,18 @@ public class AdminQuestsModerationServlet extends BaseQuestAdminServlet {
                     authoring.rejectEdit(id);
                     notifyModeration(actorId, ownerLogin, questName, "edit-rejected", null);
                     req.getSession().setAttribute(WebConst.Attr.FLASH, "The edits were rejected.");
+                    log.info("rejectEdit done actorId={} owner={} name='{}' questId={}",
+                            actorId, ownerLogin, questName, id);
                 }
                 default -> {
+                    log.warn("Moderation POST unknown action action={} id={}", action, id);
                     resp.sendError(HttpServletResponse.SC_BAD_REQUEST, "Unknown action");
                     return;
                 }
             }
             resp.sendRedirect(resp.encodeRedirectURL(req.getContextPath() + WebConst.Path.QUESTS_MOD));
         } catch (RuntimeException ex) {
+            log.error("Moderation action failed action={} id={} actorId={}", action, id, actorId, ex);
             Web.redirect(req, resp, WebConst.Path.QUESTS_MOD,
                     Map.of(WebConst.Attr.ERROR, ex.getMessage() == null ? "Operation failed" : ex.getMessage()));
         }

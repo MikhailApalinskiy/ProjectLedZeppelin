@@ -10,6 +10,8 @@ import jakarta.servlet.ServletConfig;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.UnavailableException;
 import jakarta.servlet.http.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -25,6 +27,8 @@ import static com.javarush.apalinskiy.web.util.Uploads.resolveBaseDir;
 
 public class CreateQuestServlet extends HttpServlet {
 
+    private static final Logger log = LoggerFactory.getLogger(CreateQuestServlet.class);
+
     private QuestAuthoringService authoring;
 
     @Override
@@ -32,7 +36,9 @@ public class CreateQuestServlet extends HttpServlet {
         super.init(config);
         try {
             this.authoring = Web.ctxBean(config.getServletContext(), WebConst.Ctx.AUTHORING_SERVICE, QuestAuthoringService.class);
+            log.debug("CreateQuestServlet initialized");
         } catch (IllegalStateException e) {
+            log.error("Initialization failed: QuestAuthoringService not found in context", e);
             throw new UnavailableException("QuestAuthoringService not found in context");
         }
     }
@@ -46,6 +52,7 @@ public class CreateQuestServlet extends HttpServlet {
             if (s != null) {
                 s.removeAttribute("editingQuestId");
             }
+            log.info("Editor draft cleared (new). userSessionId={}", (s == null ? "null" : s.getId()));
             Web.redirectOk(req, resp, WebConst.Path.CREATE, "An empty draft of the quest has been created");
             return;
         }
@@ -54,8 +61,10 @@ public class CreateQuestServlet extends HttpServlet {
             try {
                 authoring.loadToEditor(loadId);
                 req.getSession(true).setAttribute("editingQuestId", loadId);
+                log.info("Quest loaded into editor questId={}", loadId);
                 Web.redirectOk(req, resp, WebConst.Path.CREATE, "The quest is uploaded to the editor");
             } catch (Exception e) {
+                log.warn("Failed to load quest into editor questId={} msg={}", loadId, e.getMessage());
                 Web.redirectErr(req, resp, WebConst.Path.CREATE, "Couldn't upload the quest: " + e.getMessage());
             }
             return;
@@ -85,8 +94,10 @@ public class CreateQuestServlet extends HttpServlet {
                             }
                             req.setAttribute("form_options", sb.toString());
                         }
+                        log.debug("Prefilled form from node id={}", id);
                     }
                 } catch (NumberFormatException ignored) {
+                    log.debug("Invalid node id for prefill: '{}'", idStr);
                 }
             }
             HttpSession sess = req.getSession(false);
@@ -103,6 +114,7 @@ public class CreateQuestServlet extends HttpServlet {
                     sess.removeAttribute("form_final");
                     sess.removeAttribute("form_options");
                     sess.removeAttribute("form_image");
+                    log.debug("Restored form from session");
                 }
             }
         }
@@ -113,6 +125,7 @@ public class CreateQuestServlet extends HttpServlet {
     protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws IOException {
         String action = req.getParameter(WebConst.Param.ACTION);
         if (action == null || action.isBlank()) {
+            log.warn("Create action missing");
             Web.redirectErr(req, resp, WebConst.Path.CREATE, "The action is not specified");
             return;
         }
@@ -123,6 +136,7 @@ public class CreateQuestServlet extends HttpServlet {
                     String optionsRaw = Optional.ofNullable(req.getParameter(WebConst.Param.OPTIONS)).orElse("").trim();
                     if (!isFinal && optionsRaw.isBlank()) {
                         stashFormForRedirect(req);
+                        log.warn("replaceNode denied: non-final node without options");
                         Web.redirectErr(req, resp, WebConst.Path.CREATE, "For the NON-final branch, you must specify at least one answer option.\n");
                         return;
                     }
@@ -131,6 +145,7 @@ public class CreateQuestServlet extends HttpServlet {
                         uploadedPath = handleImageUpload(req);
                     } catch (ServletException e) {
                         stashFormForRedirect(req);
+                        log.warn("Image upload error: {}", e.getMessage());
                         Web.redirectErr(req, resp, WebConst.Path.CREATE, "Image upload error: " + e.getMessage());
                         return;
                     }
@@ -145,6 +160,7 @@ public class CreateQuestServlet extends HttpServlet {
                         }
                     }
                     authoring.saveNode(node);
+                    log.info("Node saved id={} final={} hasImage={}", node.getId(), node.isFin(), (node.getImage() != null && !node.getImage().isBlank()));
                     Web.redirect(req, resp, WebConst.Path.CREATE,
                             Map.of(WebConst.Param.CLEAR, "1", WebConst.Attr.OK, "Node #" + node.getId() + " saved"));
                 }
@@ -155,15 +171,18 @@ public class CreateQuestServlet extends HttpServlet {
                         id = Integer.parseInt(idRaw);
                     } catch (NumberFormatException e) {
                         stashFormForRedirect(req);
+                        log.warn("deleteNode: bad id '{}'", idRaw);
                         Web.redirectErr(req, resp, WebConst.Path.CREATE, "Specify the correct ID to delete");
                         return;
                     }
                     boolean removed = authoring.deleteNode(id);
                     if (!removed) {
                         stashFormForRedirect(req);
+                        log.warn("deleteNode: node not found id={}", id);
                         Web.redirectErr(req, resp, WebConst.Path.CREATE, "Node #" + id + " not found in the draft");
                         return;
                     }
+                    log.info("Node deleted id={}", id);
                     Web.redirect(req, resp, WebConst.Path.CREATE,
                             Map.of(WebConst.Param.CLEAR, "1", WebConst.Attr.OK, "Node #" + id + " deleted"));
                 }
@@ -171,6 +190,7 @@ public class CreateQuestServlet extends HttpServlet {
             }
         } catch (IllegalArgumentException | IllegalStateException e) {
             stashFormForRedirect(req);
+            log.warn("Create operation failed: {}", e.getMessage());
             Web.redirectErr(req, resp, WebConst.Path.CREATE, e.getMessage());
         }
     }

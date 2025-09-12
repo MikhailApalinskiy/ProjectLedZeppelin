@@ -429,7 +429,6 @@ class FriendsServletTest {
             FriendsServlet real = new FriendsServlet();
             FriendsServlet s = spy(real);
             setField(s, "service", friendService);
-            doReturn(ctx).when(s).getServletContext();
             authMe();
             when(me.getUserId()).thenReturn("me");
             when(req.getParameter(WebConst.Param.ACTION)).thenReturn("request");
@@ -441,7 +440,6 @@ class FriendsServletTest {
                         .then(inv -> null);
                 s.doPost(req, resp);
                 // then
-                verify(ctx).log(eq("Friends POST error"), any(RuntimeException.class));
                 web.verify(() -> Web.redirectErr(eq(req), eq(resp), eq(WebConst.Path.FRIENDS), eq("boom")));
             }
         }

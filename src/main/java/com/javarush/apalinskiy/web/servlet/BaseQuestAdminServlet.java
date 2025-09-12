@@ -15,12 +15,16 @@ import jakarta.servlet.ServletContext;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.UnavailableException;
 import jakarta.servlet.http.HttpServlet;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 public class BaseQuestAdminServlet extends HttpServlet {
+
+    private static final Logger log = LoggerFactory.getLogger(BaseQuestAdminServlet.class);
 
     protected transient QuestAuthoringService authoring;
     protected transient NotificationService notify;
@@ -46,20 +50,43 @@ public class BaseQuestAdminServlet extends HttpServlet {
             } catch (IllegalStateException ignore) {
                 this.friendService = null;
             }
+            log.debug("BaseQuestAdminServlet init: authoring={}, notify={}, users={}, userStats={}, friendService={}",
+                    (authoring == null ? "null" : authoring.getClass().getSimpleName()),
+                    (notify == null ? "null" : notify.getClass().getSimpleName()),
+                    (users == null ? "null" : users.getClass().getSimpleName()),
+                    (userStats == null ? "null" : userStats.getClass().getSimpleName()),
+                    (friendService == null ? "null" : friendService.getClass().getSimpleName())
+            );
         } catch (IllegalStateException e) {
+            log.error("BaseQuestAdminServlet init failed: required services not found", e);
             throw new UnavailableException("Required services not found: " + e.getMessage());
         }
     }
 
     protected String resolveUserIdByLogin(String login) {
         if (login == null || login.isBlank() || users == null) {
+            if (login == null || login.isBlank()) {
+                log.warn("resolveUserIdByLogin skipped: blank login");
+            } else if (users == null) {
+                log.warn("resolveUserIdByLogin skipped: users service is null login='{}'", login);
+            }
             return null;
         }
-        return users.findByLogin(login).map(User::getUserId).orElse(null);
+        String id = users.findByLogin(login).map(User::getUserId).orElse(null);
+        if (id == null) {
+            log.warn("resolveUserIdByLogin: user not found login='{}'", login);
+        } else {
+            log.debug("resolveUserIdByLogin: login='{}' -> userId={}", login, id);
+        }
+        return id;
     }
 
     protected void notifyQuestAdminChanged(User admin, String targetLogin, String questName) {
         if (admin == null || notify == null || targetLogin == null) {
+            log.warn("notifyQuestAdminChanged skipped: admin={}, notify={}, targetLoginPresent={}",
+                    admin == null ? "null" : admin.getUserId(),
+                    notify == null ? "null" : notify.getClass().getSimpleName(),
+                    targetLogin != null);
             return;
         }
         String targetUserId = resolveUserIdByLogin(targetLogin);
@@ -75,15 +102,21 @@ public class BaseQuestAdminServlet extends HttpServlet {
                 targetUserId,
                 data
         ));
+        log.info("notifyQuestAdminChanged: adminId={} targetUserId={} quest='{}'",
+                admin.getUserId(), targetUserId, data.get("questName"));
     }
 
     protected void incCreatedByUserId(String userId) {
         if (userStats == null || userId == null || userId.isBlank()) {
+            log.warn("incCreatedByUserId skipped: userStatsPresent={} userId='{}'",
+                    userStats != null, userId);
             return;
         }
         try {
             userStats.incCreated(userId);
+            log.debug("incCreatedByUserId ok userId={}", userId);
         } catch (Exception ignore) {
+            log.warn("incCreatedByUserId ignored exception userId={}", userId);
         }
     }
 
@@ -93,6 +126,8 @@ public class BaseQuestAdminServlet extends HttpServlet {
 
     protected void notifyFriendsPublishedByLogin(String ownerLogin, String questName) {
         if (ownerLogin == null || notify == null || friendService == null) {
+            log.warn("notifyFriendsPublishedByLogin skipped: ownerLoginPresent={} notifyPresent={} friendServicePresent={}",
+                    ownerLogin != null, notify != null, friendService != null);
             return;
         }
         String ownerId = resolveUserIdByLogin(ownerLogin);
@@ -104,15 +139,19 @@ public class BaseQuestAdminServlet extends HttpServlet {
 
     protected void notifyFriendsPublishedByUserId(String ownerUserId, String questName) {
         if (ownerUserId == null || notify == null || friendService == null) {
+            log.warn("notifyFriendsPublishedByUserId skipped: ownerIdPresent={} notifyPresent={} friendServicePresent={}",
+                    ownerUserId != null, notify != null, friendService != null);
             return;
         }
         List<String> friendIds;
         try {
             friendIds = friendService.listFriendIds(ownerUserId);
         } catch (Exception e) {
+            log.warn("notifyFriendsPublishedByUserId: failed to load friends ownerId={}", ownerUserId, e);
             return;
         }
         if (friendIds == null || friendIds.isEmpty()) {
+            log.debug("notifyFriendsPublishedByUserId: no friends to notify ownerId={}", ownerUserId);
             return;
         }
         Map<String, String> data = new HashMap<>();
@@ -128,5 +167,6 @@ public class BaseQuestAdminServlet extends HttpServlet {
                     data
             ));
         }
+        log.info("notifyFriendsPublished: ownerId={} quest='{}'", ownerUserId, data.get("questName"));
     }
 }

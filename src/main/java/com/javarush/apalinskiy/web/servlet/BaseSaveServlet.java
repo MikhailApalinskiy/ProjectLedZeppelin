@@ -15,6 +15,8 @@ import jakarta.servlet.UnavailableException;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.time.Instant;
@@ -23,6 +25,8 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 public class BaseSaveServlet extends HttpServlet {
+
+    private static final Logger log = LoggerFactory.getLogger(BaseSaveServlet.class);
 
     protected transient SaveStateService saveState;
     protected transient QuestService questService;
@@ -35,12 +39,17 @@ public class BaseSaveServlet extends HttpServlet {
         try {
             this.questService = Web.ctxBean(ctx, WebConst.Ctx.QUEST_SERVICE, QuestService.class);
             this.saveState = Web.ctxBean(ctx, WebConst.Ctx.SAVE_STATE_SERVICE, SaveStateService.class);
+            Object as = ctx.getAttribute(WebConst.Ctx.AUTHORING_SERVICE);
+            if (as instanceof QuestAuthoringService a) {
+                this.authoring = a;
+            }
+            log.debug("BaseSaveServlet init: questService={}, saveState={}, authoring={}",
+                    (questService == null ? "null" : questService.getClass().getSimpleName()),
+                    (saveState == null ? "null" : saveState.getClass().getSimpleName()),
+                    (authoring == null ? "null" : authoring.getClass().getSimpleName()));
         } catch (IllegalStateException e) {
+            log.error("BaseSaveServlet init failed: {}", e.getMessage(), e);
             throw new UnavailableException(e.getMessage());
-        }
-        Object as = ctx.getAttribute(WebConst.Ctx.AUTHORING_SERVICE);
-        if (as instanceof QuestAuthoringService a) {
-            this.authoring = a;
         }
     }
 
@@ -50,6 +59,7 @@ public class BaseSaveServlet extends HttpServlet {
         if (u == null) {
             String next = req.getContextPath() + (returnPath.startsWith("/") ? returnPath : ("/" + returnPath));
             String loginUrl = req.getContextPath() + WebConst.Path.LOGIN + "?next=" + Web.urlEncode(next);
+            log.info("Auth required -> redirect to login next={}", next);
             resp.sendRedirect(resp.encodeRedirectURL(loginUrl));
             return null;
         }
@@ -58,17 +68,21 @@ public class BaseSaveServlet extends HttpServlet {
 
 
     protected String resolveQuestName(String questIdOrNull) {
-        return Web.displayName(questIdOrNull, authoring);
+        String name = Web.displayName(questIdOrNull, authoring);
+        log.debug("resolveQuestName questId={} -> '{}'", questIdOrNull, name);
+        return name;
     }
 
     protected String titleFor(int nodeId, String questIdOrNull) {
         String qid = (questIdOrNull == null || questIdOrNull.isBlank()) ? "main" : questIdOrNull;
         if ("main".equals(qid)) {
             QuestNode n = questService.getById(nodeId);
-            return (n != null) ? Web.shortTitle(n.getText()) : ("Node #" + nodeId);
+            String title = (n != null) ? Web.shortTitle(n.getText()) : ("Node #" + nodeId);
+            log.debug("titleFor(main) nodeId={} -> '{}'", nodeId, title);
+            return title;
         }
         if (authoring != null) {
-            return authoring.getFromCatalog(qid)
+            String title = authoring.getFromCatalog(qid)
                     .map(q -> {
                         for (QuestNode n : q.getNodes()) {
                             if (n.getId() == nodeId) {
@@ -78,12 +92,18 @@ public class BaseSaveServlet extends HttpServlet {
                         return "Node #" + nodeId;
                     })
                     .orElse("Node #" + nodeId);
+            log.debug("titleFor(custom) questId={} nodeId={} -> '{}'", qid, nodeId, title);
+            return title;
         }
-        return "Node #" + nodeId;
+        String fallback = "Node #" + nodeId;
+        log.debug("titleFor(custom) authoring=null nodeId={} -> '{}'", nodeId, fallback);
+        return fallback;
     }
 
     protected String formatUpdated(Instant ts) {
-        if (ts == null) return null;
+        if (ts == null) {
+            return null;
+        }
         DateTimeFormatter fmt = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm")
                 .withZone(ZoneId.systemDefault());
         return fmt.format(ts);
@@ -108,6 +128,7 @@ public class BaseSaveServlet extends HttpServlet {
                 list.add(SlotView.empty(i, "main", "Main quest"));
             }
         }
+        log.debug("buildSlotsAll userId={} total={}", userId, list.size());
         return list;
     }
 }

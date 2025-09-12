@@ -18,11 +18,15 @@ import jakarta.servlet.UnavailableException;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.Optional;
 
 public class QuestServlet extends HttpServlet {
+
+    private static final Logger log = LoggerFactory.getLogger(QuestServlet.class);
 
     private transient QuestService prodService;
     private transient QuestAuthoringService authoring;
@@ -35,6 +39,7 @@ public class QuestServlet extends HttpServlet {
         try {
             this.prodService = Web.ctxBean(ctx, WebConst.Ctx.QUEST_SERVICE, QuestService.class);
         } catch (IllegalStateException e) {
+            log.error("Init failed: QuestService is not initialized", e);
             throw new UnavailableException("QuestService is not initialized");
         }
         Object a = ctx.getAttribute(WebConst.Ctx.AUTHORING_SERVICE);
@@ -46,6 +51,10 @@ public class QuestServlet extends HttpServlet {
         } catch (IllegalStateException ignore) {
             this.userStats = null;
         }
+        log.debug("QuestServlet init: prodService={}, authoring={}, userStats={}",
+                prodService.getClass().getSimpleName(),
+                (authoring == null ? "none" : authoring.getClass().getSimpleName()),
+                (userStats == null ? "none" : userStats.getClass().getSimpleName()));
     }
 
     @Override
@@ -53,6 +62,7 @@ public class QuestServlet extends HttpServlet {
             throws ServletException, IOException {
         String customId = Web.normalizedCustomParam(req);
         if (Web.isMissingCustomId(customId, authoring)) {
+            log.warn("Quest GET: custom quest missing or deleted customId={}", customId);
             resp.sendError(HttpServletResponse.SC_NOT_FOUND, "Custom quest not found or was deleted");
             return;
         }
@@ -62,10 +72,12 @@ public class QuestServlet extends HttpServlet {
         if (node == null) {
             req.setAttribute(WebConst.Attr.ERROR, WebConst.Msg.NODE_NOT_FOUND_PREFIX + id);
             node = svc.getStart();
+            log.warn("Quest GET: node not found, fallback to start customId={} requestedId={}", customId, id);
         }
         Web.pullFlash(req, WebConst.Attr.FLASH);
         req.setAttribute(WebConst.Attr.CUSTOM, customId);
         req.setAttribute("questTitle", Web.displayName(customId, authoring));
+        log.debug("Quest GET: render node id={} customId={} version={}", node.getId(), customId, svc.version());
         forwardQuest(req, resp, node, svc.version(), null);
     }
 
@@ -74,12 +86,14 @@ public class QuestServlet extends HttpServlet {
             throws ServletException, IOException {
         String customId = Web.normalizedCustomParam(req);
         if (Web.isMissingCustomId(customId, authoring)) {
+            log.warn("Quest POST: custom quest missing or deleted customId={}", customId);
             resp.sendError(HttpServletResponse.SC_NOT_FOUND, "Custom quest not found or was deleted");
             return;
         }
         TempService svc = (customId == null) ? TempService.from(prodService) : resolveCustomService(customId);
         Integer fromId = Web.parseIntOrNull(req.getParameter(WebConst.Param.FROM_ID));
         if (fromId == null) {
+            log.warn("Quest POST: missing fromId customId={}", customId);
             forwardQuest(req, resp, svc.getStart(), svc.version(), WebConst.Msg.BAD_FROM_ID);
             return;
         }
@@ -92,31 +106,44 @@ public class QuestServlet extends HttpServlet {
                 if (u != null) {
                     String questKey = (customId == null) ? "main" : customId;
                     Integer finalId = (customId == null) ? next.getId() : null;
-                    userStats.onQuestCompleted(u.getUserId(), questKey, finalId);
+                    try {
+                        userStats.onQuestCompleted(u.getUserId(), questKey, finalId);
+                        log.info("Quest completed userId={} questKey={} finalNodeId={}", u.getUserId(), questKey, finalId);
+                    } catch (Exception e) {
+                        log.warn("Quest completion stats failed userId={} questKey={} finalNodeId={}",
+                                u.getUserId(), questKey, finalId, e);
+                    }
                 }
             }
             if (next == null) {
+                log.error("Quest POST: next node is null fromId={} customId={}", fromId, customId);
                 resp.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Next node is null");
                 return;
             }
+            String target = Web.questUrl(req, next.getId(), customId);
+            log.info("Quest choice OK fromId={} -> nextId={} customId={} redirect={}", fromId, next.getId(), customId, target);
             resp.sendRedirect(resp.encodeRedirectURL(Web.questUrl(req, next.getId(), customId)));
         } else {
             QuestNode node = svc.getById(fromId);
             if (node == null) {
                 node = svc.getStart();
+                log.warn("Quest choice ERR: fromId={} not found, fallback to start customId={}", fromId, customId);
             }
             req.setAttribute(WebConst.Attr.CUSTOM, customId);
+            log.info("Quest choice ERR fromId={} customId={} reason='{}'", fromId, customId, result.getMessage());
             forwardQuest(req, resp, node, svc.version(), result.getMessage());
         }
     }
 
     private TempService resolveCustomService(String customId) throws ServletException {
         if (authoring == null) {
+            log.error("resolveCustomService: authoring service is null");
             throw new UnavailableException("Authoring service is not available");
         }
         CustomQuest q = authoring.getFromCatalog(customId).orElseThrow(
                 () -> new UnavailableException("Custom quest is missing"));
         QuestNavigator nav = QuestNavigator.from(q.getNodes(), q.getStartId());
+        log.debug("Resolved custom service customId={} name='{}' startId={}", customId, q.getName(), q.getStartId());
         return TempService.from(nav, "custom:" + q.getId());
     }
 

@@ -7,10 +7,14 @@ import com.javarush.apalinskiy.domain.notify.NotificationType;
 import com.javarush.apalinskiy.domain.user.User;
 import com.javarush.apalinskiy.service.user.UserService;
 import com.javarush.apalinskiy.service.notify.NotificationService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Map;
 
 public class DefaultNotificationService implements NotificationService {
+
+    private static final Logger log = LoggerFactory.getLogger(DefaultNotificationService.class);
 
     private final NotificationRepository repo;
     private final UserService users;
@@ -22,14 +26,29 @@ public class DefaultNotificationService implements NotificationService {
 
     @Override
     public void add(String userId, NotificationType type, String title, String body) {
-        repo.save(Notification.of(userId, type, title, body));
+        log.info("Notify.add type={} targetUserId={} title='{}'", type, userId, title);
+        try {
+            repo.save(Notification.of(userId, type, title, body));
+        } catch (RuntimeException e) {
+            log.error("Notify.add failed type={} targetUserId={} title='{}'", type, userId, title, e);
+            throw e;
+        }
     }
 
     @Override
     public void notify(NotificationEvent e) {
-        String actorName = (e.actorUserId() == null)
-                ? "System"
-                : users.findById(e.actorUserId()).map(User::getUserName).orElse("User");
+        log.info("Notify.event type={} targetUserId={} actorUserId={}", e.type(), e.targetUserId(), e.actorUserId());
+        String actorName;
+        if (e.actorUserId() == null) {
+            actorName = "System";
+        } else {
+            actorName = users.findById(e.actorUserId())
+                    .map(User::getUserName)
+                    .orElseGet(() -> {
+                        log.warn("Notify.event actor not found actorUserId={}", e.actorUserId());
+                        return "User";
+                    });
+        }
         switch (e.type()) {
             case FRIEND_REQUEST -> add(e.targetUserId(), e.type(),
                     "New friend request",

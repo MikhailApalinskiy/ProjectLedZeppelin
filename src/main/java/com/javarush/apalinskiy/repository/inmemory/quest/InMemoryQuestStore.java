@@ -5,6 +5,8 @@ import com.javarush.apalinskiy.domain.quest.index.QuestNavigator;
 import com.javarush.apalinskiy.repository.json.QuestJsonReader;
 import com.javarush.apalinskiy.domain.quest.QuestNode;
 import lombok.Getter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
@@ -14,6 +16,8 @@ import java.util.concurrent.atomic.AtomicReference;
 
 @Getter
 public class InMemoryQuestStore implements QuestDraftStore {
+
+    private static final Logger log = LoggerFactory.getLogger(InMemoryQuestStore.class);
 
     @Getter
     private static final class Snapshot {
@@ -34,6 +38,8 @@ public class InMemoryQuestStore implements QuestDraftStore {
         this.startId = startId;
         this.editingMode = editingMode;
         this.ref.set(Objects.requireNonNull(snapshot, "snapshot"));
+        log.debug("QuestStore created editingMode={} startId={} version={}",
+                editingMode, startId, snapshot.version);
     }
 
     public static InMemoryQuestStore empty(int startId) {
@@ -47,15 +53,22 @@ public class InMemoryQuestStore implements QuestDraftStore {
                 throw new IOException("Resource not found on classpath: " + resourceName);
             }
             byte[] bytes = in.readAllBytes();
+            log.info("Loaded quest resource resource={} bytes={}", resourceName, bytes.length);
             return fromBytes(bytes, startId);
+        } catch (IOException e) {
+            log.error("Failed to load quest resource resource={} startId={}", resourceName, startId, e);
+            throw e;
         }
     }
 
     private static InMemoryQuestStore fromBytes(byte[] bytes, int startId) throws IOException {
+        long t0 = System.nanoTime();
         QuestJsonReader reader = new QuestJsonReader();
         List<QuestNode> nodes = reader.read(new StringReader(new String(bytes, StandardCharsets.UTF_8)));
         QuestNavigator nav = QuestNavigator.from(nodes, startId);
         String version = "sha256:" + sha256(bytes);
+        long ms = (System.nanoTime() - t0) / 1_000_000;
+        log.info("Quest parsed nodes={} startId={} version={} parseMs={}", nodes.size(), startId, version, ms);
         return new InMemoryQuestStore(startId, new Snapshot(nav, version), false);
     }
 
@@ -67,19 +80,31 @@ public class InMemoryQuestStore implements QuestDraftStore {
     @Override
     public QuestNode start() {
         QuestNavigator nav = ref.get().nav;
-        return (nav == null) ? null : nav.start();
+        if (nav == null) {
+            log.warn("start() called but navigator is null (empty store), startId={}", startId);
+            return null;
+        }
+        return nav.start();
     }
 
     @Override
     public QuestNode get(int id) {
         QuestNavigator n = ref.get().getNav();
-        return (n == null) ? null : n.get(id);
+        if (n == null) {
+            log.warn("get({}) called but navigator is null", id);
+            return null;
+        }
+        return n.get(id);
     }
 
     @Override
     public Optional<QuestNode> choose(int fromId, String answer) {
         QuestNavigator n = ref.get().getNav();
-        return (n == null) ? Optional.empty() : n.choose(fromId, answer);
+        if (n == null) {
+            log.warn("choose({}, '{}') called but navigator is null", fromId, answer);
+            return Optional.empty();
+        }
+        return n.choose(fromId, answer);
     }
 
     @Override
@@ -91,10 +116,12 @@ public class InMemoryQuestStore implements QuestDraftStore {
     public synchronized boolean deleteNode(int id) {
         QuestNavigator cur = ref.get().getNav();
         if (cur == null) {
+            log.warn("deleteNode({}) skipped: navigator is null", id);
             return false;
         }
         Set<Integer> ids = cur.allIds();
         if (!ids.contains(id)) {
+            log.warn("deleteNode({}) skipped: id not found", id);
             return false;
         }
         List<QuestNode> newNodes = new ArrayList<>(Math.max(0, ids.size() - 1));
@@ -109,6 +136,7 @@ public class InMemoryQuestStore implements QuestDraftStore {
         }
         int newStart = (this.startId == id) ? 0 : this.startId;
         rebuild(newNodes, newStart);
+        log.debug("deleteNode({}) done: newSize={} newStartId={}", id, newNodes.size(), newStart);
         return true;
     }
 
@@ -143,12 +171,14 @@ public class InMemoryQuestStore implements QuestDraftStore {
         newNodes.add(node);
         int newStartId = (this.startId == 0) ? node.getId() : this.startId;
         rebuild(newNodes, newStartId);
+        log.debug("replaceNode(id={}) done: newSize={} newStartId={}", node.getId(), newNodes.size(), newStartId);
     }
 
     @Override
     public synchronized void clearDraft(int newStartId) {
         ref.set(new Snapshot(null, "draft:empty"));
         this.startId = newStartId;
+        log.debug("clearDraft() set startId={} version=draft:empty", newStartId);
     }
 
     @Override
@@ -156,6 +186,9 @@ public class InMemoryQuestStore implements QuestDraftStore {
         this.startId = newStartId;
         if (ref.get().nav != null) {
             rebuild(this.nodes(), newStartId);
+            log.debug("setStartId({}) rebuilt navigator", newStartId);
+        } else {
+            log.warn("setStartId({}) applied but navigator is null", newStartId);
         }
     }
 
@@ -163,6 +196,7 @@ public class InMemoryQuestStore implements QuestDraftStore {
     public synchronized void reload(List<QuestNode> nodes, int newStartId, boolean markEdited) {
         rebuild(nodes, newStartId);
         this.startId = newStartId;
+        log.debug("reload() nodes={} startId={} markEdited={}", (nodes == null ? 0 : nodes.size()), newStartId, markEdited);
     }
 
     private void rebuild(List<QuestNode> nodes, int start) {
@@ -175,6 +209,9 @@ public class InMemoryQuestStore implements QuestDraftStore {
             int effectiveStart = (editingMode && invalidStart)
                     ? safe.stream().mapToInt(QuestNode::getId).min().orElseThrow()
                     : start;
+            if (editingMode && invalidStart) {
+                log.warn("rebuild() invalid startId={}, using effectiveStart={} (editingMode)", start, effectiveStart);
+            }
             nav = editingMode
                     ? QuestNavigator.editingFrom(safe, effectiveStart)
                     : QuestNavigator.from(safe, start);
@@ -182,13 +219,16 @@ public class InMemoryQuestStore implements QuestDraftStore {
         String version = (editingMode ? "draft:" : "live:") + System.currentTimeMillis();
         ref.set(new Snapshot(nav, version));
         this.startId = start;
+        log.debug("rebuild() done mode={} nodes={} startId={} version={}",
+                (editingMode ? "editing" : "live"), safe.size(), start, version);
     }
 
     private static String sha256(byte[] data) {
         try {
             MessageDigest md = MessageDigest.getInstance("SHA-256");
-            return java.util.HexFormat.of().formatHex(md.digest(data));
+            return HexFormat.of().formatHex(md.digest(data));
         } catch (Exception e) {
+            log.warn("sha256 calculation failed, returning 'unknown'", e);
             return "unknown";
         }
     }

@@ -10,11 +10,15 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.Optional;
 
 public class UserPublicProfileServlet extends HttpServlet {
+
+    private static final Logger log = LoggerFactory.getLogger(UserPublicProfileServlet.class);
 
     private transient UserService userService;
     private transient UserStatsService userStatsService;
@@ -41,6 +45,13 @@ public class UserPublicProfileServlet extends HttpServlet {
         if (userId != null) {
             Optional<User> opt = userService.findById(userId);
             viewUser = opt.orElse(null);
+            if (viewUser != null) {
+                log.info("Public profile view userId={} login={}", viewUser.getUserId(), viewUser.getUserLogin());
+            } else {
+                log.warn("Public profile requested but not found id={}", userId);
+            }
+        } else {
+            log.warn("Public profile requested without id param");
         }
         req.setAttribute("profileUser", viewUser);
         if (viewUser != null && userStatsService != null) {

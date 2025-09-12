@@ -12,12 +12,16 @@ import jakarta.servlet.UnavailableException;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.*;
 import java.util.stream.Collectors;
 
 public class AdminModerationGraphServlet extends HttpServlet {
+
+    private static final Logger log = LoggerFactory.getLogger(AdminModerationGraphServlet.class);
 
     private QuestAuthoringService authoring;
 
@@ -27,7 +31,9 @@ public class AdminModerationGraphServlet extends HttpServlet {
         ServletContext ctx = config.getServletContext();
         try {
             this.authoring = Web.ctxBean(ctx, WebConst.Ctx.AUTHORING_SERVICE, QuestAuthoringService.class);
+            log.debug("AdminModerationGraphServlet initialized");
         } catch (IllegalStateException e) {
+            log.error("Initialization failed: QuestAuthoringService not found", e);
             throw new UnavailableException("QuestAuthoringService not found");
         }
     }
@@ -38,6 +44,7 @@ public class AdminModerationGraphServlet extends HttpServlet {
         final String kind = Web.trimOrNull(req.getParameter("kind"));
         final String id = Web.trimOrNull(req.getParameter("id"));
         if (kind == null || id == null) {
+            log.warn("Preview request with missing params kind={} id={}", kind, id);
             resp.sendError(HttpServletResponse.SC_BAD_REQUEST, "Missing parameters");
             return;
         }
@@ -49,26 +56,31 @@ public class AdminModerationGraphServlet extends HttpServlet {
                         .filter(x -> id.equals(x.getPendingId()))
                         .findFirst().orElse(null);
                 if (item == null) {
+                    log.warn("Preview 'new' not found pendingId={}", id);
                     resp.sendError(HttpServletResponse.SC_NOT_FOUND);
                     return;
                 }
                 startId = item.getStartId();
                 nodes = sanitize(item.getNodes());
                 req.setAttribute("previewTitle", "New quest: " + item.getName());
+                log.info("Preview pending NEW pendingId={} name='{}' nodes={} startId={}", id, item.getName(), nodes.size(), startId);
             }
             case "edit" -> {
                 CustomQuestRepository.PendingEdit item = authoring.listPendingEdits().stream()
                         .filter(x -> id.equals(x.getQuestId()))
                         .findFirst().orElse(null);
                 if (item == null) {
+                    log.warn("Preview 'edit' not found questId={}", id);
                     resp.sendError(HttpServletResponse.SC_NOT_FOUND);
                     return;
                 }
                 startId = item.getStartId();
                 nodes = sanitize(item.getNodes());
                 req.setAttribute("previewTitle", "Quest edits: " + item.getName());
+                log.info("Preview pending EDIT questId={} name='{}' nodes={} startId={}", id, item.getName(), nodes.size(), startId);
             }
             default -> {
+                log.warn("Preview request with unknown kind kind={} id={}", kind, id);
                 resp.sendError(HttpServletResponse.SC_BAD_REQUEST, "Unknown kind");
                 return;
             }

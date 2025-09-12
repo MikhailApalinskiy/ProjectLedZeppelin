@@ -1,24 +1,48 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<Configuration status="WARN">
+<Configuration status="WARN" monitorInterval="30">
+    <Properties>
+        <Property name="LOG_DIR">${sys:catalina.base:-${env:CATALINA_BASE:-${sys:user.dir}}}/logs/app</Property>
+        <Property name="FILE_NAME">${LOG_DIR}/project.log</Property>
+        <Property name="FILE_PATTERN">${LOG_DIR}/project.%d{yyyy-MM-dd}-%i.log.gz</Property>
+        <Property name="PATTERN">%d{yyyy-MM-dd HH:mm:ss,SSS} %level [%t] %c{1} [%X{userId:-anon} %X{requestId:-}] -
+            %msg%n%ex{full}
+        </Property>
+    </Properties>
+
     <Appenders>
-        <RollingFile name="FileAppender"
-                     fileName="logs/project.log"
-                     filePattern="logs/project.%d{yyyy-MM-dd}.log">
-            <PatternLayout pattern="%d{yyyy-MM-dd HH:mm:ss,SSS} %level %c{1}: %msg%n"/>
+        <Console name="Console" target="SYSTEM_OUT">
+            <PatternLayout pattern="%d{HH:mm:ss.SSS} %level %c{1}: %msg%n%ex{short}"/>
+        </Console>
+
+        <RollingFile
+                name="File"
+                fileName="${FILE_NAME}"
+                filePattern="${FILE_PATTERN}"
+                createOnDemand="false"
+                immediateFlush="true"
+                bufferSize="262144">
+            <PatternLayout pattern="${PATTERN}"/>
             <Policies>
                 <TimeBasedTriggeringPolicy interval="1"/>
+                <SizeBasedTriggeringPolicy size="50 MB"/>
             </Policies>
-            <DefaultRolloverStrategy max="7">
-                <Delete basePath="logs" maxDepth="1">
-                    <IfFileName glob="project.*.log" />
-                    <IfLastModified age="7d" />
+            <DefaultRolloverStrategy max="14">
+                <Delete basePath="${LOG_DIR}" maxDepth="1">
+                    <IfFileName glob="project.*.log.gz"/>
+                    <IfLastModified age="14d"/>
                 </Delete>
             </DefaultRolloverStrategy>
+            <Filters>
+                <RegexFilter regex="(?i).*password=.*|.*token=.*|.*authorization:.*"
+                             onMatch="DENY" onMismatch="NEUTRAL"/>
+            </Filters>
         </RollingFile>
     </Appenders>
+
     <Loggers>
         <Root level="debug">
-            <AppenderRef ref="FileAppender"/>
+            <AppenderRef ref="Console"/>
+            <AppenderRef ref="File"/>
         </Root>
     </Loggers>
 </Configuration>

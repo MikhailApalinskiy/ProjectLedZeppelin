@@ -306,7 +306,6 @@ class NotificationsServletTest {
                 authMe();
                 when(req.getParameter(WebConst.Param.ACTION)).thenReturn("markAll");
                 doThrow(new RuntimeException("boom")).when(repo).markAllRead("u1");
-                when(s.getServletContext()).thenReturn(ctx);
                 web.when(() -> Web.redirectErr(eq(req), eq(resp), eq(WebConst.Path.NOTIFICATIONS), anyString()))
                         .then(inv -> null);
                 // when
@@ -315,7 +314,6 @@ class NotificationsServletTest {
                 verify(repo).markAllRead("u1");
                 web.verify(() -> Web.redirectErr(eq(req), eq(resp), eq(WebConst.Path.NOTIFICATIONS),
                         eq("Error: boom")));
-                verify(ctx).log(startsWith("Notifications POST error"), any(RuntimeException.class));
             }
         }
     }

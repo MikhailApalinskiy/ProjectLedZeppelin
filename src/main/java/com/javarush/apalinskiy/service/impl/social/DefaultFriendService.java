@@ -8,11 +8,15 @@ import com.javarush.apalinskiy.service.social.FriendService;
 import com.javarush.apalinskiy.service.notify.NotificationService;
 import com.javarush.apalinskiy.domain.notify.NotificationType;
 import com.javarush.apalinskiy.service.user.UserService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
 
 public class DefaultFriendService implements FriendService {
+
+    private static final Logger log = LoggerFactory.getLogger(DefaultFriendService.class);
 
     private final FriendRepository repo;
     private final UserService users;
@@ -27,10 +31,15 @@ public class DefaultFriendService implements FriendService {
     @Override
     public void sendRequest(String fromUserId, String toUserId) {
         if (fromUserId.equals(toUserId)) {
+            log.warn("sendRequest denied: user tried to add self userId={}", fromUserId);
             throw new IllegalArgumentException("You can't add yourself as a friend");
         }
-        users.findById(toUserId).orElseThrow(() -> new IllegalArgumentException("The user was not found"));
+        users.findById(toUserId).orElseThrow(() -> {
+            log.warn("sendRequest denied: target user not found from={} to={}", fromUserId, toUserId);
+            return new IllegalArgumentException("The user was not found");
+        });
         if (repo.areFriends(fromUserId, toUserId)) {
+            log.warn("sendRequest denied: already friends from={} to={}", fromUserId, toUserId);
             throw new IllegalStateException("You are already friends");
         }
         if (repo.findPending(toUserId, fromUserId).isPresent()) {
@@ -38,49 +47,60 @@ public class DefaultFriendService implements FriendService {
             repo.addFriendship(fromUserId, toUserId);
             notify.notify(NotificationEvent.of(
                     NotificationType.FRIEND_ACCEPTED, fromUserId, toUserId, null));
+            log.info("Friendship auto-accepted between={} and={}", fromUserId, toUserId);
             return;
         }
         if (repo.findPending(fromUserId, toUserId).isPresent()) {
+            log.warn("sendRequest denied: already pending from={} to={}", fromUserId, toUserId);
             throw new IllegalStateException("The application has already been submitted");
         }
         repo.saveRequest(FriendRequest.of(fromUserId, toUserId));
         notify.notify(NotificationEvent.of(
                 NotificationType.FRIEND_REQUEST, fromUserId, toUserId, null));
+        log.info("Friend request sent from={} to={}", fromUserId, toUserId);
     }
 
     @Override
     public void accept(String toUserId, String fromUserId) {
         if (repo.findPending(fromUserId, toUserId).isEmpty()) {
+            log.warn("accept denied: no pending request from={} to={}", fromUserId, toUserId);
             throw new IllegalStateException("The application was not found");
         }
         repo.removeRequest(fromUserId, toUserId);
         repo.addFriendship(fromUserId, toUserId);
         notify.notify(NotificationEvent.of(
                 NotificationType.FRIEND_ACCEPTED, toUserId, fromUserId, null));
+        log.info("Friend request accepted from={} to={}", fromUserId, toUserId);
     }
 
     @Override
     public void decline(String toUserId, String fromUserId) {
         if (repo.findPending(fromUserId, toUserId).isEmpty()) {
+            log.warn("decline denied: no pending request from={} to={}", fromUserId, toUserId);
             throw new IllegalStateException("The application was not found");
         }
         repo.removeRequest(fromUserId, toUserId);
+        log.info("Friend request declined from={} to={}", fromUserId, toUserId);
     }
 
     @Override
     public void cancel(String fromUserId, String toUserId) {
         if (repo.findPending(fromUserId, toUserId).isEmpty()) {
+            log.warn("cancel denied: no pending request from={} to={}", fromUserId, toUserId);
             throw new IllegalStateException("The application was not found");
         }
         repo.removeRequest(fromUserId, toUserId);
+        log.info("Friend request canceled from={} to={}", fromUserId, toUserId);
     }
 
     @Override
     public void remove(String userId, String friendId) {
         if (!repo.areFriends(userId, friendId)) {
+            log.warn("remove denied: not friends user={} friend={}", userId, friendId);
             throw new IllegalStateException("You are not friends");
         }
         repo.removeFriendship(userId, friendId);
+        log.info("Friendship removed between={} and={}", userId, friendId);
     }
 
     @Override
@@ -89,16 +109,21 @@ public class DefaultFriendService implements FriendService {
         for (String fid : repo.friendsOf(userId)) {
             users.findById(fid).ifPresent(res::add);
         }
+        log.debug("listFriends userId={} size={}", userId, res.size());
         return res;
     }
 
     @Override
     public List<FriendRequest> incoming(String userId) {
-        return repo.incoming(userId);
+        List<FriendRequest> list = repo.incoming(userId);
+        log.debug("incoming requests userId={} size={}", userId, list.size());
+        return list;
     }
 
     @Override
     public List<FriendRequest> outgoing(String userId) {
-        return repo.outgoing(userId);
+        List<FriendRequest> list = repo.outgoing(userId);
+        log.debug("outgoing requests userId={} size={}", userId, list.size());
+        return list;
     }
 }

@@ -12,11 +12,15 @@ import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.*;
 
 public class GraphSvgServlet extends HttpServlet {
+
+    private static final Logger log = LoggerFactory.getLogger(GraphSvgServlet.class);
 
     private InMemoryQuestStore repo;
 
@@ -26,9 +30,11 @@ public class GraphSvgServlet extends HttpServlet {
         ServletContext ctx = config.getServletContext();
         Object obj = ctx.getAttribute(WebConst.Ctx.EDITOR_REPOSITORY);
         if (!(obj instanceof InMemoryQuestStore r)) {
+            log.error("Init failed: editor repository not found (attr={})", WebConst.Ctx.EDITOR_REPOSITORY);
             throw new ServletException("Editor repository not found in ServletContext (attr: " + WebConst.Ctx.EDITOR_REPOSITORY + ")");
         }
         this.repo = r;
+        log.debug("GraphSvgServlet initialized with InMemoryQuestStore");
     }
 
     @Override
@@ -44,8 +50,10 @@ public class GraphSvgServlet extends HttpServlet {
                 a.getFromCatalog(loadQuestId)
                         .ifPresent(cq -> session.setAttribute(WebConst.Attr.EDITING_QUEST_NAME, cq.getName()));
                 req.setAttribute(WebConst.Attr.OK, "The quest is uploaded to the editor");
+                log.info("Graph load into editor questId={} (set EDITING_QUEST_ID/NAME if available)", loadQuestId);
             } catch (Exception e) {
                 req.setAttribute(WebConst.Attr.ERROR, "Couldn't upload the quest: " + e.getMessage());
+                log.warn("Graph load failed questId={} msg={}", loadQuestId, e.getMessage());
             }
         } else if (svc instanceof QuestAuthoringService a) {
             String editingId = (String) session.getAttribute(WebConst.Attr.EDITING_QUEST_ID);
@@ -53,11 +61,13 @@ public class GraphSvgServlet extends HttpServlet {
             if (editingId != null && (editingName == null || String.valueOf(editingName).isBlank())) {
                 a.getFromCatalog(editingId)
                         .ifPresent(cq -> session.setAttribute(WebConst.Attr.EDITING_QUEST_NAME, cq.getName()));
+                log.debug("Filled missing EDITING_QUEST_NAME from catalog for questId={}", editingId);
             }
         }
         List<QuestNode> nodes = safeNodes();
         int startId = repo.startId();
         Web.buildQuestSvgModel(req, nodes, startId, true);
+        log.debug("Graph model built nodes={} startId={}", nodes.size(), startId);
         Web.forward(req, resp, WebConst.Jsp.GRAPH_SVG);
     }
 
@@ -65,6 +75,7 @@ public class GraphSvgServlet extends HttpServlet {
         try {
             return repo.nodes();
         } catch (Exception e) {
+            log.warn("Failed to read nodes from repo, returning empty list", e);
             return Collections.emptyList();
         }
     }

@@ -42,12 +42,64 @@ public class QuestAuthoringService {
     public boolean deleteNode(int id) {
         boolean ok = editorRepo.deleteNode(id);
         log.debug("deleteNode id={} ok={}", id, ok);
-        return ok;
+        if (!ok) {
+            return false;
+        }
+        List<QuestNode> all = editorRepo.nodes();
+        int currentStart = editorRepo.startId();
+        if (all.isEmpty()) {
+            if (currentStart != 0) {
+                editorRepo.setStartId(0);
+                log.debug("startId reset to 0 (draft empty)");
+            }
+            return true;
+        }
+        if (all.size() == 1) {
+            int onlyId = all.getFirst().getId();
+            if (currentStart != onlyId) {
+                editorRepo.setStartId(onlyId);
+                log.debug("startId set to the only remaining node {}", onlyId);
+            }
+            return true;
+        }
+        if (currentStart == id) {
+            Integer newStart = all.stream()
+                    .map(QuestNode::getId).min((a, b) -> {
+                        if (a == 1 && b != 1) return -1;
+                        if (b == 1 && a != 1) return 1;
+                        return Integer.compare(a, b);
+                    })
+                    .orElse(currentStart);
+            if (newStart != currentStart) {
+                editorRepo.setStartId(newStart);
+                log.debug("startId switched after delete to {}", newStart);
+            }
+        }
+        return true;
     }
 
     public void saveNode(QuestNode node) {
+        boolean existed = editorRepo.get(node.getId()) != null;
         editorRepo.replaceNode(node);
-        log.debug("saveNode id={}", node.getId());
+        int currentStart = editorRepo.startId();
+        List<QuestNode> all = editorRepo.nodes();
+        int count = (all == null ? 0 : all.size());
+        if (count == 1) {
+            if (currentStart != node.getId()) {
+                editorRepo.setStartId(node.getId());
+                log.debug("startId auto-set to the only node {}", node.getId());
+            }
+        } else if (node.getId() == 1 && currentStart != 1) {
+            editorRepo.setStartId(1);
+            log.debug("startId switched to node #1 by rule");
+        } else if (currentStart <= 0) {
+            assert all != null;
+            int minId = all.stream().mapToInt(QuestNode::getId).min().orElse(node.getId());
+            editorRepo.setStartId(minId);
+            log.debug("startId was unset, picked min id {}", minId);
+        }
+
+        log.debug("saveNode id={} existed={} total={}", node.getId(), existed, count);
     }
 
     public void setStart(int startId) {

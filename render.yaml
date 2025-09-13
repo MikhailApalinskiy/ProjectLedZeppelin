@@ -5,10 +5,7 @@ services:
     plan: free
     autoDeploy: true
     dockerfilePath: ./Dockerfile
+    healthCheckPath: /
     envVars:
       - key: JAVA_TOOL_OPTIONS
-        value: "-XX:MaxRAMPercentage=75.0 -Duploads.dir=/tmp/uploads"
-    healthCheckPath: /
-    ports:
-      - port: 8080
-        protocol: http
+        value: -XX:MaxRAMPercentage=75.0 -Duploads.dir=/tmp/uploads

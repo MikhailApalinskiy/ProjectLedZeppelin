@@ -52,14 +52,12 @@ class QuestAuthoringServiceTest {
         }
 
         @Test
-        @DisplayName("saveNode/setStart/deleteNode/nodes/clear delegate correctly (with start rules)")
+        @DisplayName("saveNode/setStart/deleteNode/nodes/clear delegate correctly (new start=1 rule)")
         void otherDelegations() {
             // Given
             QuestNode any = mock(QuestNode.class);
             when(any.getId()).thenReturn(2);
             when(editorRepo.get(anyInt())).thenReturn(null);
-            when(editorRepo.startId()).thenReturn(42);
-            when(editorRepo.nodes()).thenReturn(List.of(mock(QuestNode.class), mock(QuestNode.class)));
             when(editorRepo.deleteNode(7)).thenReturn(true);
             // When
             service.saveNode(any);
@@ -70,11 +68,11 @@ class QuestAuthoringServiceTest {
             // Then
             assertTrue(deleted);
             verify(editorRepo).replaceNode(any);
-            verify(editorRepo, times(2)).startId();
-            verify(editorRepo, atLeastOnce()).nodes();
             verify(editorRepo).setStartId(5);
             verify(editorRepo).deleteNode(7);
+            verify(editorRepo).nodes();
             verify(editorRepo).clearDraft(0);
+            verifyNoMoreInteractions(editorRepo);
         }
     }
 

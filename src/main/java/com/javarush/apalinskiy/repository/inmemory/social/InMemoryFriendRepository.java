@@ -8,13 +8,59 @@ import org.slf4j.LoggerFactory;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * In-memory implementation of {@link FriendRepository}.
+ * <p>
+ * Stores friendships and friend requests using concurrent maps.
+ * Designed for testing, prototyping, or applications without persistent storage,
+ * as all data is lost when the JVM stops.
+ * </p>
+ *
+ * <h3>Storage</h3>
+ * <ul>
+ *   <li>{@link #friends} – mapping of userId → set of friend userIds.</li>
+ *   <li>{@link #pending} – mapping of target userId → (fromUserId → {@link FriendRequest}).</li>
+ * </ul>
+ *
+ * <h3>Supported operations</h3>
+ * <ul>
+ *   <li>{@link #areFriends(String, String)} – checks if two users are friends.</li>
+ *   <li>{@link #addFriendship(String, String)} – establishes a mutual friendship.</li>
+ *   <li>{@link #removeFriendship(String, String)} – removes a friendship.</li>
+ *   <li>{@link #friendsOf(String)} – retrieves the friend list of a user.</li>
+ *   <li>{@link #findPending(String, String)} – finds a pending friend request between two users.</li>
+ *   <li>{@link #saveRequest(FriendRequest)} – saves (or overwrites) a friend request.</li>
+ *   <li>{@link #removeRequest(String, String)} – removes a friend request.</li>
+ *   <li>{@link #incoming(String)} – lists friend requests received by a user.</li>
+ *   <li>{@link #outgoing(String)} – lists friend requests sent by a user.</li>
+ * </ul>
+ *
+ * <h3>Logging</h3>
+ * <ul>
+ *   <li>DEBUG: normal operations (e.g. friendship added, request saved).</li>
+ *   <li>WARN: invalid or skipped operations (e.g. removing non-existent friendship).</li>
+ * </ul>
+ */
 public class InMemoryFriendRepository implements FriendRepository {
 
     private static final Logger log = LoggerFactory.getLogger(InMemoryFriendRepository.class);
 
+    /**
+     * Friendships: userId → set of friend userIds.
+     */
     private final ConcurrentHashMap<String, Set<String>> friends = new ConcurrentHashMap<>();
+    /**
+     * Pending requests: targetUserId → (fromUserId → request).
+     */
     private final ConcurrentHashMap<String, Map<String, FriendRequest>> pending = new ConcurrentHashMap<>();
 
+    /**
+     * Checks if two users are friends.
+     *
+     * @param a first user ID
+     * @param b second user ID
+     * @return true if {@code a} and {@code b} are friends
+     */
     @Override
     public boolean areFriends(String a, String b) {
         boolean ok = friends.getOrDefault(a, Set.of()).contains(b);
@@ -22,6 +68,12 @@ public class InMemoryFriendRepository implements FriendRepository {
         return ok;
     }
 
+    /**
+     * Adds a mutual friendship between two users.
+     *
+     * @param a first user ID
+     * @param b second user ID
+     */
     @Override
     public void addFriendship(String a, String b) {
         friends.compute(a, (k, v) -> {
@@ -37,6 +89,15 @@ public class InMemoryFriendRepository implements FriendRepository {
         log.debug("addFriendship a={} b={} (now friends)", a, b);
     }
 
+    /**
+     * Removes a mutual friendship between two users.
+     * <p>
+     * Logs a warning if the users are not friends.
+     * </p>
+     *
+     * @param a first user ID
+     * @param b second user ID
+     */
     @Override
     public void removeFriendship(String a, String b) {
         boolean[] removed = {false, false};
@@ -55,6 +116,12 @@ public class InMemoryFriendRepository implements FriendRepository {
         }
     }
 
+    /**
+     * Returns all friends of the given user.
+     *
+     * @param userId user ID
+     * @return unmodifiable set of friends (never null)
+     */
     @Override
     public Set<String> friendsOf(String userId) {
         Set<String> res = Collections.unmodifiableSet(friends.getOrDefault(userId, Set.of()));
@@ -62,6 +129,13 @@ public class InMemoryFriendRepository implements FriendRepository {
         return res;
     }
 
+    /**
+     * Finds a pending friend request from one user to another.
+     *
+     * @param from sender user ID
+     * @param to   recipient user ID
+     * @return optional containing the request if found
+     */
     @Override
     public Optional<FriendRequest> findPending(String from, String to) {
         Map<String, FriendRequest> m = pending.getOrDefault(to, Map.of());
@@ -70,6 +144,11 @@ public class InMemoryFriendRepository implements FriendRepository {
         return r;
     }
 
+    /**
+     * Saves a friend request (overwrites existing if present).
+     *
+     * @param req friend request to save
+     */
     @Override
     public void saveRequest(FriendRequest req) {
         pending.compute(req.getToUserId(), (k, v) -> {
@@ -85,6 +164,12 @@ public class InMemoryFriendRepository implements FriendRepository {
         });
     }
 
+    /**
+     * Removes a pending friend request.
+     *
+     * @param from sender user ID
+     * @param to   recipient user ID
+     */
     @Override
     public void removeRequest(String from, String to) {
         final boolean[] removed = {false};
@@ -99,6 +184,12 @@ public class InMemoryFriendRepository implements FriendRepository {
         }
     }
 
+    /**
+     * Returns all incoming friend requests for the given user, sorted by time (newest first).
+     *
+     * @param userId user ID
+     * @return list of incoming friend requests
+     */
     @Override
     public List<FriendRequest> incoming(String userId) {
         Map<String, FriendRequest> m = pending.getOrDefault(userId, Map.of());
@@ -108,6 +199,12 @@ public class InMemoryFriendRepository implements FriendRepository {
         return list;
     }
 
+    /**
+     * Returns all outgoing friend requests made by the given user, sorted by time (newest first).
+     *
+     * @param userId user ID
+     * @return list of outgoing friend requests
+     */
     @Override
     public List<FriendRequest> outgoing(String userId) {
         List<FriendRequest> list = new ArrayList<>();

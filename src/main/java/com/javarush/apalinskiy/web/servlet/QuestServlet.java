@@ -24,6 +24,47 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.Optional;
 
+/**
+ * Controller that renders quest nodes and processes user choices for both
+ * the built-in (main) quest and custom quests from the catalog.
+ *
+ * <p><b>GET</b> resolves the target node (by {@code id} or {@code node} parameter; otherwise start)
+ * and forwards to the quest view.</p>
+ *
+ * <p><b>POST</b> processes a user choice from a given node:
+ * validates {@code fromId}, resolves the next node, optionally records completion statistics,
+ * and redirects to the next node or re-renders the current one on error.</p>
+ *
+ * <h3>Services</h3>
+ * <ul>
+ *   <li>Required: {@link QuestService} (production quest content).</li>
+ *   <li>Optional: {@link QuestAuthoringService} (to serve custom quests from the catalog).</li>
+ *   <li>Optional: {@link UserStatsService} (quest-completion analytics).</li>
+ * </ul>
+ *
+ * <h3>Custom quests</h3>
+ * <ul>
+ *   <li>Presence of a normalized {@code custom} parameter switches to a custom quest service
+ *       resolved via {@link #resolveCustomService(String)}.</li>
+ *   <li>If a provided custom quest id is missing or deleted, responds with 404.</li>
+ * </ul>
+ *
+ * <h3>View</h3>
+ * <ul>
+ *   <li>Forwards to {@code WebConst.Jsp.QUEST} with attributes:
+ *     <ul>
+ *       <li>{@code node} — current {@link QuestNode}</li>
+ *       <li>{@code version} — underlying content version (main/custom)</li>
+ *       <li>optional {@code error} — message when re-rendering after a bad choice</li>
+ *     </ul>
+ *   </li>
+ * </ul>
+ *
+ * <h3>Security notes</h3>
+ * <ul>
+ *   <li>Mutating requests (POST) should be CSRF-protected by upstream middleware/filters.</li>
+ * </ul>
+ */
 public class QuestServlet extends HttpServlet {
 
     private static final Logger log = LoggerFactory.getLogger(QuestServlet.class);
@@ -32,6 +73,15 @@ public class QuestServlet extends HttpServlet {
     private transient QuestAuthoringService authoring;
     private transient UserStatsService userStats;
 
+    /**
+     * Resolves required/optional services from the servlet context.
+     *
+     * <p>Required: {@link QuestService}. Optional: {@link QuestAuthoringService} (if present under
+     * {@code WebConst.Ctx.AUTHORING_SERVICE}) and {@link UserStatsService}.</p>
+     *
+     * @param config servlet config
+     * @throws ServletException when required services are missing
+     */
     @Override
     public void init(ServletConfig config) throws ServletException {
         super.init(config);
@@ -57,6 +107,24 @@ public class QuestServlet extends HttpServlet {
                 (userStats == null ? "none" : userStats.getClass().getSimpleName()));
     }
 
+    /**
+     * Renders the requested quest node (main or custom).
+     *
+     * <p>Flow:</p>
+     * <ol>
+     *   <li>Normalize custom quest id via {@link Web#normalizedCustomParam(HttpServletRequest)}.</li>
+     *   <li>If {@link Web#isMissingCustomId(String, QuestAuthoringService)} returns true, send 404.</li>
+     *   <li>Choose a backing service: main ({@code prodService}) or custom ({@link #resolveCustomService(String)}).</li>
+     *   <li>Resolve the node id (first of {@code id}, {@code node}); default to start node.</li>
+     *   <li>If the node is missing, set an error message and fall back to the start node.</li>
+     *   <li>Pull flash, set request attributes (custom id and quest title), and forward to the view.</li>
+     * </ol>
+     *
+     * @param req  HTTP request with optional {@code id}/{@code node} and {@code custom}
+     * @param resp HTTP response
+     * @throws ServletException if forwarding fails
+     * @throws IOException      on I/O errors
+     */
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp)
             throws ServletException, IOException {
@@ -81,6 +149,29 @@ public class QuestServlet extends HttpServlet {
         forwardQuest(req, resp, node, svc.version(), null);
     }
 
+    /**
+     * Processes a choice from a given node and navigates to the next node.
+     *
+     * <p>Flow:</p>
+     * <ol>
+     *   <li>Normalize custom quest id and validate that the referenced custom quest exists; else 404.</li>
+     *   <li>Resolve the backing quest service (main or custom).</li>
+     *   <li>Require {@code fromId}; if missing, re-render the start node with a {@code BAD_FROM_ID} error.</li>
+     *   <li>Execute {@link TempService#choose(int, String)} with the submitted {@code answer}.</li>
+     *   <li>If OK:
+     *     <ul>
+     *       <li>If the next node is final and {@code userStats} is available and a user is logged in, record completion via {@link UserStatsService#onQuestCompleted(String, String, Integer)}.</li>
+     *       <li>Redirect to the next node URL via {@link Web#questUrl(HttpServletRequest, int, String)}.</li>
+     *     </ul>
+     *   </li>
+     *   <li>If error: re-render the current (or start) node, attach error message.</li>
+     * </ol>
+     *
+     * @param req  HTTP request that contains {@code fromId} and {@code answer}
+     * @param resp HTTP response
+     * @throws ServletException if forwarding fails
+     * @throws IOException      on redirect/I-O errors
+     */
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp)
             throws ServletException, IOException {
@@ -135,6 +226,13 @@ public class QuestServlet extends HttpServlet {
         }
     }
 
+    /**
+     * Builds a temporary service facade backed by a custom quest from the catalog.
+     *
+     * @param customId custom quest id (must exist in catalog)
+     * @return a {@link TempService} wrapping a {@link QuestNavigator} for the custom quest
+     * @throws ServletException if authoring service is missing or the quest cannot be found
+     */
     private TempService resolveCustomService(String customId) throws ServletException {
         if (authoring == null) {
             log.error("resolveCustomService: authoring service is null");
@@ -147,6 +245,17 @@ public class QuestServlet extends HttpServlet {
         return TempService.from(nav, "custom:" + q.getId());
     }
 
+    /**
+     * Forwards to the quest JSP with the current node, content version, and optional error message.
+     *
+     * @param req     HTTP request
+     * @param resp    HTTP response
+     * @param node    node to render
+     * @param version backing content version string
+     * @param error   optional error message to display (nullable/blank ignored)
+     * @throws ServletException if forwarding fails
+     * @throws IOException      on I/O errors
+     */
     private void forwardQuest(HttpServletRequest req, HttpServletResponse resp,
                               QuestNode node, String version, String error)
             throws ServletException, IOException {
@@ -158,15 +267,35 @@ public class QuestServlet extends HttpServlet {
         Web.forward(req, resp, WebConst.Jsp.QUEST);
     }
 
+    /**
+     * Minimal interface to abstract over two backends:
+     * the production {@link QuestService} and an in-memory {@link QuestNavigator} for custom quests.
+     */
     private interface TempService {
+
+        /**
+         * @return start node of the quest
+         */
         QuestNode getStart();
 
+        /**
+         * @return node by id or {@code null} if absent
+         */
         QuestNode getById(int id);
 
+        /**
+         * Resolves the next node based on the user's choice.
+         */
         ChooseResult choose(int fromId, String answer);
 
+        /**
+         * @return a version string to expose in the view (e.g., build hash or custom id)
+         */
         String version();
 
+        /**
+         * Factory: wraps a production {@link QuestService}.
+         */
         static TempService from(QuestService prod) {
             return new TempService() {
                 @Override
@@ -191,6 +320,12 @@ public class QuestServlet extends HttpServlet {
             };
         }
 
+        /**
+         * Factory: wraps a {@link QuestNavigator} built from a custom quest and exposes a fixed version label.
+         *
+         * @param nav     navigator over custom quest nodes
+         * @param version version label to expose to the view
+         */
         static TempService from(QuestNavigator nav, String version) {
             return new TempService() {
                 @Override

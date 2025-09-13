@@ -20,6 +20,40 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.List;
 
+/**
+ * Servlet that renders and manages the user's friend graph:
+ * current friends, incoming/outgoing requests, and mutation actions
+ * (send/cancel/accept/decline requests; remove a friend).
+ * <p>
+ * Authentication is required for all endpoints and enforced via {@link #requireAuth(HttpServletRequest, HttpServletResponse)}.
+ * The servlet relies on {@link FriendService} for mutations and (optionally) {@link NotificationService}
+ * for fire-and-forget notifications.
+ * </p>
+ *
+ * <h3>GET</h3>
+ * <ul>
+ *   <li>Pulls flash messages ({@code OK}, {@code ERROR}).</li>
+ *   <li>Loads <i>friends</i>, <i>incoming</i>, and <i>outgoing</i> lists and exposes them to the JSP.</li>
+ *   <li>Forwards to {@code WebConst.Jsp.FRIENDS}.</li>
+ * </ul>
+ *
+ * <h3>POST actions</h3>
+ * <ul>
+ *   <li><b>request</b> &rarr; {@link FriendService#sendRequest(String, String)}</li>
+ *   <li><b>accept</b>  &rarr; {@link FriendService#accept(String, String)}</li>
+ *   <li><b>decline</b> &rarr; {@link FriendService#decline(String, String)}</li>
+ *   <li><b>cancel</b>  &rarr; {@link FriendService#cancel(String, String)}</li>
+ *   <li><b>remove</b>  &rarr; {@link FriendService#remove(String, String)} (+ optional {@link NotificationType#FRIEND_REMOVED})</li>
+ * </ul>
+ *
+ * <p>Flash helpers: {@link Web#redirectOk}, {@link Web#redirectErr}. View helpers: {@link Web#forward}.</p>
+ *
+ * @see FriendService
+ * @see NotificationService
+ * @see NotificationType
+ * @see WebConst
+ * @see Web
+ */
 public class FriendsServlet extends HttpServlet {
 
     private static final Logger log = LoggerFactory.getLogger(FriendsServlet.class);
@@ -27,6 +61,13 @@ public class FriendsServlet extends HttpServlet {
     private FriendService service;
     private NotificationService notify;
 
+    /**
+     * Resolves required {@link FriendService} and optional {@link NotificationService}
+     * from the {@link ServletContext}.
+     *
+     * @param config servlet config supplied by the container
+     * @throws ServletException if initialization fails
+     */
     @Override
     public void init(ServletConfig config) throws ServletException {
         super.init(config);
@@ -40,6 +81,23 @@ public class FriendsServlet extends HttpServlet {
         log.debug("FriendsServlet initialized notifyPresent={}", notify != null);
     }
 
+    /**
+     * Renders the friends page for the authenticated user.
+     * <p>
+     * Behavior:
+     * <ul>
+     *   <li>Pulls flash messages ({@code OK}, {@code ERROR}).</li>
+     *   <li>Requires auth; if unauthenticated, {@link #requireAuth(HttpServletRequest, HttpServletResponse)} handles redirect.</li>
+     *   <li>Loads {@code friends}, {@code incoming}, and {@code outgoing} lists and exposes them as request attributes.</li>
+     *   <li>Forwards to {@code WebConst.Jsp.FRIENDS}.</li>
+     * </ul>
+     * </p>
+     *
+     * @param req  HTTP request
+     * @param resp HTTP response
+     * @throws ServletException forwarding errors
+     * @throws IOException      I/O errors during forward
+     */
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
         Web.pullFlash(req, WebConst.Attr.OK);
@@ -59,6 +117,24 @@ public class FriendsServlet extends HttpServlet {
         Web.forward(req, resp, WebConst.Jsp.FRIENDS);
     }
 
+    /**
+     * Executes friend-related mutations for the authenticated user.
+     * <p>
+     * Consumes {@code action} and auxiliary parameters:
+     * <ul>
+     *   <li><b>request</b>: {@code id} (recipient user id)</li>
+     *   <li><b>accept</b>: {@code fromId} (original sender id)</li>
+     *   <li><b>decline</b>: {@code fromId} (original sender id)</li>
+     *   <li><b>cancel</b>: {@code id} (recipient user id)</li>
+     *   <li><b>remove</b>: {@code id} (friend id)</li>
+     * </ul>
+     * On success, redirects with an OK flash; on validation/unknown action, redirects with an error flash.
+     * </p>
+     *
+     * @param req  HTTP request containing {@code action} and related parameters
+     * @param resp HTTP response used for redirects
+     * @throws IOException if a redirect fails
+     */
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws IOException {
         User me = requireAuth(req, resp);
@@ -146,6 +222,19 @@ public class FriendsServlet extends HttpServlet {
         }
     }
 
+    /**
+     * Ensures the user is authenticated before proceeding.
+     * <p>
+     * Looks up {@code WebConst.Attr.USER} in the session (creating one if missing)
+     * and, if absent, redirects to {@code WebConst.Path.LOGIN} with an error flash.
+     * Returns {@code null} in that case so the caller can stop the flow.
+     * </p>
+     *
+     * @param req  HTTP request
+     * @param resp HTTP response used for redirects
+     * @return the authenticated {@link User} or {@code null} if redirected to login
+     * @throws IOException if the redirect fails
+     */
     private User requireAuth(HttpServletRequest req, HttpServletResponse resp) throws IOException {
         User u = (User) req.getSession(true).getAttribute(WebConst.Attr.USER);
         if (u == null) {

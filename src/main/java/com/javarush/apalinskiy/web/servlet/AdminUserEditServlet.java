@@ -22,6 +22,71 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.*;
 
+/**
+ * Admin-only servlet for viewing and editing user accounts.
+ * <p>
+ * Responsibilities:
+ * <ul>
+ *   <li>Resolve {@link UserService} and {@link NotificationService} from the servlet context.</li>
+ *   <li>Render edit form for a target user (GET).</li>
+ *   <li>Apply admin updates to a user (POST), optionally renewing the admin's own session
+ *       if they edited their own sensitive data (login/name/password/role).</li>
+ *   <li>Send a {@link NotificationType#USER_ADMIN_CHANGED} notification to the edited user
+ *       when visible changes occur.</li>
+ * </ul>
+ * Authentication/authorization should be enforced upstream (e.g., an admin filter).
+ * </p>
+ *
+ * <h3>GET</h3>
+ * <p>Parameters:</p>
+ * <ul>
+ *   <li><b>id</b> — required, target user id.</li>
+ * </ul>
+ * <p>Behavior:</p>
+ * <ul>
+ *   <li>Pulls flash messages ({@code OK}, {@code ERROR}).</li>
+ *   <li>Fetches target user; redirects to {@code /users} with error flash if missing.</li>
+ *   <li>Sets request attributes:
+ *     <ul>
+ *       <li>{@code editUser} — target {@link User};</li>
+ *       <li>{@code roles} — fixed list of roles ({@link Role#USER}, {@link Role#ADMIN}).</li>
+ *     </ul>
+ *   </li>
+ *   <li>Forwards to {@code WebConst.Jsp.USER_EDIT}.</li>
+ * </ul>
+ *
+ * <h3>POST</h3>
+ * <p>Parameters:</p>
+ * <ul>
+ *   <li><b>id</b> — required, target user id;</li>
+ *   <li><b>userName</b>, <b>userLogin</b> — optional new name/login;</li>
+ *   <li><b>role</b> — {@code USER} or {@code ADMIN} (case-insensitive; defaults to {@code USER});</li>
+ *   <li><b>password</b> — optional new password (non-blank indicates change).</li>
+ * </ul>
+ * <p>Behavior:</p>
+ * <ul>
+ *   <li>Validates presence of {@code id}; redirects with error if missing.</li>
+ *   <li>Reads the "before" snapshot (if present), performs {@link UserService#adminUpdate}.</li>
+ *   <li>If the editor edits themselves and sensitive data changed, renews the session via
+ *       {@link Web#renewSessionAndPut} to refresh authentication state; otherwise updates session user attribute.</li>
+ *   <li>Builds human-readable summary and machine-readable diff via {@link Web#buildAdminChangeSummary}
+ *       and {@link Web#buildMachineReadableDiff}. Sends {@code USER_ADMIN_CHANGED} notification if there are visible changes.</li>
+ *   <li>On success, redirects back to the edit page with OK flash. On conflicts or invalid input,
+ *       redirects with ERROR flash.</li>
+ * </ul>
+ *
+ * <h3>Errors</h3>
+ * <ul>
+ *   <li>{@link DuplicateLoginException} → "The username is already occupied".</li>
+ *   <li>{@link IllegalArgumentException}/{@link NoSuchElementException} → message propagated to error flash.</li>
+ * </ul>
+ *
+ * <h3>Notes</h3>
+ * <ul>
+ *   <li>Logging includes actor id (if available) and target properties.</li>
+ *   <li>Flash helpers: {@link Web#redirectOk}, {@link Web#redirectErr}.</li>
+ * </ul>
+ */
 public class AdminUserEditServlet extends HttpServlet {
 
     private static final Logger log = LoggerFactory.getLogger(AdminUserEditServlet.class);
@@ -29,6 +94,10 @@ public class AdminUserEditServlet extends HttpServlet {
     private UserService users;
     private NotificationService notify;
 
+    /**
+     * Resolves required services from the servlet context.
+     * <p>Expected context attributes: {@code USER_SERVICE}, {@code NOTIFY_SERVICE}.</p>
+     */
     @Override
     public void init(ServletConfig config) throws ServletException {
         super.init(config);
@@ -38,6 +107,13 @@ public class AdminUserEditServlet extends HttpServlet {
         log.debug("AdminUserEditServlet initialized");
     }
 
+    /**
+     * Renders the admin user edit page.
+     * <p>
+     * Required param: {@code id}. Redirects to {@code /users} with an error flash if missing or not found.
+     * Exposes {@code editUser} and {@code roles} to the JSP, then forwards to {@code WebConst.Jsp.USER_EDIT}.
+     * </p>
+     */
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
         Web.pullFlash(req, WebConst.Attr.OK);
@@ -60,6 +136,13 @@ public class AdminUserEditServlet extends HttpServlet {
         Web.forward(req, resp, WebConst.Jsp.USER_EDIT);
     }
 
+    /**
+     * Applies admin-side updates to the target user and handles session/notifications.
+     * <p>
+     * Parameters: {@code id} (required), {@code userName}, {@code userLogin}, {@code role}, {@code password}.
+     * On success, redirects back to the edit page with an OK flash; otherwise redirects with error.
+     * </p>
+     */
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws IOException {
         String id = Web.trimOrNull(req.getParameter(WebConst.Param.ID));

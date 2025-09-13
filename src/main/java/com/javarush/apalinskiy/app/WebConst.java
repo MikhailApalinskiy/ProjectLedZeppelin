@@ -2,11 +2,35 @@ package com.javarush.apalinskiy.app;
 
 import java.nio.charset.StandardCharsets;
 
+/**
+ * Central place for application-wide constants used in servlets, JSPs,
+ * and service initialization.
+ * <p>
+ * This class contains nested groups of constants organized by purpose:
+ * <ul>
+ *   <li>{@link Charset} – encoding definitions.</li>
+ *   <li>{@link Param} – request parameter names.</li>
+ *   <li>{@link Op} – common operation values for form parameters.</li>
+ *   <li>{@link Attr} – request/session attribute keys.</li>
+ *   <li>{@link Ctx} – servlet context attribute keys for services.</li>
+ *   <li>{@link Path} – servlet path mappings.</li>
+ *   <li>{@link Jsp} – JSP view locations.</li>
+ *   <li>{@link App} – application defaults and configuration values.</li>
+ *   <li>{@link Msg} – common user-facing messages.</li>
+ *   <li>{@link InitParam} – servlet context init parameter names.</li>
+ *   <li>{@link ParamGroup} – predefined groups of parameters.</li>
+ * </ul>
+ * <p>
+ * This class is {@code final} and cannot be instantiated.
+ */
 public final class WebConst {
 
     private WebConst() {
     }
 
+    /**
+     * Character set constants.
+     */
     public static final class Charset {
         public static final String UTF8 = StandardCharsets.UTF_8.name();
 
@@ -14,6 +38,9 @@ public final class WebConst {
         }
     }
 
+    /**
+     * Common HTTP request parameter names used throughout the application.
+     */
     public static final class Param {
         public static final String ROLE = "role";
         public static final String CURRENT_PASSWORD = "currentPassword";
@@ -44,6 +71,9 @@ public final class WebConst {
         }
     }
 
+    /**
+     * Operation codes used in forms and request parameters.
+     */
     public static final class Op {
         public static final String GO = "go";
         public static final String DELETE = "delete";
@@ -54,6 +84,9 @@ public final class WebConst {
         }
     }
 
+    /**
+     * Request/session attribute keys.
+     */
     public static final class Attr {
         public static final String EDITING_QUEST_ID = "editingQuestId";
         public static final String EDITING_QUEST_NAME = "editingQuestName";
@@ -69,6 +102,9 @@ public final class WebConst {
         }
     }
 
+    /**
+     * Keys for objects stored in {@link jakarta.servlet.ServletContext}.
+     */
     public static final class Ctx {
         public static final String USER_STATS_SERVICE = "userStatsService";
         public static final String FRIEND_REPOSITORY = "friendRepository";
@@ -86,6 +122,9 @@ public final class WebConst {
         }
     }
 
+    /**
+     * Servlet path mappings for controllers.
+     */
     public static final class Path {
         public static final String QUESTS_MOD = "/quests/moderation";
         public static final String USER_EDIT = "/user/edit";
@@ -108,6 +147,9 @@ public final class WebConst {
         }
     }
 
+    /**
+     * JSP view paths.
+     */
     public static final class Jsp {
         public static final String USER_PUBLIC = "/WEB-INF/jsp/user_public.jsp";
         public static final String USER_QUESTS = "/WEB-INF/jsp/user_quests.jsp";
@@ -134,6 +176,9 @@ public final class WebConst {
         }
     }
 
+    /**
+     * Application defaults and configuration constants.
+     */
     public static final class App {
         public static final String QUEST_RESOURCE = "quest.json";
         public static final int QUEST_START_ID = 1;
@@ -145,8 +190,14 @@ public final class WebConst {
         }
     }
 
+    /**
+     * Number of save slots available per user.
+     */
     public static final int SLOT_COUNT = 10;
 
+    /**
+     * Common localized or user-facing messages.
+     */
     public static final class Msg {
         public static final String BAD_CREDENTIALS = "Incorrect login or password";
         public static final String INTERNAL_ERROR = "Internal error. Please try again.";
@@ -157,6 +208,9 @@ public final class WebConst {
         }
     }
 
+    /**
+     * Servlet context initialization parameter names.
+     */
     public static final class InitParam {
         public static final String CTX_UPLOADS_DIR = "uploads.base.dir";
 
@@ -164,7 +218,14 @@ public final class WebConst {
         }
     }
 
+    /**
+     * Predefined groups of request parameters.
+     */
     public static final class ParamGroup {
+
+        /**
+         * Parameters related to slot navigation (next step, purpose, node, custom).
+         */
         public static final String[] SLOT_NAV = {
                 Param.NEXT, Param.PURPOSE, Param.NODE, Param.CUSTOM
         };

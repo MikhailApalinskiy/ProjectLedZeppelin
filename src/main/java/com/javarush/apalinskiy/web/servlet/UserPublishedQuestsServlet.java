@@ -23,6 +23,47 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+/**
+ * Displays a user's published (and, for owners/admins, also unpublished) custom quests.
+ * <p>
+ * This controller renders the public list of quests for a given user (identified by the
+ * {@code id} query parameter). If the request comes from the same user (owner) or an
+ * administrator, the list includes all quests; otherwise only quests where
+ * {@link CustomQuest#isPublished()} is {@code true} are shown.
+ * </p>
+ *
+ * <h3>Dependencies</h3>
+ * <ul>
+ *   <li><b>Required:</b> {@link UserService} (user lookup)</li>
+ *   <li><b>Required:</b> {@link QuestAuthoringService} (quest catalog access)</li>
+ * </ul>
+ *
+ * <h3>Request parameters</h3>
+ * <ul>
+ *   <li><b>id</b> — user id whose quests should be shown.</li>
+ * </ul>
+ *
+ * <h3>Model / view</h3>
+ * <ul>
+ *   <li>Sets {@code viewUser} — the user whose quests are listed (may be {@code null} if not found).</li>
+ *   <li>Calls {@link Web#attachQuestLists(HttpServletRequest, java.util.List)} to attach
+ *       filtered lists into the model (e.g., for pagination/sorting blocks in the JSP).</li>
+ *   <li>Sets {@code selfUrl} — canonical URL of this listing (stable for pagination/links).</li>
+ *   <li>Forwards to {@code WebConst.Jsp.USER_QUESTS}.</li>
+ * </ul>
+ *
+ * <h3>Flash</h3>
+ * <p>
+ * Reads and exposes {@code FLASH} and {@code ERROR} messages using {@link Web#pullFlash}.
+ * </p>
+ *
+ * @see UserService
+ * @see QuestAuthoringService
+ * @see CustomQuest
+ * @see Role
+ * @see WebConst
+ * @see Web
+ */
 public class UserPublishedQuestsServlet extends HttpServlet {
 
     private static final Logger log = LoggerFactory.getLogger(UserPublishedQuestsServlet.class);
@@ -30,6 +71,12 @@ public class UserPublishedQuestsServlet extends HttpServlet {
     private UserService userService;
     private QuestAuthoringService authoring;
 
+    /**
+     * Resolves {@link UserService} and {@link QuestAuthoringService} from the servlet context.
+     *
+     * @param config servlet config provided by the container
+     * @throws ServletException if required services are missing
+     */
     @Override
     public void init(ServletConfig config) throws ServletException {
         super.init(config);
@@ -46,6 +93,33 @@ public class UserPublishedQuestsServlet extends HttpServlet {
                 authoring.getClass().getSimpleName());
     }
 
+    /**
+     * Renders the list of quests for the user specified by {@code id}.
+     * <p>
+     * Flow:
+     * <ol>
+     *   <li>Pull flash messages ({@code FLASH}, {@code ERROR}).</li>
+     *   <li>Resolve {@code viewUser} via {@link UserService#findById(String)} (warn if missing or id absent).</li>
+     *   <li>Load quests via {@link QuestAuthoringService#listOwnerFromCatalog(String)} when {@code viewUser} exists;
+     *       otherwise, use an empty list.</li>
+     *   <li>Determine viewer identity from session:
+     *     <ul>
+     *       <li><i>Owner</i>: session user id equals {@code viewUser.userId}</li>
+     *       <li><i>Admin</i>: session user role equals {@link Role#ADMIN}</li>
+     *     </ul>
+     *   </li>
+     *   <li>If viewer is neither owner nor admin, filter to published items only
+     *       ({@code items = items.stream().filter(CustomQuest::isPublished)...}).</li>
+     *   <li>Attach {@code viewUser}, quest lists ({@link Web#attachQuestLists}), and {@code selfUrl} to the request.</li>
+     *   <li>Forward to {@code WebConst.Jsp.USER_QUESTS}.</li>
+     * </ol>
+     * </p>
+     *
+     * @param req  HTTP request (expects {@code id} query parameter)
+     * @param resp HTTP response
+     * @throws ServletException if forwarding fails
+     * @throws IOException      on I/O errors
+     */
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp)
             throws ServletException, IOException {

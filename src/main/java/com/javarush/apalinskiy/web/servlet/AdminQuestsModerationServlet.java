@@ -18,10 +18,78 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Admin-only servlet for moderating user-submitted custom quests.
+ * <p>
+ * Displays pending submissions (new quests and edits) and handles approve/reject actions.
+ * Authentication/authorization is expected to be enforced upstream (e.g., via a filter).
+ * </p>
+ *
+ * <h3>GET</h3>
+ * <ul>
+ *   <li>Loads pending items via {@code authoring.listPendingNew()} and {@code authoring.listPendingEdits()}.</li>
+ *   <li>Sets request attributes:
+ *     <ul>
+ *       <li>{@code "pendingNew"} — list of {@code CustomQuestRepository.PendingNew}</li>
+ *       <li>{@code "pendingEdit"} — list of {@code CustomQuestRepository.PendingEdit}</li>
+ *     </ul>
+ *   </li>
+ *   <li>Pulls flash message ({@code WebConst.Attr.FLASH}) and forwards to {@code WebConst.Jsp.QUESTS_MOD}.</li>
+ * </ul>
+ *
+ * <h3>POST</h3>
+ * <p>Consumes parameters:</p>
+ * <ul>
+ *   <li>{@code action} — one of:
+ *     <ul>
+ *       <li>{@code approveCreate} — publish a newly submitted quest;</li>
+ *       <li>{@code rejectCreate} — decline a newly submitted quest;</li>
+ *       <li>{@code approveEdit} — accept and apply pending edits for an existing quest;</li>
+ *       <li>{@code rejectEdit} — decline pending edits.</li>
+ *     </ul>
+ *   </li>
+ *   <li>{@code id} — identifier of the item being moderated:
+ *     <ul>
+ *       <li>For create actions: {@code pendingId}.</li>
+ *       <li>For edit actions: {@code questId}.</li>
+ *     </ul>
+ *   </li>
+ * </ul>
+ *
+ * <h3>Side effects</h3>
+ * <ul>
+ *   <li>Invokes corresponding methods on {@code authoring} (approve/reject).</li>
+ *   <li>Sends notifications to the quest owner:
+ *     {@code NotificationType.QUEST_MODERATED} with data: {@code questName}, {@code result}, and optional {@code questId}.</li>
+ *   <li>On successful create approval:
+ *     increments author's "created" counter and notifies friends about publication.</li>
+ *   <li>Sets a flash message describing the outcome and redirects back to the moderation list.</li>
+ * </ul>
+ *
+ * <h3>Error handling</h3>
+ * <ul>
+ *   <li>400 — missing or unknown parameters.</li>
+ *   <li>On runtime errors, logs the failure and redirects with {@code WebConst.Attr.ERROR} message.</li>
+ * </ul>
+ *
+ * @see BaseQuestAdminServlet
+ * @see CustomQuestRepository.PendingNew
+ * @see CustomQuestRepository.PendingEdit
+ * @see NotificationType
+ * @see WebConst
+ * @see Web
+ */
 public class AdminQuestsModerationServlet extends BaseQuestAdminServlet {
 
     private static final Logger log = LoggerFactory.getLogger(AdminQuestsModerationServlet.class);
 
+    /**
+     * Renders the moderation list page with pending "new" and "edit" items.
+     * <ul>
+     *   <li>Attributes: {@code "pendingNew"}, {@code "pendingEdit"}.</li>
+     *   <li>View: {@code WebConst.Jsp.QUESTS_MOD}.</li>
+     * </ul>
+     */
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp)
             throws ServletException, IOException {
@@ -34,6 +102,24 @@ public class AdminQuestsModerationServlet extends BaseQuestAdminServlet {
         Web.forward(req, resp, WebConst.Jsp.QUESTS_MOD);
     }
 
+    /**
+     * Executes a moderation action for the given item.
+     * <p>
+     * Required params: {@code action}, {@code id}. On success, redirects to {@code WebConst.Path.QUESTS_MOD}.
+     * </p>
+     * <p>
+     * Flash messages:
+     * <ul>
+     *   <li>approveCreate — {@code "The quest has been published (id=<newId>)."};</li>
+     *   <li>rejectCreate — {@code "New publication rejected."};</li>
+     *   <li>approveEdit — {@code "Edits approved and applied."};</li>
+     *   <li>rejectEdit — {@code "The edits were rejected."}.</li>
+     * </ul>
+     * </p>
+     * <p>
+     * On {@link RuntimeException}, redirects with {@code WebConst.Attr.ERROR}.
+     * </p>
+     */
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws IOException {
         final String action = Web.trimOrNull(req.getParameter("action"));
@@ -104,28 +190,58 @@ public class AdminQuestsModerationServlet extends BaseQuestAdminServlet {
         }
     }
 
+    /**
+     * Finds a pending "new quest" item by its {@code pendingId}.
+     *
+     * @param pendingId identifier from the moderation UI
+     * @return the pending item or {@code null} if not found
+     */
     private CustomQuestRepository.PendingNew findPendingNew(String pendingId) {
         return authoring.listPendingNew().stream()
                 .filter(x -> pendingId.equals(x.getPendingId()))
                 .findFirst().orElse(null);
     }
 
+    /**
+     * Finds a pending "edit quest" item by its {@code questId}.
+     *
+     * @param questId quest identifier
+     * @return the pending edit or {@code null} if not found
+     */
     private CustomQuestRepository.PendingEdit findPendingEdit(String questId) {
         return authoring.listPendingEdits().stream()
                 .filter(x -> questId.equals(x.getQuestId()))
                 .findFirst().orElse(null);
     }
 
+    /**
+     * Returns a safe quest name for logging/notifications when moderating edits.
+     * Prefers the name from the pending edit; falls back to the catalog entry; defaults to {@code "Quest"}.
+     */
     private String safeQuestNameForEdit(String questId, CustomQuestRepository.PendingEdit pe) {
         if (pe != null && pe.getName() != null) return pe.getName();
         return authoring.getFromCatalog(questId).map(CustomQuest::getName).orElse("Quest");
     }
 
+    /**
+     * Returns a safe owner login for logging/notifications when moderating edits.
+     * Prefers the login from the pending edit; falls back to the catalog entry; may return {@code null}.
+     */
     private String safeOwnerLoginForEdit(String questId, CustomQuestRepository.PendingEdit pe) {
         if (pe != null && pe.getOwnerLogin() != null) return pe.getOwnerLogin();
         return authoring.getFromCatalog(questId).map(CustomQuest::getOwnerLogin).orElse(null);
     }
 
+    /**
+     * Sends a moderation result notification to the quest owner (if resolvable).
+     * <p>
+     * Data payload:
+     * <ul>
+     *   <li>{@code questName} — display name used in the message;</li>
+     *   <li>{@code result} — e.g., {@code "approved"}, {@code "rejected"}, {@code "edit-rejected"};</li>
+     *   <li>{@code questId} — optional; included for "approveCreate".</li>
+     * </ul>
+     */
     private void notifyModeration(String actorId,
                                   String ownerLogin,
                                   String questName,

@@ -12,6 +12,37 @@ import org.slf4j.LoggerFactory;
 
 import java.util.Map;
 
+/**
+ * Default implementation of {@link NotificationService}.
+ * <p>
+ * Responsible for creating and delivering {@link Notification} entities
+ * in response to user or system events.
+ * </p>
+ *
+ * <h3>Responsibilities</h3>
+ * <ul>
+ *   <li>Persist notifications via {@link NotificationRepository}.</li>
+ *   <li>Resolve actor user names via {@link UserService}.</li>
+ *   <li>Format notification messages based on {@link NotificationType} and {@link NotificationEvent}.</li>
+ *   <li>Log all notification events and failures.</li>
+ * </ul>
+ *
+ * <h3>Supported event types</h3>
+ * <ul>
+ *   <li>{@link NotificationType#FRIEND_REQUEST} – informs user of a new friend request.</li>
+ *   <li>{@link NotificationType#FRIEND_ACCEPTED} – informs user their request was accepted.</li>
+ *   <li>{@link NotificationType#FRIEND_PUBLISHED_QUEST} – notifies friends about a new quest publication.</li>
+ *   <li>{@link NotificationType#QUEST_MODERATED} – informs quest owner about moderation results.</li>
+ *   <li>{@link NotificationType#QUEST_ADMIN_CHANGED} – informs quest owner about admin changes.</li>
+ *   <li>{@link NotificationType#USER_ADMIN_CHANGED} – informs user about admin changes to their profile.</li>
+ *   <li>{@link NotificationType#FRIEND_REMOVED} – informs user that a friend removed them.</li>
+ * </ul>
+ *
+ * <p>
+ * This service is transactional in the sense that failures when saving a notification
+ * are logged and rethrown to the caller.
+ * </p>
+ */
 public class DefaultNotificationService implements NotificationService {
 
     private static final Logger log = LoggerFactory.getLogger(DefaultNotificationService.class);
@@ -19,11 +50,26 @@ public class DefaultNotificationService implements NotificationService {
     private final NotificationRepository repo;
     private final UserService users;
 
+    /**
+     * Creates a new notification service with the given dependencies.
+     *
+     * @param repo  repository used to persist notifications
+     * @param users user service used to resolve actor names
+     */
     public DefaultNotificationService(NotificationRepository repo, UserService users) {
         this.repo = repo;
         this.users = users;
     }
 
+    /**
+     * Adds a single notification for a user.
+     *
+     * @param userId target user ID
+     * @param type   notification type
+     * @param title  short notification title
+     * @param body   notification body (HTML formatted)
+     * @throws RuntimeException if persistence fails
+     */
     @Override
     public void add(String userId, NotificationType type, String title, String body) {
         log.info("Notify.add type={} targetUserId={} title='{}'", type, userId, title);
@@ -35,6 +81,16 @@ public class DefaultNotificationService implements NotificationService {
         }
     }
 
+    /**
+     * Handles a high-level notification event by generating
+     * and persisting the appropriate notification.
+     * <p>
+     * Resolves the actor's display name via {@link UserService}.
+     * If the actor is {@code null}, the name defaults to "System".
+     * </p>
+     *
+     * @param e notification event to process
+     */
     @Override
     public void notify(NotificationEvent e) {
         log.info("Notify.event type={} targetUserId={} actorUserId={}", e.type(), e.targetUserId(), e.actorUserId());
@@ -88,6 +144,15 @@ public class DefaultNotificationService implements NotificationService {
         }
     }
 
+    /**
+     * Safely extracts a value from the event data map,
+     * falling back to a default if missing or {@code null}.
+     *
+     * @param m   data map (may be null)
+     * @param k   key
+     * @param def default value if key missing
+     * @return resolved value
+     */
     private static String safe(Map<String, String> m, String k, String def) {
         return (m == null) ? def : m.getOrDefault(k, def);
     }

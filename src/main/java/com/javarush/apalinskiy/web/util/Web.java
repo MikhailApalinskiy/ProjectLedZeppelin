@@ -20,11 +20,28 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.stream.Collectors;
 
+/**
+ * Web utility helpers for servlet/JSP layer.
+ * <p>
+ * Contains small stateless helpers for parsing/normalizing parameters,
+ * building URLs, forwarding/redirecting, session/flash handling, simple
+ * string utilities, and preparing view models for JSPs.
+ * </p>
+ *
+ * <h3>Thread-safety</h3>
+ * <p>Class is stateless and all methods are static.</p>
+ */
 public class Web {
 
     private Web() {
     }
 
+    /**
+     * Trims a string and returns {@code null} if it becomes empty.
+     *
+     * @param s input string (nullable)
+     * @return trimmed string or {@code null} if empty/blank
+     */
     public static String trimOrNull(String s) {
         if (s == null) {
             return null;
@@ -33,6 +50,12 @@ public class Web {
         return t.isEmpty() ? null : t;
     }
 
+    /**
+     * Parses an integer or returns {@code null} if blank/invalid.
+     *
+     * @param s raw string
+     * @return {@link Integer} value or {@code null} on failure
+     */
     public static Integer parseIntOrNull(String s) {
         if (s == null || s.isBlank()) {
             return null;
@@ -44,6 +67,13 @@ public class Web {
         }
     }
 
+    /**
+     * Parses an integer or returns a default value on error.
+     *
+     * @param s   raw string
+     * @param def default value
+     * @return parsed integer or {@code def} if parsing fails
+     */
     public static int parseIntOrDefault(String s, int def) {
         try {
             return Integer.parseInt(s);
@@ -52,6 +82,13 @@ public class Web {
         }
     }
 
+    /**
+     * Returns the first non-null integer parameter from the request among the given names.
+     *
+     * @param req   request
+     * @param names candidate parameter names (checked in order)
+     * @return first parsed integer or {@code null} if none present/parsable
+     */
     public static Integer firstIntParam(HttpServletRequest req, String... names) {
         for (String n : names) {
             Integer v = parseIntOrNull(req.getParameter(n));
@@ -62,6 +99,12 @@ public class Web {
         return null;
     }
 
+    /**
+     * URL-encodes a value using UTF-8 (null becomes empty string).
+     *
+     * @param v value to encode
+     * @return encoded value
+     */
     public static String urlEncode(String v) {
         try {
             return URLEncoder.encode(v == null ? "" : v, StandardCharsets.UTF_8);
@@ -70,6 +113,13 @@ public class Web {
         }
     }
 
+    /**
+     * Appends query parameters (already properly encoded by this method) to a base URL.
+     *
+     * @param base   base URL (may already contain {@code ?})
+     * @param params map of params (keys/values will be UTF-8 encoded)
+     * @return URL with appended parameters
+     */
     public static String addParamsEncoded(String base, Map<String, String> params) {
         if (params == null || params.isEmpty()) {
             return base;
@@ -83,6 +133,14 @@ public class Web {
         return sb.toString();
     }
 
+    /**
+     * Builds a URL by taking selected request parameters and appending them to {@code base}.
+     *
+     * @param req   request
+     * @param base  base URL (absolute or context-relative)
+     * @param names parameter names to copy if present and non-blank
+     * @return URL with encoded parameters
+     */
     public static String addParamsFromReqEncoded(HttpServletRequest req, String base, String... names) {
         Map<String, String> m = new LinkedHashMap<>();
         for (String n : names) {
@@ -94,6 +152,15 @@ public class Web {
         return addParamsEncoded(base, m);
     }
 
+    /**
+     * Builds a quest URL based on the "next" path (if provided) and a node id,
+     * optionally including a custom quest id (taken from request param/attr).
+     *
+     * @param req    request
+     * @param next   optional next path (falls back to {@link WebConst.Path#QUEST})
+     * @param nodeId node id to include in query
+     * @return fully built context-relative URL
+     */
     public static String buildQuestUrlFromNext(HttpServletRequest req, String next, int nodeId) {
         String base = req.getContextPath() + ((next == null || next.isBlank()) ? WebConst.Path.QUEST : next);
         String custom = trimOrNull(req.getParameter(WebConst.Param.CUSTOM));
@@ -109,20 +176,52 @@ public class Web {
         return appendQuestParams(base, nodeId, custom);
     }
 
+    /**
+     * Builds a canonical quest URL {@code /quest?id=... [&custom=...]}.
+     *
+     * @param req            request
+     * @param id             node id
+     * @param customIdOrNull optional custom quest id
+     * @return URL string
+     */
     public static String questUrl(HttpServletRequest req, int id, String customIdOrNull) {
         String base = req.getContextPath() + WebConst.Path.QUEST;
         return appendQuestParams(base, id, customIdOrNull);
     }
 
+    /**
+     * Forwards to a JSP.
+     *
+     * @param req  request
+     * @param resp response
+     * @param jsp  JSP path (typically under {@code /WEB-INF/jsp/...})
+     * @throws ServletException on forward error
+     * @throws IOException      on I/O error
+     */
     public static void forward(HttpServletRequest req, HttpServletResponse resp, String jsp)
             throws ServletException, IOException {
         req.getRequestDispatcher(jsp).forward(req, resp);
     }
 
+    /**
+     * Returns {@code next} if it is a safe, same-context URL (starts with {@code ctx + "/"}),
+     * otherwise returns a link to home.
+     *
+     * @param req  request (used to get context path)
+     * @param next candidate redirect target
+     * @return safe next or home URL
+     */
     public static String safeNextOrHome(HttpServletRequest req, String next) {
         return isSafeNext(req, next) ? next : (req.getContextPath() + WebConst.Path.HOME);
     }
 
+    /**
+     * Checks that {@code next} is a safe, same-context URL.
+     *
+     * @param req  request
+     * @param next candidate URL
+     * @return {@code true} if safe and context-relative
+     */
     public static boolean isSafeNext(HttpServletRequest req, String next) {
         if (next == null || next.isBlank()) {
             return false;
@@ -131,19 +230,54 @@ public class Web {
         return next.startsWith(ctx + "/");
     }
 
+    /**
+     * Sends a redirect to the given context-relative path with query parameters.
+     *
+     * @param req    request
+     * @param resp   response
+     * @param path   context-relative servlet path
+     * @param params parameters to append
+     * @throws IOException on I/O error
+     */
     public static void redirect(HttpServletRequest req, HttpServletResponse resp, String path, Map<String, String> params) throws IOException {
         String url = addParamsEncoded(req.getContextPath() + path, params);
         resp.sendRedirect(resp.encodeRedirectURL(url));
     }
 
+    /**
+     * Redirects with an OK flash message.
+     *
+     * @param req  request
+     * @param resp response
+     * @param path path to redirect to
+     * @param msg  message to include under {@link WebConst.Attr#OK}
+     * @throws IOException on I/O error
+     */
     public static void redirectOk(HttpServletRequest req, HttpServletResponse resp, String path, String msg) throws IOException {
         redirect(req, resp, path, Map.of(WebConst.Attr.OK, Objects.toString(msg, "")));
     }
 
+    /**
+     * Redirects with an error flash message.
+     *
+     * @param req  request
+     * @param resp response
+     * @param path path to redirect to
+     * @param msg  message to include under {@link WebConst.Attr#ERROR}
+     * @throws IOException on I/O error
+     */
     public static void redirectErr(HttpServletRequest req, HttpServletResponse resp, String path, String msg) throws IOException {
         redirect(req, resp, path, Map.of(WebConst.Attr.ERROR, Objects.toString(msg, "")));
     }
 
+    /**
+     * Invalidates current session (if any), creates a new one and stores an attribute in it.
+     * <p>Useful after login for session fixation protection.</p>
+     *
+     * @param req   request
+     * @param key   attribute name (must not be null)
+     * @param value attribute value
+     */
     public static void renewSessionAndPut(HttpServletRequest req, String key, Object value) {
         HttpSession old = req.getSession(false);
         if (old != null) {
@@ -153,6 +287,12 @@ public class Web {
         fresh.setAttribute(Objects.requireNonNull(key), value);
     }
 
+    /**
+     * Moves a flash attribute from session to request and removes it from session.
+     *
+     * @param req request
+     * @param key flash key (e.g. {@link WebConst.Attr#OK} / {@link WebConst.Attr#ERROR})
+     */
     public static void pullFlash(HttpServletRequest req, String key) {
         HttpSession s = req.getSession(false);
         if (s != null) {
@@ -164,6 +304,17 @@ public class Web {
         }
     }
 
+    /**
+     * Resolves a user-friendly quest display name for a given quest id.
+     * <ul>
+     *   <li>{@code null} or {@code "main"} → returns {@code "main"}.</li>
+     *   <li>Otherwise tries to read from catalog via {@code authoring}.</li>
+     * </ul>
+     *
+     * @param questIdOrNull quest id or null
+     * @param authoring     authoring service (nullable)
+     * @return display name
+     */
     public static String displayName(String questIdOrNull, QuestAuthoringService authoring) {
         String qid = (questIdOrNull == null || questIdOrNull.isBlank()) ? "main" : questIdOrNull;
         if ("main".equalsIgnoreCase(qid)) {
@@ -180,6 +331,16 @@ public class Web {
         return "Custom quest";
     }
 
+    /**
+     * Attaches quest list and created/updated date maps as request attributes for JSPs.
+     * <ul>
+     *   <li>{@code "items"} → original list</li>
+     *   <li>{@code "createdMap"} and {@code "updatedMap"}</li>
+     * </ul>
+     *
+     * @param req   request
+     * @param items quests to attach
+     */
     public static void attachQuestLists(HttpServletRequest req, List<CustomQuest> items) {
         req.setAttribute("items", items);
         Map<String, java.util.Date> createdMap = new LinkedHashMap<>();
@@ -196,6 +357,15 @@ public class Web {
         req.setAttribute("updatedMap", updatedMap);
     }
 
+    /**
+     * Fetches a context attribute and casts it, or throws if missing/wrong type.
+     *
+     * @param ctx  servlet context
+     * @param key  attribute key
+     * @param type expected type
+     * @return attribute value
+     * @throws IllegalStateException if not found or wrong type
+     */
     public static <T> T ctxBean(ServletContext ctx, String key, Class<T> type) {
         Object obj = ctx.getAttribute(key);
         if (type.isInstance(obj)) {
@@ -204,6 +374,12 @@ public class Web {
         throw new IllegalStateException("Context bean not found: " + key);
     }
 
+    /**
+     * Copies non-blank request parameters into request attributes (same keys).
+     *
+     * @param req  request
+     * @param keys parameter names to copy
+     */
     public static void copyParamsToAttrs(HttpServletRequest req, String... keys) {
         for (String key : keys) {
             String val = req.getParameter(key);
@@ -213,6 +389,13 @@ public class Web {
         }
     }
 
+    /**
+     * Produces a short, one-line title: up to 64 chars or first sentence (between 20..80 chars).
+     * Adds an ellipsis if trimmed.
+     *
+     * @param s source string
+     * @return short title (never null)
+     */
     public static String shortTitle(String s) {
         if (s == null) {
             return "";
@@ -228,6 +411,12 @@ public class Web {
         return s.substring(0, 64) + "…";
     }
 
+    /**
+     * Heuristically checks whether a quest is effectively empty (no nodes or single blank final node).
+     *
+     * @param nodes quest nodes
+     * @return {@code true} if empty/effectively empty
+     */
     public static boolean isEffectivelyEmpty(List<QuestNode> nodes) {
         if (nodes == null || nodes.isEmpty()) {
             return true;
@@ -241,6 +430,13 @@ public class Web {
         return false;
     }
 
+    /**
+     * Builds a short multi-line snippet (wrapped by words to ~3 lines, ~120 chars total).
+     * Newlines are removed and CR/LF are normalized to spaces.
+     *
+     * @param text source text
+     * @return snippet (may be empty string)
+     */
     public static String makeSnippet(String text) {
         if (text == null) {
             return "";
@@ -255,6 +451,12 @@ public class Web {
         return String.join("\n", lines);
     }
 
+    /**
+     * Normalizes a "custom" quest id: returns {@code null} if blank or equals {@code "main"}.
+     *
+     * @param custom raw custom value
+     * @return normalized value or {@code null}
+     */
     public static String normalizeCustom(String custom) {
         if (custom == null || custom.isBlank()) {
             return null;
@@ -262,10 +464,23 @@ public class Web {
         return "main".equalsIgnoreCase(custom) ? null : custom;
     }
 
+    /**
+     * Reads and normalizes the {@code custom} request parameter via {@link #normalizeCustom(String)}.
+     *
+     * @param req request
+     * @return normalized custom id or {@code null}
+     */
     public static String normalizedCustomParam(HttpServletRequest req) {
         return normalizeCustom(req.getParameter(WebConst.Param.CUSTOM));
     }
 
+    /**
+     * Checks if a provided custom quest id is missing from the catalog.
+     *
+     * @param customId  custom quest id (nullable)
+     * @param authoring authoring service (nullable)
+     * @return {@code true} if a non-null id is not found (or authoring is null)
+     */
     public static boolean isMissingCustomId(String customId, QuestAuthoringService authoring) {
         if (customId == null) {
             return false;
@@ -276,6 +491,13 @@ public class Web {
         return authoring.getFromCatalog(customId).isEmpty();
     }
 
+    /**
+     * Wraps a string into lines up to 24 chars, trying to break on word boundaries.
+     * Produces up to 3 lines, adding ellipsis to the last if truncated.
+     *
+     * @param s text
+     * @return list of wrapped lines (size 1..3, may be empty if input blank)
+     */
     public static List<String> wrapByWords(String s) {
         String[] words = s.split("\\s+");
         List<String> lines = new ArrayList<>();
@@ -315,6 +537,15 @@ public class Web {
         return lines;
     }
 
+    /**
+     * Redirects to a path keeping selected request parameters.
+     *
+     * @param req          request
+     * @param resp         response
+     * @param pathRelative context-relative path
+     * @param paramNames   names to keep if present and non-blank
+     * @throws IOException on I/O error
+     */
     public static void redirectKeep(HttpServletRequest req,
                                     HttpServletResponse resp,
                                     String pathRelative,
@@ -331,6 +562,14 @@ public class Web {
         redirect(req, resp, pathRelative, p);
     }
 
+    /**
+     * Determines whether sensitive user fields changed (role/login and/or password flag).
+     *
+     * @param before          old user (nullable)
+     * @param after           new user (non-null)
+     * @param passwordChanged whether password changed
+     * @return {@code true} if role/login changed or password changed flag is set
+     */
     public static boolean sensitiveChanged(User before, User after, boolean passwordChanged) {
         if (before == null) {
             return passwordChanged;
@@ -340,6 +579,15 @@ public class Web {
                 || !Objects.equals(before.getUserLogin(), after.getUserLogin());
     }
 
+    /**
+     * Filters a list of quests by name substring from a request parameter.
+     * Also sets the used query parameter value as request attribute {@code "q"}.
+     *
+     * @param req       request
+     * @param items     input list (may be returned as-is)
+     * @param paramName name of the filter parameter
+     * @return filtered list (non-null)
+     */
     public static List<CustomQuest> filterQuestsByName(HttpServletRequest req,
                                                        List<CustomQuest> items,
                                                        String paramName) {
@@ -357,11 +605,26 @@ public class Web {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Filters quests by request parameter {@code q} and attaches lists/maps for JSPs.
+     *
+     * @param req   request
+     * @param items source items
+     */
     public static void filterAndAttachQuests(HttpServletRequest req, List<CustomQuest> items) {
         List<CustomQuest> filtered = filterQuestsByName(req, items, "q");
         attachQuestLists(req, filtered);
     }
 
+    /**
+     * Builds a machine-readable diff of admin user changes for notifications.
+     * <p>Includes keys like {@code role.before}, {@code role.after}, etc., and a {@code what} summary.</p>
+     *
+     * @param before          previous user (nullable)
+     * @param after           new user
+     * @param passwordChanged whether password changed
+     * @return map of change summary data
+     */
     public static Map<String, String> buildMachineReadableDiff(User before, User after, boolean passwordChanged) {
         Map<String, String> data = new LinkedHashMap<>();
         data.put("what", buildAdminChangeSummary(before, after, passwordChanged));
@@ -387,6 +650,14 @@ public class Web {
         return data;
     }
 
+    /**
+     * Builds a short, human-readable summary of admin changes (role/login/name/password).
+     *
+     * @param before          previous user (nullable)
+     * @param after           new user
+     * @param passwordChanged whether password changed
+     * @return compact summary line(s)
+     */
     public static String buildAdminChangeSummary(User before, User after, boolean passwordChanged) {
         List<String> parts = new ArrayList<>();
         if (before == null) {
@@ -413,6 +684,10 @@ public class Web {
         return Web.shortTitle(joined);
     }
 
+    /**
+     * Appends quest parameters ({@code id} and optional {@code custom}) to a base URL.
+     * <p>Private helper used by URL builders.</p>
+     */
     private static String appendQuestParams(String base, int nodeId, String customIdOrNull) {
         Map<String, String> p = new LinkedHashMap<>();
         p.put(WebConst.Param.ID, String.valueOf(nodeId));
@@ -422,10 +697,38 @@ public class Web {
         return addParamsEncoded(base, p);
     }
 
+    /**
+     * Builds an SVG-layout model for a quest graph and attaches it to the request attributes
+     * (dimensions, node positions, edges, flags). Provides an overload with default sizes.
+     *
+     * @param req           request to receive attributes
+     * @param nodes         quest nodes (may be empty)
+     * @param startId       start node id
+     * @param includeImages whether to include node image URLs in the model
+     */
     public static void buildQuestSvgModel(HttpServletRequest req, List<QuestNode> nodes, int startId, boolean includeImages) {
         buildQuestSvgModel(req, nodes, startId, includeImages, 180, 80, 80, 120, 40);
     }
 
+    /**
+     * Builds an SVG-layout model for a quest graph with explicit geometry parameters.
+     * <ul>
+     *   <li>Attributes set: {@code width}, {@code height}, {@code nodeW}, {@code nodeH},
+     *   {@code positions} (collection of node positions), {@code edges} (edge segments),
+     *   {@code isEmpty}.</li>
+     *   <li>Unreachable nodes are placed in the last layer.</li>
+     * </ul>
+     *
+     * @param req           request
+     * @param nodes         quest nodes
+     * @param startId       start node id
+     * @param includeImages include node images in positions
+     * @param nodeW         node width
+     * @param nodeH         node height
+     * @param hGap          horizontal gap
+     * @param vGap          vertical gap
+     * @param padding       canvas padding
+     */
     public static void buildQuestSvgModel(HttpServletRequest req,
                                           List<QuestNode> nodes,
                                           int startId,

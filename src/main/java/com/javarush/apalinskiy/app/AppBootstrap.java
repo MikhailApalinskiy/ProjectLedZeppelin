@@ -32,10 +32,58 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 
+/**
+ * Application bootstrap listener that wires core repositories and services
+ * into the {@link jakarta.servlet.ServletContext} at application startup.
+ * <p>
+ * Responsibilities:
+ * <ul>
+ *   <li>Create a default admin user (if it does not already exist).</li>
+ *   <li>Load the production quest resource and expose {@code QuestService} and repositories.</li>
+ *   <li>Initialize editor repository and {@code QuestAuthoringService}.</li>
+ *   <li>Register save-state, notification, friend, and user-stats services.</li>
+ *   <li>Resolve uploads base directory.</li>
+ * </ul>
+ * All created components are stored under keys defined in {@code WebConst.Ctx}.
+ *
+ * <p><strong>Error handling:</strong> if the default admin already exists, the condition is logged
+ * at WARN level and startup continues. Critical initialization failures (e.g. quest resource
+ * loading or uploads directory resolution) are logged and rethrown to fail fast.</p>
+ *
+ * @see WebConst.Ctx
+ * @see WebConst.App
+ * @see jakarta.servlet.ServletContextListener
+ */
 public class AppBootstrap implements ServletContextListener {
 
     private static final Logger log = LoggerFactory.getLogger(AppBootstrap.class);
 
+    /**
+     * Initializes and registers application services in the servlet context.
+     *
+     * <p>Registers (keys from {@link WebConst.Ctx}):</p>
+     * <ul>
+     *   <li>{@code USER_SERVICE} – {@link UserService}</li>
+     *   <li>{@code PROD_REPOSITORY} – production {@code InMemoryQuestStore}</li>
+     *   <li>{@code QUEST_SERVICE} – {@code QuestService}</li>
+     *   <li>{@code EDITOR_REPOSITORY} – editor {@code InMemoryQuestStore}</li>
+     *   <li>{@code AUTHORING_SERVICE} – {@code QuestAuthoringService}</li>
+     *   <li>{@code SAVE_STATE_SERVICE} – {@code SaveStateService}</li>
+     *   <li>{@code NOTIFY_REPO} – {@code NotificationRepository}</li>
+     *   <li>{@code NOTIFY_SERVICE} – {@code NotificationService}</li>
+     *   <li>{@code FRIEND_REPOSITORY} – {@code FriendRepository}</li>
+     *   <li>{@code FRIEND_SERVICE} – {@code FriendService}</li>
+     *   <li>{@code USER_STATS_SERVICE} – {@code UserStatsService}</li>
+     * </ul>
+     *
+     * <p>Also attempts to create a default admin user using values from
+     * {@link WebConst.App#DEFAULT_ADMIN_NAME}, {@link WebConst.App#DEFAULT_ADMIN_LOGIN},
+     * and {@link WebConst.App#DEFAULT_ADMIN_PASS}.</p>
+     *
+     * @param sce the servlet context event providing access to {@link jakarta.servlet.ServletContext}
+     * @throws RuntimeException if the quest resource cannot be loaded
+     *                          or if the uploads base directory cannot be resolved
+     */
     @Override
     public void contextInitialized(ServletContextEvent sce) {
         log.info("App context initialization started");
@@ -111,6 +159,11 @@ public class AppBootstrap implements ServletContextListener {
         log.info("App context initialization finished successfully");
     }
 
+    /**
+     * Logs that the application context is being destroyed.
+     *
+     * @param sce the servlet context event
+     */
     @Override
     public void contextDestroyed(ServletContextEvent sce) {
         log.info("App context is being destroyed");

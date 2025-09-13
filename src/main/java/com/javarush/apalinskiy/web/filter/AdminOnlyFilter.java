@@ -12,6 +12,28 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 
+/**
+ * Servlet filter that restricts access to admin-only resources.
+ * <p>
+ * This filter checks the authenticated user stored in the HTTP session and
+ * ensures they have the {@link Role#ADMIN} role. If the user is missing
+ * or not an admin, they are redirected to the home page with an
+ * "Access denied" error message.
+ * </p>
+ *
+ * <h3>Responsibilities</h3>
+ * <ul>
+ *   <li>Block anonymous users from accessing admin-only endpoints.</li>
+ *   <li>Block authenticated non-admin users from accessing admin-only endpoints.</li>
+ *   <li>Allow requests to proceed if the user is an admin.</li>
+ * </ul>
+ *
+ * <h3>Logging</h3>
+ * <ul>
+ *   <li>Logs warnings when access is denied (anonymous or non-admin).</li>
+ *   <li>Logs info messages when admin access is granted.</li>
+ * </ul>
+ */
 public class AdminOnlyFilter implements Filter {
 
     private static final Logger log = LoggerFactory.getLogger(AdminOnlyFilter.class);

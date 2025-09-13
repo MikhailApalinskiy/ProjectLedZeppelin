@@ -25,12 +25,75 @@ import java.util.Optional;
 
 import static com.javarush.apalinskiy.web.util.Uploads.resolveBaseDir;
 
+/**
+ * Authoring servlet that powers the quest editor page (create/update draft nodes, upload images).
+ * <p>
+ * Responsibilities:
+ * <ul>
+ *   <li>Resolve {@link QuestAuthoringService} from the application context.</li>
+ *   <li><b>GET</b>:
+ *     <ul>
+ *       <li>{@code ?new} — clears the current editor draft and removes {@code editingQuestId} from session;</li>
+ *       <li>{@code ?load=<questId>} — loads an existing quest into the editor and stores {@code editingQuestId} in session;</li>
+ *       <li>Prefills the form from {@code id} (node id) or restores the last form state from the session;</li>
+ *       <li>Forwards to {@code WebConst.Jsp.CREATE}.</li>
+ *     </ul>
+ *   </li>
+ *   <li><b>POST</b>:
+ *     <ul>
+ *       <li>{@code action=replaceNode} — validates input, optionally processes image upload, constructs {@link QuestNode}
+ *           via {@link FormQuestNodeParser#parseNode(HttpServletRequest)}, persists it with {@link QuestAuthoringService#saveNode(QuestNode)};</li>
+ *       <li>{@code action=deleteNode} — deletes a node from the draft by id;</li>
+ *       <li>On errors, stashes user inputs to session and redirects back with an error flash.</li>
+ *     </ul>
+ *   </li>
+ * </ul>
+ *
+ * <h3>Image uploads</h3>
+ * <ul>
+ *   <li>Accepted only for {@code multipart/*} requests; {@code Content-Type} must start with {@code image/}.</li>
+ *   <li>Target directory is resolved via an application-specific method {@code resolveBaseDir(getServletContext())}.</li>
+ *   <li>Filename is sanitized; extension inferred from original name or content type; stored under {@code /uploads/quest-<ts>.<ext>}.</li>
+ *   <li>Requires multipart handling to be configured (e.g., {@code @MultipartConfig} or web.xml).</li>
+ * </ul>
+ *
+ * <h3>Form prefill/restore (GET)</h3>
+ * <ul>
+ *   <li>With {@code id}, attempts to prefill fields from the corresponding draft node.</li>
+ *   <li>Otherwise restores the last submitted-but-failed form from session attributes: {@code form_id}, {@code form_text},
+ *       {@code form_final}, {@code form_options}, {@code form_image}.</li>
+ * </ul>
+ *
+ * <h3>Flash & redirects</h3>
+ * <ul>
+ *   <li>Uses {@link Web#redirectOk} and {@link Web#redirectErr} for user feedback.</li>
+ *   <li>OK cases also set {@code clear=1} to present a clean form.</li>
+ * </ul>
+ *
+ * <h3>Notes</h3>
+ * <ul>
+ *   <li>When replacing a non-final node without any options, the request is rejected with a helpful message.</li>
+ *   <li>If no new image is uploaded, preserves the existing node image (if any).</li>
+ * </ul>
+ *
+ * @see QuestAuthoringService
+ * @see FormQuestNodeParser
+ * @see QuestNode
+ * @see Option
+ * @see WebConst
+ * @see Web
+ */
 public class CreateQuestServlet extends HttpServlet {
 
     private static final Logger log = LoggerFactory.getLogger(CreateQuestServlet.class);
 
     private QuestAuthoringService authoring;
 
+    /**
+     * Resolves {@link QuestAuthoringService} from the servlet context.
+     *
+     * @throws UnavailableException if the service is missing
+     */
     @Override
     public void init(ServletConfig config) throws ServletException {
         super.init(config);
@@ -43,6 +106,14 @@ public class CreateQuestServlet extends HttpServlet {
         }
     }
 
+    /**
+     * Renders the editor page or performs draft management actions:
+     * <ul>
+     *   <li>{@code ?new}: clears the draft and resets {@code editingQuestId} in session, then redirects with OK flash;</li>
+     *   <li>{@code ?load=<questId>}: loads quest into editor, stores {@code editingQuestId} in session, redirects with OK flash;</li>
+     *   <li>Otherwise: optionally prefill form by {@code id} or restore from session, then forward to the editor JSP.</li>
+     * </ul>
+     */
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp)
             throws ServletException, IOException {
@@ -121,6 +192,16 @@ public class CreateQuestServlet extends HttpServlet {
         Web.forward(req, resp, WebConst.Jsp.CREATE);
     }
 
+    /**
+     * Handles editor actions:
+     * <ul>
+     *   <li>{@code replaceNode}: validates final/non-final constraints, processes image upload if present,
+     *       merges with existing image if omitted, saves the node, redirects with OK;</li>
+     *   <li>{@code deleteNode}: validates id and removes node from the draft, redirects with OK;</li>
+     *   <li>Unknown action: redirects with an error.</li>
+     * </ul>
+     * On validation errors, stashes form inputs to session and redirects back with error flash.
+     */
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws IOException {
         String action = req.getParameter(WebConst.Param.ACTION);
@@ -195,6 +276,13 @@ public class CreateQuestServlet extends HttpServlet {
         }
     }
 
+    /**
+     * Processes an image upload (if any) and stores it under the configured uploads directory.
+     * <p>
+     * Returns the web path (e.g., {@code /uploads/quest-<ts>.jpg}) or {@code null} if no upload present.
+     * Throws {@link ServletException} for invalid payloads (non-image, oversized).
+     * </p>
+     */
     private String handleImageUpload(HttpServletRequest req) throws IOException, ServletException {
         String reqCt = req.getContentType();
         if (reqCt == null || !reqCt.toLowerCase().startsWith("multipart/")) {
@@ -236,6 +324,9 @@ public class CreateQuestServlet extends HttpServlet {
         return "/uploads/" + uniq;
     }
 
+    /**
+     * Returns a copy of {@link QuestNode} with its image path set, preserving its final/non-final shape.
+     */
     private QuestNode withImage(QuestNode src, String imagePath) {
         if (src.isFin()) {
             return QuestNode.fin(src.getId(), src.getText(), imagePath);
@@ -244,6 +335,9 @@ public class CreateQuestServlet extends HttpServlet {
         }
     }
 
+    /**
+     * Saves current form fields to the session so they can be restored after a redirect on error.
+     */
     private void stashFormForRedirect(HttpServletRequest req) {
         HttpSession s = req.getSession(true);
         s.setAttribute("form_id", Optional.ofNullable(req.getParameter(WebConst.Param.ID)).orElse(""));
@@ -252,6 +346,9 @@ public class CreateQuestServlet extends HttpServlet {
         s.setAttribute("form_options", Optional.ofNullable(req.getParameter(WebConst.Param.OPTIONS)).orElse(""));
     }
 
+    /**
+     * Redirects back to the editor with an encoded error message in the query string.
+     */
     private void sendError(HttpServletResponse resp, String msg) throws IOException {
         resp.sendRedirect(resp.encodeRedirectURL(
                 WebConst.Path.CREATE + "?" + WebConst.Attr.ERROR + "=" + Web.urlEncode(Objects.toString(msg, ""))

@@ -377,10 +377,6 @@ h2 {
     color: #bfdbfe;
 }
 
-.alert-info .alert-dot {
-    background: #3b82f6;
-}
-
 @media (prefers-reduced-motion: no-preference) {
     .alert {
         opacity: 0;
@@ -456,4 +452,34 @@ h2 {
 .btn.btn-danger:hover,
 .btn.btn-danger:focus-visible {
     background: rgb(var(--danger-hover));
+}
+
+:root {
+    color-scheme: light dark;
+}
+
+body {
+    color: rgb(var(--fg)) !important;
+    background-color: rgb(var(--bg1)) !important;
+}
+
+@media (prefers-color-scheme: light) {
+    .btn,
+    .inline-form .btn,
+    .link,
+    .btn-ghost {
+        color: rgb(var(--fg)) !important;
+    }
+
+    .btn-primary,
+    .btn-danger {
+        color: #fff !important;
+    }
+}
+
+.alert,
+.alert-error,
+.alert-ok,
+.alert-info {
+    color: #e6edf3 !important;
 }

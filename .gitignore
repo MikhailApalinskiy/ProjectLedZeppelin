@@ -7,6 +7,8 @@ target/
 .idea
 *.iml
 
+logs/
+uploads/
 
 ### Eclipse ###
 .apt_generated

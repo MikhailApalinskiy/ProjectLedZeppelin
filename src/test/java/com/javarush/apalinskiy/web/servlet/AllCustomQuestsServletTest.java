@@ -3,6 +3,7 @@ package com.javarush.apalinskiy.web.servlet;
 import com.javarush.apalinskiy.app.WebConst;
 import com.javarush.apalinskiy.domain.quest.custom.CustomQuest;
 import com.javarush.apalinskiy.service.quest.QuestAuthoringService;
+import com.javarush.apalinskiy.service.user.UserService;
 import com.javarush.apalinskiy.web.util.Web;
 import jakarta.servlet.ServletConfig;
 import jakarta.servlet.ServletContext;
@@ -17,7 +18,6 @@ import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.lang.reflect.Field;
 import java.util.List;
 
 import static org.mockito.Answers.CALLS_REAL_METHODS;
@@ -39,21 +39,25 @@ class AllCustomQuestsServletTest {
     @Mock
     QuestAuthoringService authoring;
     @Mock
+    UserService userService;
+    @Mock
     CustomQuest q1, q2;
 
-    private static void setField(Object target, Object value) {
-        try {
-            Field f;
+    private static void setField(Object target, String fieldName, Object value) {
+        Class<?> c = target.getClass();
+        while (c != null) {
             try {
-                f = target.getClass().getDeclaredField("authoring");
-            } catch (NoSuchFieldException ex) {
-                f = target.getClass().getSuperclass().getDeclaredField("authoring");
+                java.lang.reflect.Field f = c.getDeclaredField(fieldName);
+                f.setAccessible(true);
+                f.set(target, value);
+                return;
+            } catch (NoSuchFieldException e) {
+                c = c.getSuperclass(); // пробуем в родителе
+            } catch (IllegalAccessException e) {
+                throw new RuntimeException("Cannot set field '" + fieldName + "'", e);
             }
-            f.setAccessible(true);
-            f.set(target, value);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
         }
+        throw new RuntimeException(new NoSuchFieldException(fieldName));
     }
 
     @Nested
@@ -69,10 +73,13 @@ class AllCustomQuestsServletTest {
             try (MockedStatic<Web> web = mockStatic(Web.class, CALLS_REAL_METHODS)) {
                 web.when(() -> Web.ctxBean(ctx, WebConst.Ctx.AUTHORING_SERVICE, QuestAuthoringService.class))
                         .thenReturn(authoring);
+                web.when(() -> Web.ctxBean(ctx, WebConst.Ctx.USER_SERVICE, UserService.class))
+                        .thenReturn(userService);
                 // when
                 s.init(config);
                 // then
                 web.verify(() -> Web.ctxBean(ctx, WebConst.Ctx.AUTHORING_SERVICE, QuestAuthoringService.class));
+                web.verify(() -> Web.ctxBean(ctx, WebConst.Ctx.USER_SERVICE, UserService.class));
             }
         }
 
@@ -100,18 +107,22 @@ class AllCustomQuestsServletTest {
         void ok_flow() throws Exception {
             // given
             AllCustomQuestsServlet s = new AllCustomQuestsServlet();
-            setField(s, authoring);
+            setField(s, "authoring", authoring);
+            setField(s, "userService", userService);
             List<CustomQuest> items = List.of(q1, q2);
             when(authoring.listAllFromCatalog()).thenReturn(items);
             when(req.getContextPath()).thenReturn("/app");
             when(req.getServletPath()).thenReturn("/quests");
             try (MockedStatic<Web> web = mockStatic(Web.class, CALLS_REAL_METHODS)) {
+                web.when(() -> Web.attachOwnerNamesById(eq(req), eq(items), any(UserService.class)))
+                        .then(inv -> null);
                 web.when(() -> Web.filterAndAttachQuests(eq(req), eq(items))).then(inv -> null);
                 web.when(() -> Web.forward(eq(req), eq(resp), eq(WebConst.Jsp.QUESTS_LIST))).then(inv -> null);
                 // when
                 s.doGet(req, resp);
                 // then
                 verify(authoring).listAllFromCatalog();
+                web.verify(() -> Web.attachOwnerNamesById(eq(req), eq(items), any()));
                 web.verify(() -> Web.filterAndAttachQuests(eq(req), eq(items)));
                 verify(req).setAttribute("pageTitleKey", "all.quests");
                 verify(req).setAttribute("showOwnerActions", Boolean.FALSE);
@@ -125,7 +136,7 @@ class AllCustomQuestsServletTest {
         void empty_catalog() throws Exception {
             // given
             AllCustomQuestsServlet s = new AllCustomQuestsServlet();
-            setField(s, authoring);
+            setField(s, "authoring", authoring);
             List<CustomQuest> items = List.of();
             when(authoring.listAllFromCatalog()).thenReturn(items);
             when(req.getContextPath()).thenReturn("/ctx");

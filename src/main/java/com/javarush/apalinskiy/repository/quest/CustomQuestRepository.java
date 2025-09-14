@@ -6,115 +6,111 @@ import lombok.Getter;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.NoSuchElementException;
 import java.util.Optional;
 
 /**
- * Repository interface for managing user-created (custom) quests.
+ * Contract for storing, querying, and moderating custom quests.
  * <p>
- * Provides CRUD operations for {@link CustomQuest} as well as
- * staging mechanisms for moderation workflows (pending create/edit).
- * </p>
- *
- * <h3>Responsibilities</h3>
- * <ul>
- *   <li>Store and retrieve {@link CustomQuest} entities.</li>
- *   <li>Support listing all quests or only those by a specific owner.</li>
- *   <li>Enforce uniqueness of quest IDs.</li>
- *   <li>Allow staging new quests and edits for moderation before publishing.</li>
- * </ul>
- *
- * <h3>Moderation Workflow</h3>
- * <p>
- * When a user submits a new quest or edits an existing one,
- * the change is stored in a {@link PendingNew} or {@link PendingEdit}
- * entry until approved or rejected by an administrator.
+ * Unless stated otherwise, methods are expected to be idempotent with respect to
+ * missing entities (i.e., no-op + {@code false} / exception where applicable).
+ * Implementations SHOULD return quests ordered by {@code updatedAt} descending
+ * for {@link #listAll()} and {@link #listByOwner(String)} to provide a stable UX.
  * </p>
  */
 public interface CustomQuestRepository {
 
     /**
-     * Creates and persists a new quest immediately (without staging).
+     * Persists a new quest with a generated identifier.
      *
-     * @param ownerLogin  quest owner's login
+     * @param ownerId     owner user id
      * @param name        quest name
-     * @param startId     ID of the start node
-     * @param nodes       list of quest nodes
-     * @param published   whether quest is published immediately
-     * @param versionNote version or changelog note
+     * @param startId     start node id
+     * @param nodes       quest nodes (stored by value/copy)
+     * @param published   initial published flag
+     * @param versionNote optional version/comment label
      */
-    void create(String ownerLogin, String name, int startId, List<QuestNode> nodes,
+    void create(String ownerId, String name, int startId, List<QuestNode> nodes,
                 boolean published, String versionNote);
 
     /**
-     * Retrieves a quest by its ID.
+     * Retrieves a quest by id.
      *
-     * @param id quest ID
-     * @return optional containing the quest if found
+     * @param id quest id
+     * @return optional quest; empty if not found
      */
     Optional<CustomQuest> get(String id);
 
     /**
-     * Lists all quests, usually sorted by update time (newest first).
+     * Lists all quests ordered by {@code updatedAt} descending.
      *
-     * @return list of all quests
+     * @return immutable list of quests
      */
     List<CustomQuest> listAll();
 
     /**
-     * Lists quests owned by the specified user.
+     * Lists quests for the given owner ordered by {@code updatedAt} descending.
      *
-     * @param ownerLogin owner login
-     * @return list of quests owned by the user
+     * @param ownerId owner user id
+     * @return immutable list of quests
      */
-    List<CustomQuest> listByOwner(String ownerLogin);
+    List<CustomQuest> listByOwner(String ownerId);
 
     /**
-     * Updates an existing quest.
+     * Replaces graph, start node, publish flag and version note of an existing quest.
+     * Implementations SHOULD update {@code updatedAt}.
      *
-     * @param id          quest ID
-     * @param startId     new start node ID
-     * @param nodes       updated list of nodes
-     * @param published   whether quest is published
-     * @param versionNote version or changelog note
+     * @param id          quest id
+     * @param startId     new start node id
+     * @param nodes       replacement nodes
+     * @param published   new published flag
+     * @param versionNote new version/comment label
      */
     void update(String id, int startId, List<QuestNode> nodes,
                 boolean published, String versionNote);
 
     /**
-     * Deletes a quest by its ID.
+     * Deletes a quest by id.
      *
-     * @param id quest ID
-     * @return true if the quest was removed, false if not found
+     * @param id quest id
+     * @return {@code true} if a quest was removed, {@code false} otherwise
      */
     boolean delete(String id);
 
     /**
-     * Deletes a quest only if the given user is its owner.
+     * Deletes a quest only if the provided owner id matches the quest owner.
      *
-     * @param id         quest ID
-     * @param ownerLogin expected owner login
-     * @return true if deleted, false otherwise
+     * @param id      quest id
+     * @param ownerId expected owner id
+     * @return {@code true} if removed; {@code false} if not found or owner mismatch
      */
-    boolean deleteIfOwner(String id, String ownerLogin);
+    boolean deleteIfOwner(String id, String ownerId);
 
     /**
-     * Represents a new quest submitted for moderation.
+     * Pending "new quest" submission for moderation.
      */
     @Getter
     final class PendingNew {
         private final String pendingId;
-        private final String ownerLogin;
+        private final String ownerId;
         private final String name;
         private final int startId;
         private final List<QuestNode> nodes;
         private final String versionNote;
         private final Instant submittedAt;
 
-        public PendingNew(String pendingId, String ownerLogin, String name,
+        /**
+         * @param pendingId   moderation id generated by repository
+         * @param ownerId     owner user id
+         * @param name        quest name
+         * @param startId     start node id
+         * @param nodes       submitted nodes
+         * @param versionNote version/comment label
+         * @param submittedAt submission timestamp
+         */
+        public PendingNew(String pendingId, String ownerId, String name,
                           int startId, List<QuestNode> nodes, String versionNote, Instant submittedAt) {
             this.pendingId = pendingId;
-            this.ownerLogin = ownerLogin;
+            this.ownerId = ownerId;
             this.name = name;
             this.startId = startId;
             this.nodes = nodes;
@@ -124,57 +120,67 @@ public interface CustomQuestRepository {
     }
 
     /**
-     * Stages a new quest for moderation (not visible until approved).
+     * Stages a new quest for moderation.
      *
-     * @param ownerLogin  quest owner's login
+     * @param ownerId     owner user id
      * @param name        quest name
-     * @param startId     start node ID
-     * @param nodes       quest nodes
-     * @param versionNote version note or changelog
+     * @param startId     start node id
+     * @param nodes       nodes to store
+     * @param versionNote version/comment label
      */
-    void stageCreate(String ownerLogin, String name, int startId, List<QuestNode> nodes, String versionNote);
+    void stageCreate(String ownerId, String name, int startId, List<QuestNode> nodes, String versionNote);
 
     /**
-     * Lists all staged new quests awaiting moderation.
+     * Lists pending "new quest" submissions ordered by submission time descending.
      *
-     * @return list of pending new quests
+     * @return immutable list of pending new items
      */
     List<PendingNew> listPendingNew();
 
     /**
-     * Approves a staged quest creation and persists it as a new quest.
+     * Approves a pending "new quest" and materializes it as a published quest.
      *
-     * @param pendingId ID of the staged quest
-     * @return ID of the newly created quest
-     * @throws NoSuchElementException if pending item is not found
+     * @param pendingId moderation id
+     * @return generated quest id
+     * @throws java.util.NoSuchElementException if the pending item is not found
      */
     String approveCreate(String pendingId);
 
     /**
-     * Rejects a staged quest creation (removes it from staging).
+     * Rejects a pending "new quest".
      *
-     * @param pendingId ID of the staged quest
-     * @throws NoSuchElementException if pending item is not found
+     * @param pendingId moderation id
+     * @throws java.util.NoSuchElementException if the pending item is not found
      */
+
     void rejectCreate(String pendingId);
 
     /**
-     * Represents an edit to an existing quest submitted for moderation.
+     * Pending edit submission for moderation of an existing quest.
      */
     @Getter
     final class PendingEdit {
         private final String questId;
-        private final String ownerLogin;
+        private final String ownerId;
         private final String name;
         private final int startId;
         private final List<QuestNode> nodes;
         private final String versionNote;
         private final Instant submittedAt;
 
-        public PendingEdit(String questId, String ownerLogin, String name,
+        /**
+         * @param questId     target quest id
+         * @param ownerId     owner user id
+         * @param name        current quest name (for display)
+         * @param startId     proposed start node id
+         * @param nodes       proposed nodes
+         * @param versionNote version/comment label
+         * @param submittedAt submission timestamp
+         */
+        public PendingEdit(String questId, String ownerId, String name,
                            int startId, List<QuestNode> nodes, String versionNote, Instant submittedAt) {
             this.questId = questId;
-            this.ownerLogin = ownerLogin;
+            this.ownerId = ownerId;
             this.name = name;
             this.startId = startId;
             this.nodes = nodes;
@@ -184,36 +190,36 @@ public interface CustomQuestRepository {
     }
 
     /**
-     * Stages an edit to an existing quest for moderation.
+     * Stages an edit for moderation for an existing quest.
      *
-     * @param questId     quest being edited
-     * @param startId     new start node ID
-     * @param nodes       updated nodes
-     * @param versionNote version or changelog note
-     * @throws NoSuchElementException if the quest does not exist
+     * @param questId     quest id to edit
+     * @param startId     proposed start node id
+     * @param nodes       proposed nodes
+     * @param versionNote version/comment label
+     * @throws java.util.NoSuchElementException if the target quest is not found
      */
     void stageEdit(String questId, int startId, List<QuestNode> nodes, String versionNote);
 
     /**
-     * Lists all staged edits awaiting moderation.
+     * Lists pending edits ordered by submission time descending.
      *
-     * @return list of pending edits
+     * @return immutable list of pending edit items
      */
     List<PendingEdit> listPendingEdits();
 
     /**
-     * Approves a staged edit and applies it to the quest.
+     * Applies a pending edit to the live quest (implementations SHOULD update {@code updatedAt}).
      *
-     * @param questId quest being edited
-     * @throws NoSuchElementException if pending edit is not found
+     * @param questId quest id that has a pending edit
+     * @throws java.util.NoSuchElementException if the pending edit is not found
      */
     void approveEdit(String questId);
 
     /**
-     * Rejects a staged edit (removes it from staging).
+     * Rejects a pending edit.
      *
-     * @param questId quest being edited
-     * @throws NoSuchElementException if pending edit is not found
+     * @param questId quest id that has a pending edit
+     * @throws java.util.NoSuchElementException if the pending edit is not found
      */
     void rejectEdit(String questId);
 }

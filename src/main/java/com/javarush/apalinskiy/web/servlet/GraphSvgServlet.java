@@ -22,7 +22,7 @@ import java.util.*;
  * Renders an SVG preview of the quest graph currently held in the in-memory editor store.
  * <p>
  * The servlet reads nodes and start id from {@link InMemoryQuestStore} and builds a view model
- * for an SVG diagram via {@link Web#buildQuestSvgModel(HttpServletRequest, java.util.List, int, boolean)}.
+ * for an SVG diagram via {@link Web#buildQuestSvgModel(HttpServletRequest, List, int, boolean)}.
  * It can optionally load a quest from the catalog into the editor (when {@code load} parameter is provided)
  * using {@link QuestAuthoringService}, and keep editor metadata in the HTTP session.
  * </p>
@@ -86,7 +86,7 @@ public class GraphSvgServlet extends HttpServlet {
      *   <li>If no {@code load}, but {@code EDITING_QUEST_ID} exists and {@code EDITING_QUEST_NAME} is blank,
      *       tries to backfill the name from the catalog.</li>
      *   <li>Reads nodes/start id from the in-memory store and calls
-     *       {@link Web#buildQuestSvgModel(HttpServletRequest, java.util.List, int, boolean)} with {@code readOnly=true}.</li>
+     *       {@link Web#buildQuestSvgModel(HttpServletRequest, List, int, boolean)} with {@code readOnly=true}.</li>
      *   <li>Forwards to {@code WebConst.Jsp.GRAPH_SVG}.</li>
      * </ol>
      * </p>

@@ -194,7 +194,7 @@ class QuestAuthoringServiceTest {
         }
 
         @Test
-        @DisplayName("throws NullPointerException when ownerLogin is null (fails early, no draft needed)")
+        @DisplayName("throws NullPointerException when ownerId is null (fails early, no draft needed)")
         void publishNullOwner() {
             // Given
             // When / Then

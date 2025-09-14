@@ -7,7 +7,7 @@
     <meta charset="UTF-8"/>
     <title>Пользователи — TextQuest</title>
 
-    <c:url var="cssMain"  value="/assets/css/main.css"/>
+    <c:url var="cssMain" value="/assets/css/main.css"/>
     <c:url var="cssUsers" value="/assets/css/users.css"/>
     <link rel="stylesheet" href="${cssMain}"/>
     <link rel="stylesheet" href="${cssUsers}"/>
@@ -17,19 +17,19 @@
 <body>
 <div class="container">
 
-    <c:set var="CTX"              value="${pageContext.request.contextPath}"/>
-    <c:set var="PATH_HOME"        value="/"/>
-    <c:set var="PATH_USERS"       value="/users"/>
-    <c:set var="PATH_EDIT_USER"   value="/user/edit"/>
-    <c:set var="PATH_FRIENDS"     value="/friends"/>
-    <c:set var="PARAM_Q"          value="q"/>
-    <c:set var="PARAM_ID"         value="id"/>
-    <c:set var="PARAM_ACTION"     value="action"/>
-    <c:set var="ACTION_REQUEST"   value="request"/>
-    <c:set var="ROLE_ADMIN"       value="ADMIN"/>
-    <c:set var="DATE_PATTERN"     value="yyyy-MM-dd HH:mm:ss"/>
+    <c:set var="CTX" value="${pageContext.request.contextPath}"/>
+    <c:set var="PATH_HOME" value="/"/>
+    <c:set var="PATH_USERS" value="/users"/>
+    <c:set var="PATH_EDIT_USER" value="/user/edit"/>
+    <c:set var="PATH_FRIENDS" value="/friends"/>
+    <c:set var="PARAM_Q" value="q"/>
+    <c:set var="PARAM_ID" value="id"/>
+    <c:set var="PARAM_ACTION" value="action"/>
+    <c:set var="ACTION_REQUEST" value="request"/>
+    <c:set var="ROLE_ADMIN" value="ADMIN"/>
+    <c:set var="DATE_PATTERN" value="yyyy-MM-dd HH:mm:ss"/>
 
-    <c:url var="homeUrl"  value="${PATH_HOME}"/>
+    <c:url var="homeUrl" value="${PATH_HOME}"/>
     <c:url var="usersUrl" value="${PATH_USERS}"/>
 
     <%@ include file="/WEB-INF/jsp/fragments/alerts.jspf" %>
@@ -64,8 +64,9 @@
     </section>
 
     <section class="card">
-        <c:set var="isAuth"  value="${not empty sessionScope.user}"/>
-        <c:set var="isAdmin" value="${isAuth and sessionScope.user.role eq ROLE_ADMIN}"/>
+        <c:set var="cur" value="${empty requestScope.user ? sessionScope.user : requestScope.user}"/>
+        <c:set var="isAuth" value="${not empty cur}"/>
+        <c:set var="isAdmin" value="${isAuth and cur.role eq ROLE_ADMIN}"/>
 
         <c:choose>
             <c:when test="${empty users}">
@@ -86,8 +87,8 @@
                     </thead>
                     <tbody>
                     <c:forEach var="u" items="${users}" varStatus="st">
-                        <c:set var="isSelf"        value="${isAuth and sessionScope.user.userId eq u.userId}"/>
-                        <c:set var="canAddFriend"  value="${isAuth and not isSelf}"/>
+                        <c:set var="isSelf" value="${isAuth and cur.userId eq u.userId}"/>
+                        <c:set var="canAddFriend" value="${isAuth and not isSelf}"/>
 
                         <tr>
                             <td><span class="pill">${st.index + 1}</span></td>
@@ -101,7 +102,7 @@
                                     <c:if test="${canAddFriend}">
                                         <form method="post" action="${CTX}${PATH_FRIENDS}" style="display:inline">
                                             <input type="hidden" name="${PARAM_ACTION}" value="${ACTION_REQUEST}"/>
-                                            <input type="hidden" name="${PARAM_ID}"     value="${u.userId}"/>
+                                            <input type="hidden" name="${PARAM_ID}" value="${u.userId}"/>
                                             <button type="submit" class="btn">Добавить в друзья</button>
                                         </form>
                                     </c:if>

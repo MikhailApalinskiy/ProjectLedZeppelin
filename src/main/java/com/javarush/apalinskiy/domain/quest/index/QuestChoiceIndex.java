@@ -58,8 +58,8 @@ public final class QuestChoiceIndex {
      *                               within the same node
      */
     public static QuestChoiceIndex from(List<QuestNode> nodes) {
-        java.util.Objects.requireNonNull(nodes, "nodes");
-        Map<String, Integer> m = new java.util.HashMap<>();
+        Objects.requireNonNull(nodes, "nodes");
+        Map<String, Integer> m = new HashMap<>();
         for (QuestNode from : nodes) {
             for (Option o : from.getOptions()) {
                 Integer next = o.next();

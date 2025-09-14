@@ -19,6 +19,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Servlet that renders and manages the user's friend graph:
@@ -202,7 +203,7 @@ public class FriendsServlet extends HttpServlet {
                                     NotificationType.FRIEND_REMOVED,
                                     me.getUserId(),
                                     friendId,
-                                    java.util.Map.of()
+                                    Map.of()
                             ));
                         }
                     } catch (Exception ignore) {

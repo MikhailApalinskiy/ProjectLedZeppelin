@@ -33,9 +33,9 @@ class QuestChoiceIndexTest {
             when(opt.choice()).thenReturn("ghost");
             QuestNode qn = mock(QuestNode.class);
             when(qn.getId()).thenReturn(42);
-            when(qn.getOptions()).thenReturn(java.util.List.of(opt));
+            when(qn.getOptions()).thenReturn(List.of(opt));
             // When
-            QuestChoiceIndex idx = QuestChoiceIndex.from(java.util.List.of(qn));
+            QuestChoiceIndex idx = QuestChoiceIndex.from(List.of(qn));
             // Then
             assertNull(idx.nextId(42, "ghost"));
         }

@@ -2,9 +2,10 @@ services:
   - type: web
     name: quest-platform
     env: docker
-    plan: free
+    plan: starter
     autoDeploy: true
     dockerfilePath: ./Dockerfile
+    dockerContext: .
     healthCheckPath: /
     envVars:
       - key: JAVA_TOOL_OPTIONS

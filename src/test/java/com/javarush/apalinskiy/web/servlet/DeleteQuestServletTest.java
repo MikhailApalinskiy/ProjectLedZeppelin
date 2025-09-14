@@ -55,8 +55,6 @@ class DeleteQuestServletTest {
     CustomQuest quest;
     @Mock
     User actor;
-    @Mock
-    User owner;
 
     private static void setField(Object target, String field, Object value) {
         try {
@@ -173,7 +171,6 @@ class DeleteQuestServletTest {
             DeleteQuestServlet s = new DeleteQuestServlet();
             setField(s, "authoring", authoring);
             setField(s, "notifications", notifications);
-            setField(s, "users", users);
             when(req.getSession()).thenReturn(ses);
             when(ses.getAttribute(WebConst.Attr.USER)).thenReturn(actor);
             when(req.getParameter(WebConst.Param.ID)).thenReturn("Q1");
@@ -184,19 +181,20 @@ class DeleteQuestServletTest {
             when(actor.getUserId()).thenReturn("admin1");
             when(authoring.getFromCatalog("Q1")).thenReturn(Optional.of(quest));
             when(quest.getName()).thenReturn("QuestName");
-            when(quest.getOwnerLogin()).thenReturn("ownerLogin");
+            when(quest.getOwnerId()).thenReturn("owner1");
             when(authoring.deleteFromCatalogAsAdmin("Q1")).thenReturn(true);
-            when(users.findByLogin("ownerLogin")).thenReturn(Optional.of(owner));
-            when(owner.getUserId()).thenReturn("owner1");
             // when
             s.doPost(req, resp);
             // then
             verify(ses).setAttribute(eq(WebConst.Attr.FLASH), eq("The quest has been deleted."));
-            verify(notifications).add(eq("owner1"),
+            verify(notifications).add(
+                    eq("owner1"),
                     eq(NotificationType.QUEST_ADMIN_CHANGED),
                     eq("The administrator deleted your quest.\n"),
-                    contains("Quest <b>QuestName</b> was deleted by the administrator."));
+                    contains("Quest <b>QuestName</b> was deleted by the administrator.")
+            );
             verify(resp).sendRedirect("/app/");
+            verifyNoMoreInteractions(notifications);
         }
 
         @Test
@@ -234,14 +232,13 @@ class DeleteQuestServletTest {
             when(req.getSession()).thenReturn(ses);
             when(ses.getAttribute(WebConst.Attr.USER)).thenReturn(actor);
             when(req.getParameter(WebConst.Param.ID)).thenReturn("Q2");
-            when(req.getParameter(WebConst.Param.NEXT)).thenReturn(null);
+            when(req.getParameter(WebConst.Param.NEXT)).thenReturn("/app/");
             when(req.getContextPath()).thenReturn("/app");
             when(resp.encodeRedirectURL(anyString())).thenAnswer(a -> a.getArgument(0));
             when(actor.getRole()).thenReturn(Role.USER);
-            when(actor.getUserLogin()).thenReturn("me");
+            when(actor.getUserId()).thenReturn("me");
             when(authoring.getFromCatalog("Q2")).thenReturn(Optional.of(quest));
             when(quest.getName()).thenReturn("Quest");
-            when(quest.getOwnerLogin()).thenReturn("me");
             when(authoring.deleteFromCatalogIfOwner("Q2", "me")).thenReturn(true);
             // when
             s.doPost(req, resp);
@@ -264,9 +261,9 @@ class DeleteQuestServletTest {
             when(req.getContextPath()).thenReturn("/app");
             when(resp.encodeRedirectURL(anyString())).thenAnswer(a -> a.getArgument(0));
             when(actor.getRole()).thenReturn(Role.USER);
-            when(actor.getUserLogin()).thenReturn("me");
+            when(actor.getUserId()).thenReturn("uid-1");
             when(authoring.getFromCatalog("Q3")).thenReturn(Optional.empty());
-            when(authoring.deleteFromCatalogIfOwner("Q3", "me")).thenReturn(false);
+            when(authoring.deleteFromCatalogIfOwner("Q3", "uid-1")).thenReturn(false);
             // when
             s.doPost(req, resp);
             // then

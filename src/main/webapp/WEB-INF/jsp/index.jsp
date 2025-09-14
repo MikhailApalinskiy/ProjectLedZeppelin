@@ -53,9 +53,10 @@
 </head>
 <body>
 
-<c:set var="user" value="${sessionScope.user}"/>
+<c:set var="user" value="${requestScope.user}"/>
 <c:set var="isAuth" value="${not empty user}"/>
 <c:set var="isAdmin" value="${isAuth and user.role eq 'ADMIN'}"/>
+
 <c:set var="userName" value="${isAuth ? user.userName : ''}"/>
 <c:set var="avatar" value="${empty userName ? '?' : fn:toUpperCase(fn:substring(userName,0,1))}"/>
 

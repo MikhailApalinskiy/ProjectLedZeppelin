@@ -108,7 +108,6 @@ class PublishServletTest {
             withSession();
             when(session.getAttribute(WebConst.Attr.EDITING_QUEST_ID)).thenReturn("Q1");
             when(session.getAttribute(WebConst.Attr.USER)).thenReturn(user);
-            when(user.getUserLogin()).thenReturn("uLogin");
             when(user.getRole()).thenReturn(Role.USER);
             when(authoring.getFromCatalog("Q1")).thenReturn(Optional.empty());
             try (MockedStatic<Web> web = mockStatic(Web.class)) {
@@ -118,7 +117,6 @@ class PublishServletTest {
                 verify(authoring).updateExisting("Q1", false);
                 web.verify(() -> Web.redirectOk(req, resp, WebConst.Path.HOME, "Changes submitted for moderation"));
                 web.verifyNoMoreInteractions();
-                verify(subject, never()).notifyQuestAdminChanged(any(), anyString(), anyString());
             }
         }
 
@@ -129,18 +127,17 @@ class PublishServletTest {
             withSession();
             when(session.getAttribute(WebConst.Attr.EDITING_QUEST_ID)).thenReturn("Q2");
             when(session.getAttribute(WebConst.Attr.USER)).thenReturn(user);
-            when(user.getUserLogin()).thenReturn("adminLogin");
+            when(user.getUserId()).thenReturn("admin1");
             when(user.getRole()).thenReturn(Role.ADMIN);
             when(authoring.getFromCatalog("Q2")).thenReturn(Optional.of(cq));
             when(cq.getName()).thenReturn("QuestName");
-            when(cq.getOwnerLogin()).thenReturn("ownerLogin");
-            doNothing().when(subject).notifyQuestAdminChanged(eq(user), eq("ownerLogin"), eq("QuestName"));
+            when(cq.getOwnerId()).thenReturn("owner2");
             try (MockedStatic<Web> web = mockStatic(Web.class)) {
                 // when
                 subject.doPost(req, resp);
                 // then
                 verify(authoring).updateExisting("Q2", true);
-                verify(subject).notifyQuestAdminChanged(user, "ownerLogin", "QuestName");
+                verify(subject).notifyQuestAdminChangedById(user, "owner2", "QuestName");
                 web.verify(() -> Web.redirectOk(req, resp, WebConst.Path.HOME, "Changes saved"));
                 web.verifyNoMoreInteractions();
             }
@@ -153,17 +150,17 @@ class PublishServletTest {
             withSession();
             when(session.getAttribute(WebConst.Attr.EDITING_QUEST_ID)).thenReturn("Q3");
             when(session.getAttribute(WebConst.Attr.USER)).thenReturn(user);
-            when(user.getUserLogin()).thenReturn("adminLogin");
+            // when
+            when(user.getUserId()).thenReturn("admin1");
             when(user.getRole()).thenReturn(Role.ADMIN);
             when(authoring.getFromCatalog("Q3")).thenReturn(Optional.of(cq));
             when(cq.getName()).thenReturn("QuestName");
-            when(cq.getOwnerLogin()).thenReturn("adminLogin");
+            when(cq.getOwnerId()).thenReturn("admin1");
             try (MockedStatic<Web> web = mockStatic(Web.class)) {
                 // when
                 subject.doPost(req, resp);
                 // then
                 verify(authoring).updateExisting("Q3", true);
-                verify(subject, never()).notifyQuestAdminChanged(any(), anyString(), anyString());
                 web.verify(() -> Web.redirectOk(req, resp, WebConst.Path.HOME, "Changes saved"));
                 web.verifyNoMoreInteractions();
             }
@@ -222,7 +219,7 @@ class PublishServletTest {
             // given
             withSession();
             when(session.getAttribute(WebConst.Attr.USER)).thenReturn(user);
-            when(user.getUserLogin()).thenReturn("adminLogin");
+            // when
             when(user.getUserId()).thenReturn("adminId");
             when(user.getRole()).thenReturn(Role.ADMIN);
             when(req.getParameter("questName")).thenReturn("Quest OK");
@@ -232,10 +229,11 @@ class PublishServletTest {
                 // when
                 subject.doPost(req, resp);
                 // then
-                verify(authoring).publish("adminLogin", "Quest OK");
+                verify(authoring).publish("adminId", "Quest OK");
                 verify(subject).incCreatedByUserId("adminId");
                 verify(subject).notifyFriendsPublishedByUserId("adminId", "Quest OK");
-                web.verify(() -> Web.redirectOk(req, resp, WebConst.Path.HOME, "The quest has been published"));
+                web.verify(() -> Web.redirectOk(eq(req), eq(resp), eq(WebConst.Path.HOME),
+                        eq("The quest has been published")));
                 web.verifyNoMoreInteractions();
             }
         }
@@ -246,22 +244,25 @@ class PublishServletTest {
             // given
             withSession();
             when(session.getAttribute(WebConst.Attr.USER)).thenReturn(user);
-            when(user.getUserLogin()).thenReturn("userLogin");
+            when(user.getUserId()).thenReturn("uid-1");
             when(user.getRole()).thenReturn(Role.USER);
             when(req.getParameter("questName")).thenReturn("New Quest");
             try (MockedStatic<Web> web = mockStatic(Web.class)) {
                 // when
                 subject.doPost(req, resp);
                 // then
-                verify(authoring).submitNewForModeration("userLogin", "New Quest");
-                web.verify(() -> Web.redirectOk(req, resp, WebConst.Path.HOME, "The quest has been submitted for moderation"));
+                verify(authoring).submitNewForModeration("uid-1", "New Quest");
+                web.verify(() -> Web.redirectOk(
+                        eq(req), eq(resp), eq(WebConst.Path.HOME),
+                        eq("The quest has been submitted for moderation")
+                ));
                 web.verifyNoMoreInteractions();
             }
         }
 
         @Test
-        @DisplayName("given no user in session when doPost then owner is 'anonymous' and flow uses role!=ADMIN")
-        void should_UseAnonymous_When_NoUser() throws IOException {
+        @DisplayName("given no user in session when doPost then submits with NULL owner and redirects ok")
+        void should_UseNullOwner_When_NoUser() throws IOException {
             // given
             withSession();
             when(session.getAttribute(WebConst.Attr.USER)).thenReturn(null);
@@ -270,8 +271,10 @@ class PublishServletTest {
                 // when
                 subject.doPost(req, resp);
                 // then
-                verify(authoring).submitNewForModeration("anonymous", "Anon Quest");
-                web.verify(() -> Web.redirectOk(req, resp, WebConst.Path.HOME, "The quest has been submitted for moderation"));
+                verify(authoring).submitNewForModeration(null, "Anon Quest");
+                web.verify(() -> Web.redirectOk(
+                        eq(req), eq(resp), eq(WebConst.Path.HOME),
+                        eq("The quest has been submitted for moderation")));
                 web.verifyNoMoreInteractions();
             }
         }
@@ -287,22 +290,27 @@ class PublishServletTest {
             // given
             withSession();
             when(session.getAttribute(WebConst.Attr.USER)).thenReturn(user);
-            when(user.getUserLogin()).thenReturn("userLogin");
+            when(user.getUserId()).thenReturn("uid-1");
             when(user.getRole()).thenReturn(Role.USER);
             when(req.getParameter("questName")).thenReturn("X");
             doThrow(new IllegalStateException("Start node is not set."))
-                    .when(authoring).submitNewForModeration("userLogin", "X");
+                    .when(authoring).submitNewForModeration("uid-1", "X");
             try (MockedStatic<Web> web = mockStatic(Web.class)) {
                 // when
                 subject.doPost(req, resp);
                 // then
-                web.verify(() -> Web.redirect(eq(req), eq(resp), eq(WebConst.Path.PUBLISH),
+                web.verify(() -> Web.redirect(
+                        eq(req),
+                        eq(resp),
+                        eq(WebConst.Path.PUBLISH),
                         argThat(map -> {
                             String err = map.get(WebConst.Attr.ERROR);
                             Object name = map.get("questName");
-                            return (err != null) && err.startsWith("Publication failed: Start node is not set.")
+                            return err != null
+                                    && err.startsWith("Publication failed: Start node is not set.")
                                     && "X".equals(name);
-                        })));
+                        })
+                ));
                 web.verifyNoMoreInteractions();
             }
         }

@@ -120,8 +120,10 @@
                                 </header>
 
                                 <p class="ql-meta">
-                                    <span class="ql-meta-item">Автор: <strong><c:out
-                                            value="${qst.ownerLogin}"/></strong></span>
+                                    <c:set var="__ownerName" value="${ownerNameById[qst.ownerId]}"/>
+                                    <span class="ql-meta-item">
+                                      Автор: <strong><c:out value="${empty __ownerName ? qst.ownerId : __ownerName}"/></strong>
+                                    </span>
                                     <span class="ql-dot" aria-hidden="true">·</span>
                                     <span class="ql-meta-item">Узлов: <strong><c:out
                                             value="${fn:length(qst.nodes)}"/></strong></span>

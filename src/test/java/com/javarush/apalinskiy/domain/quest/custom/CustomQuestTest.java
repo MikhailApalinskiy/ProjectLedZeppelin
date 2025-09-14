@@ -33,7 +33,7 @@ class CustomQuestTest {
             CustomQuest q = new CustomQuest("id1", "owner", "name", 1, nodes, true, "v1", now, now);
             // Then
             assertEquals("id1", q.getId());
-            assertEquals("owner", q.getOwnerLogin());
+            assertEquals("owner", q.getOwnerId());
             assertEquals("name", q.getName());
             assertEquals(1, q.getStartId());
             assertTrue(q.isPublished());
@@ -55,7 +55,7 @@ class CustomQuestTest {
         }
 
         @Test
-        @DisplayName("throws NPE when ownerLogin is null")
+        @DisplayName("throws NPE when ownerId is null")
         void throwsOnNullOwner() {
             // Given
             List<QuestNode> nodes = List.of(n(1));
@@ -176,7 +176,7 @@ class CustomQuestTest {
             CustomQuest q1 = q0.withUpdate(List.of(n(2)), 2, true, "v2");
             // Then
             assertEquals("ID", q1.getId());
-            assertEquals("OWN", q1.getOwnerLogin());
+            assertEquals("OWN", q1.getOwnerId());
             assertEquals("NAME", q1.getName());
             assertEquals(t0, q1.getCreatedAt());
         }

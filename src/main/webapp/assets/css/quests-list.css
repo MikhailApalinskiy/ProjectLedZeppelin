@@ -1,3 +1,4 @@
+
 .page-quests .container {
     max-width: 1000px;
 }
@@ -7,6 +8,7 @@
     font-size: 22px;
     line-height: 1.25;
     letter-spacing: .2px;
+    color: rgb(var(--fg, 24, 28, 32));
 }
 
 .page-quests .ql-grid {
@@ -16,21 +18,20 @@
 }
 
 .page-quests .ql-card {
-    background: rgba(21, 25, 34, .9);
-    border: 1px solid rgba(127, 127, 127, .18);
+    background: rgb(var(--card, 255, 255, 255));
+    border: 1px solid rgba(var(--fg, 24, 28, 32), .10);
     border-radius: 14px;
     padding: 14px;
     display: grid;
     gap: 10px;
-    transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease;
+    transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease, background-color .16s ease;
     will-change: transform;
 }
 
 .page-quests .ql-card:hover {
     transform: translateY(-2px);
-    border-color: rgba(127, 127, 127, .28);
-    box-shadow: 0 6px 16px rgba(0, 0, 0, .25),
-    0 1px 0 rgba(255, 255, 255, .03) inset;
+    border-color: rgba(var(--fg, 24, 28, 32), .18);
+    box-shadow: var(--shadow, 0 8px 26px rgba(0, 0, 0, .06));
 }
 
 .page-quests .ql-card-head {
@@ -45,35 +46,36 @@
     font-size: 16px;
     font-weight: 700;
     letter-spacing: .2px;
+    color: rgb(var(--fg, 24, 28, 32));
 }
 
 .page-quests .ql-badge {
     display: inline-block;
     padding: 4px 8px;
     border-radius: 999px;
-    border: 1px solid rgba(127, 127, 127, .26);
+    border: 1px solid rgba(var(--fg, 24, 28, 32), .16);
     font-size: 12px;
     line-height: 1;
-    color: rgb(var(--muted, 167, 175, 192));
-    background: rgba(255, 255, 255, .04);
+    color: rgb(var(--muted, 110, 118, 129));
+    background: rgba(var(--fg, 24, 28, 32), .04);
     white-space: nowrap;
 }
 
 .page-quests .ql-badge.ok {
-    border-color: rgba(64, 185, 120, .35);
-    background: rgba(64, 185, 120, .12);
-    color: #8fe0b6;
+    border-color: rgba(16, 185, 129, .35);
+    background: rgba(16, 185, 129, .10);
+    color: #166534;
 }
 
 .page-quests .ql-badge.muted {
-    border-color: rgba(127, 127, 127, .26);
-    background: rgba(255, 255, 255, .04);
+    border-color: rgba(var(--fg, 24, 28, 32), .16);
+    background: rgba(var(--fg, 24, 28, 32), .04);
 }
 
 .page-quests .ql-meta {
     margin: 0;
     font-size: 13px;
-    color: rgb(var(--muted, 167, 175, 192));
+    color: rgb(var(--muted, 110, 118, 129));
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
@@ -85,14 +87,14 @@
 }
 
 .page-quests .ql-meta .ql-meta-item strong {
-    color: rgb(var(--fg, 231, 233, 238));
+    color: rgb(var(--fg, 24, 28, 32));
     font-weight: 600;
 }
 
 .page-quests .ql-dates {
     margin: 0;
     font-size: 12px;
-    color: rgb(var(--muted, 167, 175, 192));
+    color: rgb(var(--muted, 110, 118, 129));
     display: flex;
     flex-wrap: wrap;
     gap: 10px 14px;
@@ -114,8 +116,8 @@
 
 @media (min-width: 520px) {
     .page-quests .ql-row {
-        grid-template-columns: auto auto 1fr;
-        align-items: stretch;
+        align-items: center;
+        justify-content: space-between;
     }
 }
 
@@ -131,6 +133,10 @@
     opacity: 1;
 }
 
+:root {
+    --search-h: 44px;
+}
+
 .page-quests form[role="search"] {
     display: flex;
     align-items: center;
@@ -139,36 +145,33 @@
     margin: 6px 0 12px;
 }
 
-:root {
-    --search-h: 44px;
-}
-
 .page-quests form[role="search"] .input {
     flex: 1 1 320px;
     min-width: 260px;
-
     height: var(--search-h);
     padding: 0 14px 0 40px;
     border-radius: 12px;
 
-    border: 1px solid rgba(127, 127, 127, .28);
-    background: rgba(127, 127, 127, .06) url("data:image/svg+xml;utf8,\
+    border: 1px solid rgba(var(--fg, 24, 28, 32), .18);
+    background: rgba(var(--fg, 24, 28, 32), .05) url("data:image/svg+xml;utf8,\
 <svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='gray' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'>\
 <circle cx='11' cy='11' r='7'/><line x1='21' y1='21' x2='16.65' y2='16.65'/></svg>") no-repeat 12px center / 18px 18px;
 
+    color: rgb(var(--fg, 24, 28, 32));
+    caret-color: rgb(var(--fg, 24, 28, 32));
     outline: 2px solid transparent;
     transition: border-color .15s ease, outline-color .15s ease, box-shadow .15s ease, background-color .15s ease;
 }
 
 .page-quests form[role="search"] .input::placeholder {
-    color: rgba(127, 127, 127, .75);
+    color: rgba(var(--muted, 110, 118, 129), .85);
 }
 
 .page-quests form[role="search"] .input:focus {
-    border-color: rgba(var(--ring), .55);
-    outline-color: rgba(var(--ring), .28);
-    box-shadow: 0 0 0 2px rgba(var(--ring), .14);
-    background-color: rgba(127, 127, 127, .08);
+    border-color: rgba(var(--ring, 59, 130, 246), .55);
+    outline-color: rgba(var(--ring, 59, 130, 246), .28);
+    box-shadow: 0 0 0 2px rgba(var(--ring, 59, 130, 246), .14);
+    background-color: rgba(var(--fg, 24, 28, 32), .06);
 }
 
 .page-quests form[role="search"] .btn {
@@ -189,21 +192,40 @@
 }
 
 @media (prefers-color-scheme: dark) {
+    .page-quests .ql-card {
+        background: rgba(21, 25, 34, .9);
+        border-color: rgba(127, 127, 127, .22);
+    }
+
+    .page-quests .ql-card:hover {
+        border-color: rgba(127, 127, 127, .30);
+        box-shadow: 0 6px 16px rgba(0, 0, 0, .25), 0 1px 0 rgba(255, 255, 255, .03) inset;
+    }
+
+    .page-quests .ql-badge {
+        border-color: rgba(127, 127, 127, .26);
+        background: rgba(255, 255, 255, .04);
+        color: rgb(var(--muted, 167, 175, 192));
+    }
+
+    .page-quests .ql-badge.ok {
+        border-color: rgba(64, 185, 120, .35);
+        background: rgba(64, 185, 120, .12);
+        color: #8fe0b6;
+    }
+
     .page-quests form[role="search"] .input {
         border-color: rgba(127, 127, 127, .22);
         background-color: rgba(255, 255, 255, .04);
+        color: rgb(var(--fg, 232, 234, 237));
+        caret-color: rgb(var(--fg, 232, 234, 237));
+    }
+
+    .page-quests form[role="search"] .input::placeholder {
+        color: rgba(255, 255, 255, .75);
     }
 
     .page-quests form[role="search"] .input:focus {
         background-color: rgba(255, 255, 255, .06);
     }
-}
-
-.page-quests form[role="search"] .input {
-    color: #fff;
-    caret-color: #fff;
-}
-
-.page-quests form[role="search"] .input::placeholder {
-    color: rgba(255, 255, 255, .75);
 }

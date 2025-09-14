@@ -21,6 +21,7 @@ import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.lang.reflect.Field;
+import java.util.Collections;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -138,16 +139,16 @@ class FriendsServletTest {
             when(ses.getAttribute(WebConst.Attr.USER)).thenReturn(me);
             when(me.getUserId()).thenReturn("u1");
             when(friendService.listFriends("u1")).thenReturn(List.of(uA, uB));
-            when(friendService.incoming("u1")).thenReturn(java.util.Collections.emptyList());
-            when(friendService.outgoing("u1")).thenReturn(java.util.Collections.emptyList());
+            when(friendService.incoming("u1")).thenReturn(Collections.emptyList());
+            when(friendService.outgoing("u1")).thenReturn(Collections.emptyList());
             RequestDispatcher rd = mock(RequestDispatcher.class);
             when(req.getRequestDispatcher(WebConst.Jsp.FRIENDS)).thenReturn(rd);
             // when
             s.doGet(req, resp);
             // then
             verify(req).setAttribute(eq("friends"),  eq(List.of(uA, uB)));
-            verify(req).setAttribute(eq("incoming"), eq(java.util.Collections.emptyList()));
-            verify(req).setAttribute(eq("outgoing"), eq(java.util.Collections.emptyList()));
+            verify(req).setAttribute(eq("incoming"), eq(Collections.emptyList()));
+            verify(req).setAttribute(eq("outgoing"), eq(Collections.emptyList()));
             verify(rd).forward(req, resp);
         }
 

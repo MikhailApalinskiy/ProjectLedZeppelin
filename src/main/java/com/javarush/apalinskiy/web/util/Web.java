@@ -6,6 +6,7 @@ import com.javarush.apalinskiy.domain.quest.Option;
 import com.javarush.apalinskiy.domain.quest.QuestNode;
 import com.javarush.apalinskiy.domain.user.User;
 import com.javarush.apalinskiy.domain.quest.custom.CustomQuest;
+import com.javarush.apalinskiy.service.user.UserService;
 import com.javarush.apalinskiy.web.view.EdgeSeg;
 import com.javarush.apalinskiy.web.view.NodePos;
 import jakarta.servlet.ServletContext;
@@ -97,6 +98,25 @@ public class Web {
             }
         }
         return null;
+    }
+
+    /**
+     * Populates request attribute {@code "ownerNameById"} with a map of ownerId → userName.
+     * Collects unique ownerIds from {@code items}, looks each up via {@code userService},
+     * and puts found names into the map. Missing users are skipped; the attribute is overwritten.
+     *
+     * @param req         HTTP request that will receive the attribute
+     * @param items       quests to extract ownerIds from
+     * @param userService service used to resolve users by id
+     */
+    public static void attachOwnerNamesById(HttpServletRequest req, List<CustomQuest> items, UserService userService) {
+        Set<String> ids = new LinkedHashSet<>();
+        for (CustomQuest q : items) ids.add(q.getOwnerId());
+        Map<String, String> map = new HashMap<>();
+        for (String id : ids) {
+            userService.findById(id).ifPresent(u -> map.put(id, u.getUserName()));
+        }
+        req.setAttribute("ownerNameById", map);
     }
 
     /**
@@ -343,14 +363,14 @@ public class Web {
      */
     public static void attachQuestLists(HttpServletRequest req, List<CustomQuest> items) {
         req.setAttribute("items", items);
-        Map<String, java.util.Date> createdMap = new LinkedHashMap<>();
-        Map<String, java.util.Date> updatedMap = new LinkedHashMap<>();
+        Map<String, Date> createdMap = new LinkedHashMap<>();
+        Map<String, Date> updatedMap = new LinkedHashMap<>();
         for (CustomQuest q : items) {
             if (q.getCreatedAt() != null) {
-                createdMap.put(q.getId(), java.util.Date.from(q.getCreatedAt()));
+                createdMap.put(q.getId(), Date.from(q.getCreatedAt()));
             }
             if (q.getUpdatedAt() != null) {
-                updatedMap.put(q.getId(), java.util.Date.from(q.getUpdatedAt()));
+                updatedMap.put(q.getId(), Date.from(q.getUpdatedAt()));
             }
         }
         req.setAttribute("createdMap", createdMap);

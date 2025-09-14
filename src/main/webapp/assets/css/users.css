@@ -226,12 +226,12 @@ table.list th {
     padding: 0 14px 0 40px;
     border-radius: 12px;
 
-    color: #fff;
-    caret-color: #fff;
+    color: rgb(var(--fg, 24, 28, 32));
+    caret-color: rgb(var(--fg, 24, 28, 32));
 
-    border: 1px solid rgba(127, 127, 127, .28);
-    background: rgba(21, 25, 34, .9) url("data:image/svg+xml;utf8,\
-<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%23c9c9c9' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'>\
+    border: 1px solid rgba(var(--fg, 24, 28, 32), .18);
+    background: rgb(var(--card, 255, 255, 255)) url("data:image/svg+xml;utf8,\
+<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%23707786' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'>\
 <circle cx='11' cy='11' r='7'/><line x1='21' y1='21' x2='16.65' y2='16.65'/></svg>") no-repeat 12px center / 18px 18px;
 
     outline: 2px solid transparent;
@@ -239,13 +239,14 @@ table.list th {
 }
 
 .search-form[role="search"] .input::placeholder {
-    color: rgba(255, 255, 255, .75);
+    color: rgba(var(--muted, 110, 118, 129), .9);
 }
 
 .search-form[role="search"] .input:focus {
-    border-color: rgba(30, 136, 229, .55);
-    outline-color: rgba(30, 136, 229, .18);
-    box-shadow: 0 0 0 2px rgba(30, 136, 229, .10);
+    border-color: rgba(var(--ring, 59, 130, 246), .55);
+    outline-color: rgba(var(--ring, 59, 130, 246), .18);
+    box-shadow: 0 0 0 2px rgba(var(--ring, 59, 130, 246), .10);
+    background-color: rgb(var(--card, 255, 255, 255));
 }
 
 .search-form[role="search"] .btn {
@@ -258,5 +259,20 @@ table.list th {
     .search-form[role="search"] .input {
         flex: 1 1 100%;
         min-width: 100%;
+    }
+}
+
+@media (prefers-color-scheme: dark) {
+    .search-form[role="search"] .input {
+        border-color: rgba(127, 127, 127, .22);
+        background: rgba(21, 25, 34, .90) url("data:image/svg+xml;utf8,\
+<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%23c9c9c9' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'>\
+<circle cx='11' cy='11' r='7'/><line x1='21' y1='21' x2='16.65' y2='16.65'/></svg>") no-repeat 12px center / 18px 18px;
+        color: rgb(var(--fg, 232, 234, 237));
+        caret-color: rgb(var(--fg, 232, 234, 237));
+    }
+
+    .search-form[role="search"] .input::placeholder {
+        color: rgba(255, 255, 255, .75);
     }
 }

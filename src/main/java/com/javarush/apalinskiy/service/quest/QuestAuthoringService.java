@@ -17,39 +17,12 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * Service for authoring and managing quests in the editor.
+ * Application service that coordinates editor draft operations, catalog (publication)
+ * operations and moderation workflow for custom quests.
  * <p>
- * Combines {@link QuestDraftStore} for in-progress editing,
- * {@link QuestStore} for published content, and {@link CustomQuestRepository}
- * for catalog persistence and moderation workflow.
+ * The service delegates persistence to three repositories:
+ * editor draft store, production store and the public catalog repository.
  * </p>
- *
- * <h3>Responsibilities</h3>
- * <ul>
- *   <li>Manipulate the editor draft (add, delete, replace, clear nodes, set start).</li>
- *   <li>Load quests from the catalog into the editor.</li>
- *   <li>Publish drafts as new quests or update existing ones.</li>
- *   <li>Stage quests for moderation (pending new/edit) and approve or reject them.</li>
- *   <li>Validate current drafts for consistency and integrity.</li>
- *   <li>List catalog entries (all, by owner, pending new/edit).</li>
- *   <li>Provide utilities for computing quest version hashes.</li>
- * </ul>
- *
- * <h3>Draft lifecycle</h3>
- * <ul>
- *   <li>Draft is created and edited in {@link QuestDraftStore}.</li>
- *   <li>Validated with {@link #validateCurrentDraft()} before publishing.</li>
- *   <li>Published directly ({@link #publishNew(String, String)}) or staged for moderation
- *       ({@link #submitNewForModeration(String, String)}).</li>
- *   <li>Updated via {@link #updateExisting(String, boolean)} (admin or staged edit).</li>
- * </ul>
- *
- * <h3>Limitations</h3>
- * <ul>
- *   <li>Persistence depends on the {@link CustomQuestRepository} implementation (in-memory by default).</li>
- *   <li>Editor state is reset after publish or submit.</li>
- *   <li>Version is computed deterministically from node content, start ID, and options.</li>
- * </ul>
  */
 @Getter
 public class QuestAuthoringService {
@@ -57,25 +30,24 @@ public class QuestAuthoringService {
     private static final Logger log = LoggerFactory.getLogger(QuestAuthoringService.class);
 
     /**
-     * Draft (editor) store used for interactive editing.
+     * In-memory/temporary editor draft storage used while authoring.
      */
     private final QuestDraftStore editorRepo;
     /**
-     * Live/published store (read-only navigation snapshot).
+     * Read-only/engine-facing production store (not used directly in publication flow here).
      */
     private final QuestStore prodRepo;
     /**
-     * Catalog repository storing published quests and moderation queues.
+     * Public catalog with live quests and moderation queues.
      */
     private final CustomQuestRepository catalogRepo;
 
     /**
-     * Creates a new authoring service.
+     * Creates the service with required repositories.
      *
-     * @param editorRepo  draft store used for editing sessions (must not be {@code null})
-     * @param prodRepo    live store for published content (must not be {@code null})
-     * @param catalogRepo catalog repository (must not be {@code null})
-     * @throws NullPointerException if any argument is {@code null}
+     * @param editorRepo  draft repository used by the editor
+     * @param prodRepo    production repository (engine/runtime)
+     * @param catalogRepo public catalog / moderation repository
      */
     public QuestAuthoringService(QuestDraftStore editorRepo, QuestStore prodRepo, CustomQuestRepository catalogRepo) {
         this.editorRepo = Objects.requireNonNull(editorRepo);
@@ -84,33 +56,24 @@ public class QuestAuthoringService {
     }
 
     /**
-     * Returns a node by ID from the current editor draft.
-     *
-     * @param id node ID
-     * @return node or {@code null} if not found
+     * @return current draft node by id or {@code null} if missing
      */
     public QuestNode get(int id) {
         return editorRepo.get(id);
     }
 
     /**
-     * Returns all nodes of the current editor draft (immutable snapshot).
-     *
-     * @return list of draft nodes (never {@code null}, may be empty)
+     * @return snapshot of current draft nodes
      */
     public List<QuestNode> nodes() {
         return editorRepo.nodes();
     }
 
     /**
-     * Deletes a node from the editor draft.
-     * <ul>
-     *   <li>Returns {@code false} if the node does not exist.</li>
-     *   <li>If node #1 is deleted, resets {@code startId} to 0.</li>
-     * </ul>
+     * Deletes a node from the draft. If node #1 is removed, start id is reset to 0.
      *
-     * @param id node ID to delete
-     * @return {@code true} if deleted, {@code false} otherwise
+     * @param id node id
+     * @return {@code true} if the node existed and was removed
      */
     public boolean deleteNode(int id) {
         boolean ok = editorRepo.deleteNode(id);
@@ -126,14 +89,9 @@ public class QuestAuthoringService {
     }
 
     /**
-     * Saves (inserts or replaces) a node in the editor draft.
-     * <ul>
-     *   <li>If the node existed — it is replaced; otherwise inserted.</li>
-     *   <li>If the node ID is 1, {@code startId} is forced to 1.</li>
-     * </ul>
+     * Inserts or replaces a node in the draft. If node id is 1, forces start id to 1.
      *
-     * @param node node to persist in the draft (must not be {@code null})
-     * @throws NullPointerException if {@code node} is {@code null}
+     * @param node node to persist into the draft
      */
     public void saveNode(QuestNode node) {
         boolean existed = editorRepo.get(node.getId()) != null;
@@ -146,9 +104,9 @@ public class QuestAuthoringService {
     }
 
     /**
-     * Sets the start node ID for the current editor draft.
+     * Sets the start node id in the draft.
      *
-     * @param startId new start node ID
+     * @param startId start node id
      */
     public void setStart(int startId) {
         editorRepo.setStartId(startId);
@@ -156,7 +114,7 @@ public class QuestAuthoringService {
     }
 
     /**
-     * Clears the editor draft and resets {@code startId} to 0.
+     * Clears the current draft.
      */
     public void clearEditorDraft() {
         editorRepo.clearDraft(0);
@@ -164,10 +122,9 @@ public class QuestAuthoringService {
     }
 
     /**
-     * Loads a quest from the catalog into the editor draft.
-     * <p>Replaces current draft contents.</p>
+     * Loads a catalog quest into the editor draft (non-published state).
      *
-     * @param questId catalog quest ID to load (must not be {@code null})
+     * @param questId id of the catalog quest to load
      * @throws IllegalArgumentException if the quest is not found
      */
     public void loadToEditor(String questId) {
@@ -181,19 +138,19 @@ public class QuestAuthoringService {
     }
 
     /**
-     * Retrieves a quest from the catalog by ID.
+     * Fetches a quest from the catalog.
      *
-     * @param id catalog quest ID
-     * @return optional with the quest if found
+     * @param id quest id
+     * @return optional quest
      */
     public Optional<CustomQuest> getFromCatalog(String id) {
         return catalogRepo.get(id);
     }
 
     /**
-     * Lists all quests in the catalog.
+     * Lists all quests from the catalog (typically ordered by {@code updatedAt DESC}).
      *
-     * @return quests sorted by update time (implementation-dependent)
+     * @return list of quests
      */
     public List<CustomQuest> listAllFromCatalog() {
         List<CustomQuest> list = catalogRepo.listAll();
@@ -202,73 +159,64 @@ public class QuestAuthoringService {
     }
 
     /**
-     * Lists all quests in the catalog belonging to the specified owner.
+     * Lists catalog quests owned by the given user.
      *
-     * @param ownerLogin owner login
-     * @return list of quests owned by the user
+     * @param ownerId owner user id
+     * @return list of quests
      */
-    public List<CustomQuest> listOwnerFromCatalog(String ownerLogin) {
-        List<CustomQuest> list = catalogRepo.listByOwner(ownerLogin);
-        log.debug("listOwnerFromCatalog owner={} size={}", ownerLogin, list.size());
+    public List<CustomQuest> listOwnerFromCatalog(String ownerId) {
+        List<CustomQuest> list = catalogRepo.listByOwner(ownerId);
+        log.debug("listOwnerFromCatalog ownerId={} size={}", ownerId, list.size());
         return list;
     }
 
     /**
-     * Publishes the current draft as a new quest (immediately visible).
-     * <ul>
-     *   <li>Validates draft via {@link #validateCurrentDraft()}.</li>
-     *   <li>Uses {@code questName} or falls back to "Untitled Quest".</li>
-     *   <li>Clears the editor draft after publishing.</li>
-     * </ul>
+     * Publishes a new quest from the current draft immediately (admin path).
+     * Resets the editor draft on success.
      *
-     * @param ownerLogin owner login (must not be {@code null})
-     * @param questName  optional quest name (blank → "Untitled Quest")
-     * @throws IllegalStateException if validation fails
-     * @throws NullPointerException  if {@code ownerLogin} is {@code null}
+     * @param ownerId   owner user id (non-null)
+     * @param questName desired quest name; defaults to "Untitled Quest" if blank
+     * @throws IllegalStateException if the draft is invalid
      */
-    public void publishNew(String ownerLogin, String questName) {
-        Objects.requireNonNull(ownerLogin, "ownerLogin");
+    public void publishNew(String ownerId, String questName) {
+        Objects.requireNonNull(ownerId, "ownerId");
         String name = (questName == null || questName.isBlank()) ? "Untitled Quest" : questName.trim();
         Draft d = buildDraftOrThrow();
-        catalogRepo.create(ownerLogin, name, d.start, d.nodes, true, d.version);
-        log.info("Quest published owner={} name='{}' nodes={} startId={} version={}",
-                ownerLogin, name, d.nodes.size(), d.start, d.version);
+        catalogRepo.create(ownerId, name, d.start, d.nodes, true, d.version);
+        log.info("Quest published ownerID={} name='{}' nodes={} startId={} version={}",
+                ownerId, name, d.nodes.size(), d.start, d.version);
         editorRepo.reload(Collections.emptyList(), 0, false);
     }
 
     /**
      * Alias for {@link #publishNew(String, String)}.
-     *
-     * @param ownerLogin owner login
-     * @param questName  quest name
-     * @throws IllegalStateException if validation fails
      */
-    public void publish(String ownerLogin, String questName) {
-        publishNew(ownerLogin, questName);
+    public void publish(String ownerId, String questName) {
+        publishNew(ownerId, questName);
     }
 
     /**
      * Deletes a quest from the catalog if the caller is the owner.
      *
-     * @param questId    quest ID
-     * @param ownerLogin expected owner login
-     * @return {@code true} if deleted; {@code false} if not found or not the owner
+     * @param questId quest id
+     * @param ownerID caller user id (must match quest owner)
+     * @return {@code true} if removed; {@code false} otherwise
      */
-    public boolean deleteFromCatalogIfOwner(String questId, String ownerLogin) {
-        boolean ok = catalogRepo.deleteIfOwner(questId, ownerLogin);
+    public boolean deleteFromCatalogIfOwner(String questId, String ownerID) {
+        boolean ok = catalogRepo.deleteIfOwner(questId, ownerID);
         if (ok) {
-            log.info("Quest deleted by owner questId={} owner={}", questId, ownerLogin);
+            log.info("Quest deleted by owner questId={} ownerId={}", questId, ownerID);
         } else {
-            log.warn("Delete by owner skipped questId={} owner={} (not found / not owner)", questId, ownerLogin);
+            log.warn("Delete by owner skipped questId={} ownerId={} (not found / not owner)", questId, ownerID);
         }
         return ok;
     }
 
     /**
-     * Deletes a quest from the catalog as an administrator.
+     * Deletes a quest from the catalog as an admin.
      *
-     * @param questId quest ID
-     * @return {@code true} if deleted; {@code false} if not found
+     * @param questId quest id
+     * @return {@code true} if removed; {@code false} otherwise
      */
     public boolean deleteFromCatalogAsAdmin(String questId) {
         boolean ok = catalogRepo.delete(questId);
@@ -281,15 +229,9 @@ public class QuestAuthoringService {
     }
 
     /**
-     * Validates the current editor draft and returns a list of error messages.
-     * <ul>
-     *   <li>Checks that draft is not empty and start node is set.</li>
-     *   <li>Requires at least one final node.</li>
-     *   <li>Ensures every non-final node has at least one option with a valid {@code next}.</li>
-     *   <li>Ensures all links point to existing nodes.</li>
-     * </ul>
+     * Validates the current draft for structural consistency.
      *
-     * @return list of validation errors; empty list if draft is valid
+     * @return list of human-readable validation errors (empty if valid)
      */
     public List<String> validateCurrentDraft() {
         List<String> errors = new ArrayList<>();
@@ -330,38 +272,34 @@ public class QuestAuthoringService {
     }
 
     /**
-     * Submits the current draft as a <em>new</em> quest for moderation (pending NEW).
-     * <ul>
-     *   <li>Validates the draft and stages it in the catalog.</li>
-     *   <li>Clears the editor draft after staging.</li>
-     * </ul>
+     * Submits a new quest for moderation based on the current draft.
+     * Resets the editor draft on success.
      *
-     * @param ownerLogin owner login (must not be {@code null})
-     * @param questName  optional quest name (blank → "Untitled Quest")
-     * @throws IllegalStateException if validation fails
-     * @throws NullPointerException  if {@code ownerLogin} is {@code null}
+     * @param ownerId   owner user id (non-null)
+     * @param questName desired quest name; defaults to "Untitled Quest" if blank
+     * @throws IllegalStateException if the draft is invalid
      */
-    public void submitNewForModeration(String ownerLogin, String questName) {
-        Objects.requireNonNull(ownerLogin, "ownerLogin");
+    public void submitNewForModeration(String ownerId, String questName) {
+        Objects.requireNonNull(ownerId, "ownerId");
         String name = (questName == null || questName.isBlank()) ? "Untitled Quest" : questName.trim();
         Draft d = buildDraftOrThrow();
-        catalogRepo.stageCreate(ownerLogin, name, d.start, d.nodes, d.version);
+        catalogRepo.stageCreate(ownerId, name, d.start, d.nodes, d.version);
         log.info("Quest submitted for moderation owner={} name='{}' nodes={} startId={} version={}",
-                ownerLogin, name, d.nodes.size(), d.start, d.version);
+                ownerId, name, d.nodes.size(), d.start, d.version);
         editorRepo.reload(Collections.emptyList(), 0, false);
     }
 
     /**
-     * Updates an existing quest using the current draft.
+     * Updates an existing quest from the current draft.
      * <ul>
-     *   <li>If {@code asAdmin} is {@code true} — updates immediately (published).</li>
-     *   <li>Otherwise — stages an EDIT for moderation.</li>
+     *   <li>If {@code asAdmin} is true, changes are applied immediately and the quest stays published.</li>
+     *   <li>Otherwise an edit is staged for moderation.</li>
      * </ul>
      *
-     * @param questId quest ID to update (must exist)
-     * @param asAdmin whether to publish immediately (admin path)
+     * @param questId target quest id (non-null; must exist)
+     * @param asAdmin whether to apply immediately
      * @throws IllegalArgumentException if the quest does not exist
-     * @throws IllegalStateException    if draft validation fails
+     * @throws IllegalStateException    if the draft is invalid
      */
     public void updateExisting(String questId, boolean asAdmin) {
         Objects.requireNonNull(questId, "questId");
@@ -382,9 +320,7 @@ public class QuestAuthoringService {
     }
 
     /**
-     * Lists pending NEW submissions awaiting moderation.
-     *
-     * @return list of pending NEW entries
+     * @return pending NEW submissions (most recent first)
      */
     public List<CustomQuestRepository.PendingNew> listPendingNew() {
         List<CustomQuestRepository.PendingNew> list = catalogRepo.listPendingNew();
@@ -393,9 +329,7 @@ public class QuestAuthoringService {
     }
 
     /**
-     * Lists pending EDIT submissions awaiting moderation.
-     *
-     * @return list of pending EDIT entries
+     * @return pending EDIT submissions (most recent first)
      */
     public List<CustomQuestRepository.PendingEdit> listPendingEdits() {
         List<CustomQuestRepository.PendingEdit> list = catalogRepo.listPendingEdits();
@@ -404,11 +338,10 @@ public class QuestAuthoringService {
     }
 
     /**
-     * Approves a pending NEW submission and creates a new quest.
+     * Approves a pending NEW submission and returns the created quest id.
      *
-     * @param pendingId ID of the pending NEW submission
-     * @return ID of the newly created quest
-     * @throws NoSuchElementException if the pending item is not found
+     * @param pendingId moderation id
+     * @return new quest id
      */
     public String approveCreate(String pendingId) {
         String id = catalogRepo.approveCreate(pendingId);
@@ -419,8 +352,7 @@ public class QuestAuthoringService {
     /**
      * Rejects a pending NEW submission.
      *
-     * @param pendingId ID of the pending NEW submission
-     * @throws NoSuchElementException if the pending item is not found
+     * @param pendingId moderation id
      */
     public void rejectCreate(String pendingId) {
         catalogRepo.rejectCreate(pendingId);
@@ -428,10 +360,9 @@ public class QuestAuthoringService {
     }
 
     /**
-     * Approves a pending EDIT and applies it to the quest.
+     * Approves a pending EDIT for the given quest id.
      *
-     * @param questId quest ID
-     * @throws NoSuchElementException if the pending edit is not found
+     * @param questId quest id
      */
     public void approveEdit(String questId) {
         catalogRepo.approveEdit(questId);
@@ -439,10 +370,9 @@ public class QuestAuthoringService {
     }
 
     /**
-     * Rejects a pending EDIT submission.
+     * Rejects a pending EDIT for the given quest id.
      *
-     * @param questId quest ID
-     * @throws NoSuchElementException if the pending edit is not found
+     * @param questId quest id
      */
     public void rejectEdit(String questId) {
         catalogRepo.rejectEdit(questId);
@@ -450,19 +380,18 @@ public class QuestAuthoringService {
     }
 
     /**
-     * Computes a deterministic content-based version for a quest draft
-     * (hash over start ID, nodes, their texts, images, and options).
+     * Computes a stable content hash for the draft graph and start node.
      *
-     * @param nodes nodes to include in the digest
-     * @param start start node ID
-     * @return version string in the form {@code sha256:<hex>} or {@code sha256:unknown} on failure
+     * @param nodes nodes to hash
+     * @param start start node id
+     * @return version string in the form {@code sha256:<hex>}
      */
     private static String computeVersion(List<QuestNode> nodes, int start) {
         try {
             MessageDigest md = MessageDigest.getInstance("SHA-256");
             md.update(("start:" + start + ";").getBytes(StandardCharsets.UTF_8));
             nodes.stream()
-                    .sorted(java.util.Comparator.comparingInt(QuestNode::getId))
+                    .sorted(Comparator.comparingInt(QuestNode::getId))
                     .forEach(n -> {
                         md.update(("id:" + n.getId() + ";fin:" + n.isFin() + ";").getBytes(StandardCharsets.UTF_8));
                         md.update(("img:" + (n.getImage() == null ? "" : n.getImage()) + ";").getBytes(StandardCharsets.UTF_8));
@@ -480,7 +409,7 @@ public class QuestAuthoringService {
     }
 
     /**
-     * Immutable holder for a validated draft snapshot.
+     * Immutable snapshot of a validated draft.
      */
     @Getter
     private static final class Draft {
@@ -496,13 +425,9 @@ public class QuestAuthoringService {
     }
 
     /**
-     * Validates the current draft and builds an immutable {@link Draft} snapshot.
-     * <p>
-     * Performs strict validation and additionally checks graph consistency
-     * by constructing a {@link QuestNavigator}.
-     * </p>
+     * Builds a validated draft snapshot and computes its version.
      *
-     * @return validated draft snapshot
+     * @return draft descriptor
      * @throws IllegalStateException if validation fails
      */
     private Draft buildDraftOrThrow() {

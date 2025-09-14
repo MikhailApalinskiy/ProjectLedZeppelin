@@ -23,64 +23,71 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Base class for admin servlets that operate on custom quests and related user signals.
+ * Base servlet for administration of custom quests.
  * <p>
- * Centralizes lookup of core services from the {@link ServletContext} and provides
- * small helper methods for user resolution, notifications, and stats updates.
- * Subclasses are expected to enforce admin authorization upstream (e.g., via a filter).
- * </p>
+ * Provides common initialization and utility methods for servlets that
+ * manage quest moderation, editing, publishing, and notifications.
+ * This class centralizes access to backend services (authoring, users,
+ * notifications, stats, friends) so that subclasses can focus on request handling.
+ * <p>
+ * On {@link #init(ServletConfig)}, it attempts to resolve all required
+ * beans from the servlet context, logging which services are available.
+ * Missing optional services ({@code UserStatsService}, {@code FriendService})
+ * are tolerated and replaced with {@code null}.
+ * <b>Subclasses:</b> Servlets such as {@code AdminQuestsModerationServlet}
+ * extend this base to reuse initialization and helper methods.
  *
- * <h3>Injected services (from context)</h3>
- * <ul>
- *   <li>{@code AUTHORING_SERVICE} → {@link QuestAuthoringService} (required)</li>
- *   <li>{@code NOTIFY_SERVICE} → {@link NotificationService} (required)</li>
- *   <li>{@code USER_SERVICE} → {@link UserService} (required)</li>
- *   <li>{@code USER_STATS_SERVICE} → {@link UserStatsService} (optional)</li>
- *   <li>{@code FRIEND_SERVICE} → {@link FriendService} (optional)</li>
- * </ul>
- *
- * <h3>Helpers</h3>
- * <ul>
- *   <li>{@link #resolveUserIdByLogin(String)} — maps login to userId with logging.</li>
- *   <li>{@link #notifyQuestAdminChanged(User, String, String)} — notifies the owner that an admin updated their quest.</li>
- *   <li>{@link #incCreatedByUserId(String)} / {@link #incCreatedByLogin(String)} — increments "created" counter.</li>
- *   <li>{@link #notifyFriendsPublishedByLogin(String, String)} / {@link #notifyFriendsPublishedByUserId(String, String)}
- *       — broadcasts a "friend published quest" event to the owner’s friends.</li>
- * </ul>
- *
- * <p>All service fields are marked {@code transient} to avoid accidental session serialization.</p>
+ * @author Your Name
+ * @since 1.0
  */
 public class BaseQuestAdminServlet extends HttpServlet {
 
     private static final Logger log = LoggerFactory.getLogger(BaseQuestAdminServlet.class);
 
     /**
-     * Required authoring service (catalog and moderation operations).
+     * Quest authoring and catalog operations.
      */
     protected transient QuestAuthoringService authoring;
+
     /**
-     * Notification dispatch service.
+     * Notification delivery service for moderation, admin, and friend events.
      */
     protected transient NotificationService notify;
+
     /**
-     * User directory / identity lookups.
+     * Service for user lookup and profile access.
      */
     protected transient UserService users;
+
     /**
-     * Optional per-user statistics service.
+     * Tracks per-user quest statistics (optional, may be {@code null}).
      */
     protected transient UserStatsService userStats;
+
     /**
-     * Optional friend graph service.
+     * Manages friendship relations (optional, may be {@code null}).
      */
     protected transient FriendService friendService;
 
     /**
-     * Resolves required/optional services from the {@link ServletContext}.
+     * Initializes the servlet by resolving backend services from the servlet context.
      * <p>
-     * Required services must be present; otherwise initialization fails with
-     * {@link UnavailableException}. Optional services are probed and may remain {@code null}.
-     * </p>
+     * Mandatory:
+     * <ul>
+     *   <li>{@link QuestAuthoringService}</li>
+     *   <li>{@link NotificationService}</li>
+     *   <li>{@link UserService}</li>
+     * </ul>
+     * Optional:
+     * <ul>
+     *   <li>{@link UserStatsService}</li>
+     *   <li>{@link FriendService}</li>
+     * </ul>
+     * If a required service is missing, the servlet is marked unavailable.
+     *
+     * @param config servlet configuration
+     * @throws ServletException     if superclass initialization fails
+     * @throws UnavailableException if required services are missing
      */
     @Override
     public void init(ServletConfig config) throws ServletException {
@@ -114,54 +121,24 @@ public class BaseQuestAdminServlet extends HttpServlet {
     }
 
     /**
-     * Resolves a user id by their login (username) using {@link UserService}.
+     * Sends a {@link NotificationType#QUEST_ADMIN_CHANGED} event to the quest owner
+     * when an admin updates their quest.
      * <p>
-     * Returns {@code null} and logs a warning if login is blank, the user service is missing,
-     * or the user cannot be found.
-     * </p>
+     * Behavior:
+     * <ul>
+     *   <li>Skips notification if admin, target user, or notify service is missing.</li>
+     *   <li>Attaches quest name (defaulting to "Quest") and a fixed "what" message.</li>
+     *   <li>Logs the operation for auditing.</li>
+     * </ul>
      *
-     * @param login user login (may be {@code null})
-     * @return resolved user id or {@code null}
+     * @param admin        the admin user performing the action (may be {@code null})
+     * @param targetUserId id of the quest owner (must be non-blank)
+     * @param questName    human-readable quest name (defaults to "Quest" if blank)
      */
-    protected String resolveUserIdByLogin(String login) {
-        if (login == null || login.isBlank() || users == null) {
-            if (login == null || login.isBlank()) {
-                log.warn("resolveUserIdByLogin skipped: blank login");
-            } else if (users == null) {
-                log.warn("resolveUserIdByLogin skipped: users service is null login='{}'", login);
-            }
-            return null;
-        }
-        String id = users.findByLogin(login).map(User::getUserId).orElse(null);
-        if (id == null) {
-            log.warn("resolveUserIdByLogin: user not found login='{}'", login);
-        } else {
-            log.debug("resolveUserIdByLogin: login='{}' -> userId={}", login, id);
-        }
-        return id;
-    }
-
-    /**
-     * Sends a {@link NotificationType#QUEST_ADMIN_CHANGED} notification to the owner
-     * indicating that an admin updated their quest.
-     * <p>
-     * Skips silently (with a warning) if required data/services are missing or the owner cannot be resolved.
-     * </p>
-     *
-     * @param admin       acting admin (may be {@code null})
-     * @param targetLogin owner's login
-     * @param questName   quest display name (falls back to "Quest" if blank)
-     */
-    protected void notifyQuestAdminChanged(User admin, String targetLogin, String questName) {
-        if (admin == null || notify == null || targetLogin == null) {
-            log.warn("notifyQuestAdminChanged skipped: admin={}, notify={}, targetLoginPresent={}",
-                    admin == null ? "null" : admin.getUserId(),
-                    notify == null ? "null" : notify.getClass().getSimpleName(),
-                    targetLogin != null);
-            return;
-        }
-        String targetUserId = resolveUserIdByLogin(targetLogin);
-        if (targetUserId == null) {
+    protected void notifyQuestAdminChangedById(User admin, String targetUserId, String questName) {
+        if (admin == null || notify == null || targetUserId == null || targetUserId.isBlank()) {
+            log.warn("notifyQuestAdminChangedById skipped: adminPresent={} notifyPresent={} targetPresent={}",
+                    admin != null, notify != null, targetUserId != null);
             return;
         }
         Map<String, String> data = new HashMap<>();
@@ -173,13 +150,20 @@ public class BaseQuestAdminServlet extends HttpServlet {
                 targetUserId,
                 data
         ));
-        log.info("notifyQuestAdminChanged: adminId={} targetUserId={} quest='{}'",
+        log.info("notifyQuestAdminChangedById: adminId={} targetUserId={} quest='{}'",
                 admin.getUserId(), targetUserId, data.get("questName"));
     }
 
     /**
-     * Increments the "created quests" counter for the given user id using {@link UserStatsService}.
-     * <p>Safely no-ops if the stats service is absent, user id is blank, or the call fails.</p>
+     * Increments the "created quests" counter for the given user.
+     * <p>
+     * Behavior:
+     * <ul>
+     *   <li>Skips if {@code userStats} is not configured or {@code userId} is blank.</li>
+     *   <li>Catches and logs exceptions thrown by {@code userStats.incCreated}.</li>
+     * </ul>
+     *
+     * @param userId identifier of the user whose counter should be incremented
      */
     protected void incCreatedByUserId(String userId) {
         if (userStats == null || userId == null || userId.isBlank()) {
@@ -196,35 +180,19 @@ public class BaseQuestAdminServlet extends HttpServlet {
     }
 
     /**
-     * Convenience wrapper for {@link #incCreatedByUserId(String)} that accepts a login.
-     */
-    protected void incCreatedByLogin(String login) {
-        incCreatedByUserId(resolveUserIdByLogin(login));
-    }
-
-    /**
-     * Notifies all friends of the quest owner (resolved by login) that the owner has published a quest.
-     * <p>Skips if any required dependency is missing or the owner cannot be resolved.</p>
-     */
-    protected void notifyFriendsPublishedByLogin(String ownerLogin, String questName) {
-        if (ownerLogin == null || notify == null || friendService == null) {
-            log.warn("notifyFriendsPublishedByLogin skipped: ownerLoginPresent={} notifyPresent={} friendServicePresent={}",
-                    ownerLogin != null, notify != null, friendService != null);
-            return;
-        }
-        String ownerId = resolveUserIdByLogin(ownerLogin);
-        if (ownerId == null) {
-            return;
-        }
-        notifyFriendsPublishedByUserId(ownerId, questName);
-    }
-
-    /**
-     * Notifies all friends (by user id) that the owner has published a quest.
+     * Notifies all friends of a user when that user publishes a quest.
      * <p>
-     * Fetches friend ids from {@link FriendService}, filters out blanks/self, and sends
-     * {@link NotificationType#FRIEND_PUBLISHED_QUEST} to each friend with payload {questName}.
-     * </p>
+     * Behavior:
+     * <ul>
+     *   <li>Skips if owner id, notification service, or friend service is missing.</li>
+     *   <li>Retrieves friend IDs via {@code friendService}; logs and aborts if failed.</li>
+     *   <li>Sends {@link NotificationType#FRIEND_PUBLISHED_QUEST} events to each friend,
+     *       excluding the owner themselves.</li>
+     *   <li>Quest name defaults to "Quest" if blank.</li>
+     * </ul>
+     *
+     * @param ownerUserId id of the user who published the quest
+     * @param questName   human-readable quest name (defaults to "Quest" if blank)
      */
     protected void notifyFriendsPublishedByUserId(String ownerUserId, String questName) {
         if (ownerUserId == null || notify == null || friendService == null) {

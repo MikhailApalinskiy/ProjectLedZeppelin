@@ -60,18 +60,19 @@ class InMemoryCustomQuestRepositoryTest {
             List<CustomQuest> list = repo.listByOwner("alice");
             // Then
             assertEquals(1, list.size());
-            assertEquals("alice", list.getFirst().getOwnerLogin());
+            assertEquals("alice", list.getFirst().getOwnerId());
         }
 
         @Test
         @DisplayName("listAll sorted by updatedAt DESC when one updated then it is first")
-        void listAllSortedByUpdatedAt() {
+        void listAllSortedByUpdatedAt() throws InterruptedException {
             // Given
             repo.create("o", "A", 1, nodes(1), false, "v1");
             repo.create("o", "B", 1, nodes(1), false, "v1");
             List<CustomQuest> all = repo.listAll();
             String idA = all.stream().filter(q -> q.getName().equals("A")).findFirst().orElseThrow().getId();
             String idB = all.stream().filter(q -> q.getName().equals("B")).findFirst().orElseThrow().getId();
+            Thread.sleep(1100);
             // When
             repo.update(idA, 2, nodes(2), true, "v2");
             List<CustomQuest> after = repo.listAll();

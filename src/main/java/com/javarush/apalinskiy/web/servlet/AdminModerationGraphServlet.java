@@ -66,7 +66,7 @@ import java.util.stream.Collectors;
  * @see QuestAuthoringService
  * @see CustomQuestRepository.PendingNew
  * @see CustomQuestRepository.PendingEdit
- * @see Web#buildQuestSvgModel(HttpServletRequest, java.util.List, int, boolean)
+ * @see Web#buildQuestSvgModel(HttpServletRequest, List, int, boolean)
  * @see WebConst
  */
 public class AdminModerationGraphServlet extends HttpServlet {

@@ -37,7 +37,6 @@
 <c:set var="isAuth" value="${not empty me}"/>
 <c:set var="isAdmin" value="${isAuth and me.role eq ROLE_ADMIN}"/>
 <c:set var="isOwner" value="${isAuth and not empty u and me.userId eq u.userId}"/>
-
 <c:set var="selfUrl"
        value="${pageContext.request.contextPath}${pageContext.request.servletPath}?${PARAM_ID}=${u.userId}"/>
 
@@ -88,7 +87,10 @@
                                 </header>
 
                                 <p class="ql-meta">
-                                    <span class="ql-meta-item">Автор: <strong><c:out value="${q.ownerLogin}"/></strong></span>
+                                    <c:set var="__ownerName" value="${ownerNameById[q.ownerId]}"/>
+                                    <span class="ql-meta-item">
+                                        Автор: <strong><c:out value="${empty __ownerName ? q.ownerId : __ownerName}"/></strong>
+                                    </span>
                                     <span class="ql-dot" aria-hidden="true">·</span>
                                     <span class="ql-meta-item">Узлов: <strong><c:out
                                             value="${fn:length(q.nodes)}"/></strong></span>

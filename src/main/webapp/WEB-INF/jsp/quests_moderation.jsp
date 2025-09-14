@@ -50,7 +50,7 @@
                     <thead>
                     <tr>
                         <th>Название</th>
-                        <th>Автор (login)</th>
+                        <th>Автор</th>
                         <th>Отправлено</th>
                         <th class="col-actions">Действия</th>
                     </tr>
@@ -59,7 +59,19 @@
                     <c:forEach var="pn" items="${pendingNew}">
                         <tr>
                             <td><c:out value="${pn.name}"/></td>
-                            <td><code><c:out value="${pn.ownerLogin}"/></code></td>
+                            <td>
+                                <c:set var="owner" value="${ownerById[pn.ownerId]}"/>
+                                <c:choose>
+                                    <c:when test="${not empty owner}">
+                                        <span><c:out
+                                                value="${empty owner.userName ? owner.userLogin : owner.userName}"/></span>
+                                        <span class="muted">(@<c:out value="${owner.userLogin}"/>)</span>
+                                    </c:when>
+                                    <c:otherwise>
+                                        <code><c:out value="${pn.ownerId}"/></code>
+                                    </c:otherwise>
+                                </c:choose>
+                            </td>
                             <td><code><c:out value="${pn.submittedAt}"/></code></td>
                             <td class="col-actions td-actions">
                                 <form method="post" action="${modAction}" class="actions actions--row">
@@ -102,7 +114,7 @@
                     <thead>
                     <tr>
                         <th>Квест</th>
-                        <th>Автор (login)</th>
+                        <th>Автор</th>
                         <th>Quest ID</th>
                         <th>Отправлено</th>
                         <th class="col-actions">Действия</th>
@@ -112,7 +124,19 @@
                     <c:forEach var="pe" items="${pendingEdit}">
                         <tr>
                             <td><c:out value="${pe.name}"/></td>
-                            <td><code><c:out value="${pe.ownerLogin}"/></code></td>
+                            <td>
+                                <c:set var="owner" value="${ownerById[pe.ownerId]}"/>
+                                <c:choose>
+                                    <c:when test="${not empty owner}">
+                                        <span><c:out
+                                                value="${empty owner.userName ? owner.userLogin : owner.userName}"/></span>
+                                        <span class="muted">(@<c:out value="${owner.userLogin}"/>)</span>
+                                    </c:when>
+                                    <c:otherwise>
+                                        <code><c:out value="${pe.ownerId}"/></code>
+                                    </c:otherwise>
+                                </c:choose>
+                            </td>
                             <td><code><c:out value="${pe.questId}"/></code></td>
                             <td><code><c:out value="${pe.submittedAt}"/></code></td>
                             <td class="col-actions td-actions">

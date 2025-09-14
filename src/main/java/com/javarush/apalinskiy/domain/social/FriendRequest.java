@@ -69,7 +69,7 @@ public class FriendRequest {
     /**
      * Returns the creation timestamp as a legacy {@link Date}.
      * <p>
-     * Useful for JSP/EL bindings or APIs expecting {@code java.util.Date}.
+     * Useful for JSP/EL bindings or APIs expecting {@code Date}.
      * </p>
      *
      * @return creation time as {@link Date}

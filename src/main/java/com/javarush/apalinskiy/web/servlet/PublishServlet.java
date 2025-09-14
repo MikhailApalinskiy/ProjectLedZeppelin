@@ -19,78 +19,67 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Publishes a quest from the editor or submits it for moderation.
- *
- * <p><b>GET</b> validates the current editor draft via
- * {@link QuestAuthoringService#validateCurrentDraft()} and either blocks with a redirect and
- * error flash, or forwards to the publish confirmation page.</p>
- *
- * <p><b>POST</b> has two flows:</p>
+ * Servlet responsible for publishing quests.
+ * <p>
+ * Provides both the publication form (via <b>GET</b>) and handles submission (via <b>POST</b>).
+ * <p>
+ * Workflow:
  * <ul>
- *   <li><b>Editing existing quest</b> (there is {@code EDITING_QUEST_ID} in session):
+ *   <li><b>GET</b>:
  *     <ul>
- *       <li>Calls {@link QuestAuthoringService#updateExisting(String, boolean)}.</li>
- *       <li>If the actor is admin and edits someone else’s quest, notifies the owner via
- *           {@link BaseQuestAdminServlet#notifyQuestAdminChanged(User, String, String)}.</li>
- *       <li>Redirects to Home with either “Changes saved” (admin) or
- *           “Changes submitted for moderation”.</li>
+ *       <li>Validates the current draft via {@link QuestAuthoringService#validateCurrentDraft()}.</li>
+ *       <li>If invalid, blocks navigation and redirects back to the graph view with an error message.</li>
+ *       <li>If valid, forwards to the publish JSP.</li>
  *     </ul>
  *   </li>
- *   <li><b>Publishing a new quest</b>:
+ *   <li><b>POST</b>:
  *     <ul>
- *       <li>Validates {@code questName} (non-blank, ≤ 100 chars).</li>
- *       <li>If admin: {@link QuestAuthoringService#publish(String, String)}, increments stats with
- *           {@link BaseQuestAdminServlet#incCreatedByUserId(String)}, notifies friends with
- *           {@link BaseQuestAdminServlet#notifyFriendsPublishedByUserId(String, String)}, then redirects OK.</li>
- *       <li>If not admin: {@link QuestAuthoringService#submitNewForModeration(String, String)}, then redirects OK.</li>
+ *       <li>If editing an existing quest (session contains {@code EDITING_QUEST_ID}), updates it directly.</li>
+ *       <li>If publishing a new quest:
+ *         <ul>
+ *           <li>Validates quest name (non-blank, max length 100).</li>
+ *           <li>If admin:
+ *             <ul>
+ *               <li>Publishes immediately.</li>
+ *               <li>Increments user stats and notifies friends.</li>
+ *             </ul>
+ *           </li>
+ *           <li>If not admin:
+ *             <ul>
+ *               <li>Submits the quest for moderation.</li>
+ *             </ul>
+ *           </li>
+ *         </ul>
+ *       </li>
+ *       <li>On error, redirects back to the publish form with a descriptive error message.</li>
  *     </ul>
  *   </li>
  * </ul>
  *
- * <h3>Session / Context</h3>
- * <ul>
- *   <li>Reads {@link WebConst.Attr#USER} from session to identify actor and role.</li>
- *   <li>May read {@link WebConst.Attr#EDITING_QUEST_ID} to detect “edit existing” flow.</li>
- * </ul>
+ * <b>Security:</b> Requires an authenticated user in the session. Role {@link Role#ADMIN}
+ * grants immediate publish rights, otherwise moderation is required.
  *
- * <h3>View constants</h3>
- * <ul>
- *   <li>GET forwards to {@code WebConst.Jsp.PUBLISH} when the draft is valid.</li>
- *   <li>On validation errors, redirects back with message flashes using {@link Web} helpers.</li>
- * </ul>
- *
- * <h3>Security notes</h3>
- * <ul>
- *   <li>Mutating operations should be CSRF-protected by an upstream filter.</li>
- *   <li>Admin paths send notifications to affected users where applicable.</li>
- * </ul>
- *
- * @see BaseQuestAdminServlet
- * @see QuestAuthoringService
- * @see CustomQuest
- * @see WebConst
- * @see Web
+ * @author Your Name
+ * @since 1.0
  */
 public class PublishServlet extends BaseQuestAdminServlet {
 
     private static final Logger log = LoggerFactory.getLogger(PublishServlet.class);
 
     /**
-     * Validates the current editor draft and forwards to the publish page if valid.
+     * Handles GET requests for the publish page.
      * <p>
-     * Steps:
-     * <ol>
-     *   <li>Run {@link QuestAuthoringService#validateCurrentDraft()}.</li>
-     *   <li>If there are errors, build a message, log the user (if any), and redirect with an error to
-     *       {@code WebConst.Path.GRAPH_SVG}.</li>
-     *   <li>Else copy potential flashes, then forward to {@code WebConst.Jsp.PUBLISH}.</li>
-     * </ol>
-     * </p>
+     * Behavior:
+     * <ul>
+     *   <li>Validates the current draft.</li>
+     *   <li>If invalid, prevents navigation to publish page and redirects to graph view with error.</li>
+     *   <li>If valid, copies error/ok params and forwards to {@link WebConst.Jsp#PUBLISH}.</li>
+     * </ul>
      *
-     * @param req  HTTP request
-     * @param resp HTTP response
-     * @throws ServletException if forwarding fails
-     * @throws IOException      on I/O errors
+     * @param req  current HTTP request
+     * @param resp current HTTP response
+     * @throws ServletException if forwarding to JSP fails
+     * @throws IOException      if redirect/forward fails
      */
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
@@ -115,24 +104,41 @@ public class PublishServlet extends BaseQuestAdminServlet {
     }
 
     /**
-     * Submits the current draft for publication or moderation.
+     * Handles POST requests to publish or update a quest.
      * <p>
      * Behavior:
      * <ul>
-     *   <li>If {@code EDITING_QUEST_ID} exists in session, updates the existing quest (admin may apply immediately).</li>
-     *   <li>Otherwise, validates {@code questName} and either publishes immediately (admin) or submits for moderation (non-admin).</li>
-     *   <li>Uses {@link Web#redirectOk} / {@link Web#redirect} to deliver user-facing feedback.</li>
+     *   <li>Resolves current user and determines if they are admin.</li>
+     *   <li>If session contains {@code EDITING_QUEST_ID}, updates the existing quest.
+     *       Admin updates trigger notifications to the quest owner.</li>
+     *   <li>If no editing id is present:
+     *     <ul>
+     *       <li>Validates quest name (not blank, ≤100 chars).</li>
+     *       <li>Admin flow:
+     *         <ul>
+     *           <li>Publishes quest immediately.</li>
+     *           <li>Increments created-quests counter.</li>
+     *           <li>Notifies friends about the publication.</li>
+     *         </ul>
+     *       </li>
+     *       <li>User flow:
+     *         <ul>
+     *           <li>Submits quest for moderation.</li>
+     *         </ul>
+     *       </li>
+     *     </ul>
+     *   </li>
+     *   <li>On validation or state errors, redirects back to publish page with an error.</li>
      * </ul>
-     * </p>
      *
-     * @param req  HTTP request (expects {@code questName} when creating a new publication)
-     * @param resp HTTP response used for redirects
-     * @throws IOException on redirect errors
+     * @param req  current HTTP request
+     * @param resp current HTTP response
+     * @throws IOException if redirect fails
      */
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws IOException {
         User user = (User) req.getSession().getAttribute(WebConst.Attr.USER);
-        String owner = (user != null) ? user.getUserLogin() : "anonymous";
+        String ownerId = (user != null) ? user.getUserId() : null;
         boolean isAdmin = (user != null && user.getRole() == Role.ADMIN);
         HttpSession s = req.getSession(false);
         String editingId = (s != null) ? (String) s.getAttribute(WebConst.Attr.EDITING_QUEST_ID) : null;
@@ -140,12 +146,12 @@ public class PublishServlet extends BaseQuestAdminServlet {
             if (editingId != null && !editingId.isBlank()) {
                 Optional<CustomQuest> cqOpt = authoring.getFromCatalog(editingId);
                 String questName = cqOpt.map(CustomQuest::getName).orElse("Quest");
-                String ownerLogin = cqOpt.map(CustomQuest::getOwnerLogin).orElse(null);
+                String questOwnerId = cqOpt.map(CustomQuest::getOwnerId).orElse(null);
                 authoring.updateExisting(editingId, isAdmin);
-                log.info("Quest update submitted questId={} by={} isAdmin={}", editingId, owner, isAdmin);
-                if (isAdmin && ownerLogin != null && !ownerLogin.equals(owner)) {
-                    notifyQuestAdminChanged(user, ownerLogin, questName);
-                    log.info("Owner notified about admin update questId={} ownerLogin={}", editingId, ownerLogin);
+                log.info("Quest update submitted questId={} byUserId={} isAdmin={}", editingId, ownerId, isAdmin);
+                if (isAdmin && questOwnerId != null && !questOwnerId.equals(ownerId)) {
+                    notifyQuestAdminChangedById(user, questOwnerId, questName);
+                    log.info("Owner notified about admin update questId={} ownerId={}", editingId, questOwnerId);
                 }
                 Web.redirectOk(req, resp, WebConst.Path.HOME,
                         isAdmin ? "Changes saved" : "Changes submitted for moderation");
@@ -154,34 +160,33 @@ public class PublishServlet extends BaseQuestAdminServlet {
             String questNameRaw = req.getParameter("questName");
             String questName = questNameRaw == null ? "" : questNameRaw.trim();
             if (questName.isBlank()) {
-                log.warn("Publish POST: empty quest name by={}", owner);
+                log.warn("Publish POST: empty quest name byUserId={}", ownerId);
                 Web.redirect(req, resp, WebConst.Path.PUBLISH,
                         Map.of(WebConst.Attr.ERROR, "Specify the name of the quest",
                                 "questName", String.valueOf(questNameRaw)));
                 return;
             }
             if (questName.length() > 100) {
-                log.warn("Publish POST: too long quest name (len={}) by={}", questName.length(), owner);
+                log.warn("Publish POST: too long quest name (len={}) byUserId={}", questName.length(), ownerId);
                 Web.redirect(req, resp, WebConst.Path.PUBLISH,
                         Map.of(WebConst.Attr.ERROR, "The name is too long (maximum 100 characters)",
                                 "questName", questName));
                 return;
             }
             if (isAdmin) {
-                authoring.publish(owner, questName);
-                incCreatedByUserId(user.getUserId());
-                notifyFriendsPublishedByUserId(user.getUserId(), questName);
-                log.info("Quest published by admin ownerLogin={} userId={} name='{}'",
-                        owner, user.getUserId(), questName);
+                authoring.publish(ownerId, questName);
+                incCreatedByUserId(ownerId);
+                notifyFriendsPublishedByUserId(ownerId, questName);
+                log.info("Quest published by admin ownerId={} name='{}'", ownerId, questName);
                 Web.redirectOk(req, resp, WebConst.Path.HOME, "The quest has been published");
             } else {
-                authoring.submitNewForModeration(owner, questName);
-                log.info("Quest submitted for moderation by ownerLogin={} name='{}'", owner, questName);
+                authoring.submitNewForModeration(ownerId, questName);
+                log.info("Quest submitted for moderation by ownerId={} name='{}'", ownerId, questName);
                 Web.redirectOk(req, resp, WebConst.Path.HOME, "The quest has been submitted for moderation");
             }
         } catch (IllegalArgumentException | IllegalStateException ex) {
             String msg = "Publication failed: " + ex.getMessage();
-            log.warn("Publish POST failed by={} reason={}", owner, ex.getMessage());
+            log.warn("Publish POST failed byUserId={} reason={}", ownerId, ex.getMessage());
             Web.redirect(req, resp, WebConst.Path.PUBLISH,
                     Map.of(WebConst.Attr.ERROR, msg,
                             "questName", String.valueOf(req.getParameter("questName"))));

@@ -21,6 +21,7 @@
     <c:set var="PATH_PROFILE" value="/profile"/>
     <c:set var="ACT_UPDATE_NAME" value="updateName"/>
     <c:set var="ACT_CHANGE_PASSWORD" value="changePassword"/>
+    <c:set var="user" value="${empty requestScope.user ? sessionScope.user : requestScope.user}"/>
 
     <c:url var="homeUrl" value="${PATH_HOME}"/>
     <c:url var="profileUrl" value="${PATH_PROFILE}"/>

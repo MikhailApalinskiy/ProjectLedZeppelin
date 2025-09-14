@@ -11,80 +11,49 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * In-memory implementation of {@link CustomQuestRepository}.
+ * In-memory, thread-safe implementation of {@link CustomQuestRepository}.
  * <p>
- * Stores authored quests and moderation state (pending new and pending edits)
- * in thread-safe maps. Data is lost when the JVM stops and is intended
- * for testing, prototyping, or non-persistent environments.
+ * Stores quests and moderation staging data in {@link ConcurrentHashMap}s.
+ * Ordering in {@code listAll}/{@code listByOwner} is by {@code updatedAt} DESC.
+ * This repository is non-persistent and intended for tests/dev.
  * </p>
  *
- * <h3>Storage</h3>
- * <ul>
- *   <li>{@link #byId} – live approved {@link CustomQuest} instances.</li>
- *   <li>{@link #stagedNew} – quests submitted by users for creation, awaiting moderation.</li>
- *   <li>{@link #stagedEdit} – edits submitted for existing quests, awaiting moderation.</li>
- * </ul>
- *
- * <h3>Lifecycle</h3>
- * <ul>
- *   <li>Authors can directly {@link #create(String, String, int, List, boolean, String)} a quest
- *       (e.g. self-published) or submit it via {@link #stageCreate(String, String, int, List, String)}
- *       for moderation.</li>
- *   <li>Moderators can {@link #approveCreate(String)} or {@link #rejectCreate(String)}.</li>
- *   <li>Edits are staged with {@link #stageEdit(String, int, List, String)} and moderated with
- *       {@link #approveEdit(String)} or {@link #rejectEdit(String)}.</li>
- *   <li>Approved quests are stored in {@link #byId} and can be updated or deleted.</li>
- * </ul>
- *
- * <h3>Logging</h3>
- * <ul>
- *   <li>DEBUG: normal lifecycle operations (create, update, approve, reject).</li>
- *   <li>WARN: attempted operations on missing or invalid quests.</li>
- * </ul>
+ * @implNote All mutations are atomic per key via map operations; no cross-key transactions.
  */
 public class InMemoryCustomQuestRepository implements CustomQuestRepository {
 
     private static final Logger log = LoggerFactory.getLogger(InMemoryCustomQuestRepository.class);
 
-    /**
-     * Active quests stored by ID.
-     */
     private final Map<String, CustomQuest> byId = new ConcurrentHashMap<>();
-    /**
-     * Pending new quests awaiting moderation.
-     */
     private final Map<String, PendingNew> stagedNew = new ConcurrentHashMap<>();
-    /**
-     * Pending edits awaiting moderation.
-     */
     private final Map<String, PendingEdit> stagedEdit = new ConcurrentHashMap<>();
 
     /**
-     * Immediately creates and stores a new custom quest (no moderation).
+     * Creates and stores a new quest with a generated id and {@code createdAt}/{@code updatedAt}=now.
      *
-     * @param ownerLogin  quest owner login
+     * @param ownerId     owner user id
      * @param name        quest name
-     * @param startId     start node ID
+     * @param startId     start node id
      * @param nodes       quest nodes
-     * @param published   whether quest should be published
-     * @param versionNote version label/note
+     * @param published   initial published flag
+     * @param versionNote version/comment label
      */
     @Override
-    public void create(String ownerLogin, String name, int startId, List<QuestNode> nodes,
+    public void create(String ownerId, String name, int startId, List<QuestNode> nodes,
                        boolean published, String versionNote) {
         String id = UUID.randomUUID().toString();
         Instant now = Instant.now();
-        CustomQuest cq = new CustomQuest(id, ownerLogin, name, startId, nodes, published, versionNote, now, now);
+        CustomQuest cq = new CustomQuest(id, ownerId, name, startId, nodes, published, versionNote, now, now);
         byId.put(id, cq);
-        log.debug("Created custom quest id={} owner={} name='{}' nodes={} published={}",
-                id, ownerLogin, name, nodes.size(), published);
+        log.debug("Created custom quest id={} ownerId={} name='{}' nodes={} published={}",
+                id, ownerId, name, nodes.size(), published);
     }
 
     /**
-     * Retrieves a quest by ID.
+     * Gets a quest by id.
      *
-     * @param id quest ID
-     * @return optional containing quest if found
+     * @param id quest id
+     * @return optional quest, empty if not found
      */
     @Override
     public Optional<CustomQuest> get(String id) {
@@ -94,9 +63,9 @@ public class InMemoryCustomQuestRepository implements CustomQuestRepository {
     }
 
     /**
-     * Lists all quests sorted by {@link CustomQuest#getUpdatedAt} (descending).
+     * Lists all quests sorted by {@code updatedAt} descending.
      *
-     * @return list of all quests
+     * @return immutable list of quests
      */
     @Override
     public List<CustomQuest> listAll() {
@@ -108,29 +77,30 @@ public class InMemoryCustomQuestRepository implements CustomQuestRepository {
     }
 
     /**
-     * Lists all quests by a given owner, sorted by {@link CustomQuest#getUpdatedAt} (descending).
+     * Lists quests of a specific owner sorted by {@code updatedAt} descending.
      *
-     * @param ownerLogin quest owner login
-     * @return list of quests belonging to the owner
+     * @param ownerId owner user id
+     * @return immutable list of quests for the owner
      */
     @Override
-    public List<CustomQuest> listByOwner(String ownerLogin) {
+    public List<CustomQuest> listByOwner(String ownerId) {
         List<CustomQuest> list = byId.values().stream()
-                .filter(q -> q.getOwnerLogin().equals(ownerLogin))
+                .filter(q -> q.getOwnerId().equals(ownerId))
                 .sorted(Comparator.comparing(CustomQuest::getUpdatedAt).reversed())
                 .toList();
-        log.debug("List quests by owner={} size={}", ownerLogin, list.size());
+        log.debug("List quests by ownerId={} size={}", ownerId, list.size());
         return list;
     }
 
     /**
-     * Updates an existing quest if it exists.
+     * Updates an existing quest with new graph/start/publish/version and bumps {@code updatedAt}.
+     * No-ops (with a warning) if the quest does not exist.
      *
-     * @param id          quest ID
-     * @param startId     new start node ID
-     * @param nodes       new nodes
-     * @param published   publication flag
-     * @param versionNote version note
+     * @param id          quest id
+     * @param startId     new start node id
+     * @param nodes       replacement nodes
+     * @param published   new published flag
+     * @param versionNote new version/comment label
      */
     @Override
     public void update(String id, int startId, List<QuestNode> nodes, boolean published, String versionNote) {
@@ -144,10 +114,10 @@ public class InMemoryCustomQuestRepository implements CustomQuestRepository {
     }
 
     /**
-     * Deletes a quest by ID.
+     * Deletes a quest by id.
      *
-     * @param id quest ID
-     * @return true if deleted, false if not found
+     * @param id quest id
+     * @return {@code true} if a quest was removed, {@code false} otherwise
      */
     @Override
     public boolean delete(String id) {
@@ -161,51 +131,51 @@ public class InMemoryCustomQuestRepository implements CustomQuestRepository {
     }
 
     /**
-     * Deletes a quest only if it belongs to the given owner.
+     * Deletes a quest only if {@code ownerId} matches the quest owner.
      *
-     * @param id         quest ID
-     * @param ownerLogin expected owner login
-     * @return true if deleted, false otherwise
+     * @param id      quest id
+     * @param ownerId expected owner id
+     * @return {@code true} if removed, {@code false} if missing or owner mismatch
      */
     @Override
-    public boolean deleteIfOwner(String id, String ownerLogin) {
+    public boolean deleteIfOwner(String id, String ownerId) {
         CustomQuest q = byId.get(id);
         if (q == null) {
             log.warn("Delete-if-owner skipped: quest not found id={}", id);
             return false;
         }
-        if (!ownerLogin.equals(q.getOwnerLogin())) {
-            log.warn("Delete-if-owner denied: owner mismatch id={} owner={}", id, ownerLogin);
+        if (!ownerId.equals(q.getOwnerId())) {
+            log.warn("Delete-if-owner denied: owner mismatch id={} ownerId={}", id, ownerId);
             return false;
         }
         byId.remove(id);
-        log.debug("Deleted quest by owner id={} owner={}", id, ownerLogin);
+        log.debug("Deleted quest by owner id={} ownerId={}", id, ownerId);
         return true;
     }
 
     /**
-     * Stages a new quest for moderation.
+     * Stages a new quest for moderation (CREATE). Generates a {@code pendingId}.
      *
-     * @param ownerLogin  quest owner login
+     * @param ownerId     owner user id
      * @param name        quest name
-     * @param startId     start node ID
-     * @param nodes       quest nodes
-     * @param versionNote version note
+     * @param startId     start node id
+     * @param nodes       nodes to store
+     * @param versionNote version/comment label
      */
     @Override
-    public void stageCreate(String ownerLogin, String name, int startId, List<QuestNode> nodes, String versionNote) {
+    public void stageCreate(String ownerId, String name, int startId, List<QuestNode> nodes, String versionNote) {
         String pendingId = "new-" + UUID.randomUUID();
         stagedNew.put(pendingId, new PendingNew(
-                pendingId, ownerLogin, name, startId, List.copyOf(nodes), versionNote, Instant.now()
+                pendingId, ownerId, name, startId, List.copyOf(nodes), versionNote, Instant.now()
         ));
-        log.debug("Staged CREATE pendingId={} owner={} name='{}' nodes={} startId={}",
-                pendingId, ownerLogin, name, nodes.size(), startId);
+        log.debug("Staged CREATE pendingId={} ownerId={} name='{}' nodes={} startId={}",
+                pendingId, ownerId, name, nodes.size(), startId);
     }
 
     /**
-     * Lists all staged new quests awaiting moderation, sorted by submission time (descending).
+     * Lists pending CREATE items sorted by submission time DESC.
      *
-     * @return list of pending new quests
+     * @return immutable list of pending new items
      */
     @Override
     public List<PendingNew> listPendingNew() {
@@ -217,12 +187,11 @@ public class InMemoryCustomQuestRepository implements CustomQuestRepository {
     }
 
     /**
-     * Approves a staged new quest, moves it into live storage,
-     * and returns the new quest ID.
+     * Approves a pending CREATE and materializes the quest as published.
      *
-     * @param pendingId pending ID
-     * @return new quest ID
-     * @throws NoSuchElementException if pending ID not found
+     * @param pendingId moderation id
+     * @return generated quest id
+     * @throws NoSuchElementException if {@code pendingId} not found
      */
     @Override
     public String approveCreate(String pendingId) {
@@ -234,19 +203,19 @@ public class InMemoryCustomQuestRepository implements CustomQuestRepository {
         String newId = UUID.randomUUID().toString();
         Instant now = Instant.now();
         byId.put(newId, new CustomQuest(
-                newId, pn.getOwnerLogin(), pn.getName(), pn.getStartId(),
+                newId, pn.getOwnerId(), pn.getName(), pn.getStartId(),
                 pn.getNodes(), true, pn.getVersionNote(), now, now
         ));
-        log.debug("Approved CREATE pendingId={} -> newId={} owner={} name='{}'",
-                pendingId, newId, pn.getOwnerLogin(), pn.getName());
+        log.debug("Approved CREATE pendingId={} -> newId={} ownerId={} name='{}'",
+                pendingId, newId, pn.getOwnerId(), pn.getName());
         return newId;
     }
 
     /**
-     * Rejects a staged new quest.
+     * Rejects a pending CREATE.
      *
-     * @param pendingId pending ID
-     * @throws NoSuchElementException if pending ID not found
+     * @param pendingId moderation id
+     * @throws NoSuchElementException if {@code pendingId} not found
      */
     @Override
     public void rejectCreate(String pendingId) {
@@ -258,12 +227,12 @@ public class InMemoryCustomQuestRepository implements CustomQuestRepository {
     }
 
     /**
-     * Stages an edit for an existing quest.
+     * Stages an edit for moderation (EDIT) for an existing quest.
      *
-     * @param questId     quest ID
-     * @param startId     new start node ID
-     * @param nodes       new nodes
-     * @param versionNote version note
+     * @param questId     target quest id
+     * @param startId     new start node id
+     * @param nodes       replacement nodes
+     * @param versionNote version/comment label
      * @throws NoSuchElementException if quest not found
      */
     @Override
@@ -274,17 +243,17 @@ public class InMemoryCustomQuestRepository implements CustomQuestRepository {
             throw new NoSuchElementException("Quest not found: " + questId);
         }
         stagedEdit.put(questId, new PendingEdit(
-                questId, live.getOwnerLogin(), live.getName(),
+                questId, live.getOwnerId(), live.getName(),
                 startId, List.copyOf(nodes), versionNote, Instant.now()
         ));
-        log.debug("Staged EDIT questId={} owner={} name='{}' nodes={} startId={}",
-                questId, live.getOwnerLogin(), live.getName(), nodes.size(), startId);
+        log.debug("Staged EDIT questId={} ownerId={} name='{}' nodes={} startId={}",
+                questId, live.getOwnerId(), live.getName(), nodes.size(), startId);
     }
 
     /**
-     * Lists all staged edits awaiting moderation, sorted by submission time (descending).
+     * Lists pending EDIT items sorted by submission time DESC.
      *
-     * @return list of pending edits
+     * @return immutable list of pending edit items
      */
     @Override
     public List<PendingEdit> listPendingEdits() {
@@ -296,10 +265,10 @@ public class InMemoryCustomQuestRepository implements CustomQuestRepository {
     }
 
     /**
-     * Approves a staged edit, updating the live quest.
+     * Applies a pending EDIT to the live quest (preserving publish flag) and updates {@code updatedAt}.
      *
-     * @param questId quest ID
-     * @throws NoSuchElementException if pending edit not found
+     * @param questId quest id that has a pending edit
+     * @throws NoSuchElementException if no pending edit exists for the id
      */
     @Override
     public void approveEdit(String questId) {
@@ -315,10 +284,10 @@ public class InMemoryCustomQuestRepository implements CustomQuestRepository {
     }
 
     /**
-     * Rejects a staged edit.
+     * Rejects a pending EDIT.
      *
-     * @param questId quest ID
-     * @throws NoSuchElementException if pending edit not found
+     * @param questId quest id that has a pending edit
+     * @throws NoSuchElementException if no pending edit exists for the id
      */
     @Override
     public void rejectEdit(String questId) {

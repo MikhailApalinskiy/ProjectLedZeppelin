@@ -4,6 +4,7 @@ import com.javarush.apalinskiy.app.WebConst;
 import com.javarush.apalinskiy.domain.quest.custom.CustomQuest;
 import com.javarush.apalinskiy.domain.user.User;
 import com.javarush.apalinskiy.service.quest.QuestAuthoringService;
+import com.javarush.apalinskiy.service.user.UserService;
 import com.javarush.apalinskiy.web.util.Web;
 import jakarta.servlet.ServletConfig;
 import jakarta.servlet.ServletContext;
@@ -22,6 +23,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.mockito.Answers.CALLS_REAL_METHODS;
 import static org.mockito.ArgumentMatchers.eq;
@@ -44,6 +46,8 @@ class MyCustomQuestsServletTest {
     HttpSession session;
     @Mock
     QuestAuthoringService authoring;
+    @Mock
+    UserService userService;
     @Mock
     User user;
     @Mock
@@ -70,10 +74,13 @@ class MyCustomQuestsServletTest {
             try (MockedStatic<Web> web = mockStatic(Web.class, CALLS_REAL_METHODS)) {
                 web.when(() -> Web.ctxBean(ctx, WebConst.Ctx.AUTHORING_SERVICE, QuestAuthoringService.class))
                         .thenReturn(authoring);
+                web.when(() -> Web.ctxBean(ctx, WebConst.Ctx.USER_SERVICE, UserService.class))
+                        .thenReturn(userService);
                 // when
                 servlet.init(config);
                 // then
                 web.verify(() -> Web.ctxBean(ctx, WebConst.Ctx.AUTHORING_SERVICE, QuestAuthoringService.class));
+                web.verify(() -> Web.ctxBean(ctx, WebConst.Ctx.USER_SERVICE, UserService.class));
             }
         }
 
@@ -104,18 +111,12 @@ class MyCustomQuestsServletTest {
             // given
             when(req.getSession()).thenReturn(session);
             when(session.getAttribute(WebConst.Attr.USER)).thenReturn(null);
+            // when
             try (MockedStatic<Web> web = mockStatic(Web.class, CALLS_REAL_METHODS)) {
-                when(config.getServletContext()).thenReturn(ctx);
-                web.when(() -> Web.ctxBean(ctx, WebConst.Ctx.AUTHORING_SERVICE, QuestAuthoringService.class))
-                        .thenReturn(authoring);
-                servlet.init(config);
-                web.when(() -> Web.redirect(eq(req), eq(resp), eq(WebConst.Path.LOGIN), eq(Map.of())))
-                        .then(inv -> null);
-                // when
                 servlet.doGet(req, resp);
                 // then
-                web.verify(() -> Web.redirect(eq(req), eq(resp), eq(WebConst.Path.LOGIN), eq(Map.of())));
-                verifyNoMoreInteractions(authoring);
+                web.verify(() -> Web.redirect(req, resp, WebConst.Path.LOGIN, Map.of()));
+                verifyNoInteractions(authoring, userService);
             }
         }
 
@@ -130,15 +131,21 @@ class MyCustomQuestsServletTest {
                 if (WebConst.Attr.USER.equals(key)) return user;
                 return null;
             });
+            when(user.getUserId()).thenReturn("uid-1");
             when(user.getUserLogin()).thenReturn("me");
+            when(q1.getOwnerId()).thenReturn("uid-1");
+            when(q2.getOwnerId()).thenReturn("uid-2");
             List<CustomQuest> items = List.of(q1, q2);
-            when(authoring.listOwnerFromCatalog("me")).thenReturn(items);
+            when(authoring.listOwnerFromCatalog("uid-1")).thenReturn(items);
+            when(userService.findById(any())).thenReturn(Optional.empty());
             when(req.getContextPath()).thenReturn("/app");
             when(req.getServletPath()).thenReturn("/my/quests");
             try (MockedStatic<Web> web = mockStatic(Web.class, CALLS_REAL_METHODS)) {
                 when(config.getServletContext()).thenReturn(ctx);
-                web.when(() -> Web.ctxBean(ctx, WebConst.Ctx.AUTHORING_SERVICE, QuestAuthoringService.class))
+                web.when(() -> Web.ctxBean(any(ServletContext.class), eq(WebConst.Ctx.AUTHORING_SERVICE), eq(QuestAuthoringService.class)))
                         .thenReturn(authoring);
+                web.when(() -> Web.ctxBean(any(ServletContext.class), eq(WebConst.Ctx.USER_SERVICE), eq(UserService.class)))
+                        .thenReturn(userService);
                 servlet.init(config);
                 web.when(() -> Web.pullFlash(req, WebConst.Attr.FLASH)).then(inv -> null);
                 web.when(() -> Web.pullFlash(req, WebConst.Attr.ERROR)).then(inv -> null);
@@ -146,9 +153,10 @@ class MyCustomQuestsServletTest {
                 // when
                 servlet.doGet(req, resp);
                 // then
-                verify(authoring).listOwnerFromCatalog("me");
+                verify(authoring).listOwnerFromCatalog("uid-1");
                 web.verify(() -> Web.pullFlash(req, WebConst.Attr.FLASH));
                 web.verify(() -> Web.pullFlash(req, WebConst.Attr.ERROR));
+                web.verify(() -> Web.attachOwnerNamesById(req, items, userService));
                 web.verify(() -> Web.filterAndAttachQuests(req, items));
                 verify(req).setAttribute("pageTitleKey", "my.quests");
                 verify(req).setAttribute("showOwnerActions", Boolean.TRUE);

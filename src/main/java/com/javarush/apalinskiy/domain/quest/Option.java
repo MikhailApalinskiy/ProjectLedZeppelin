@@ -5,6 +5,9 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.javarush.apalinskiy.domain.quest.choice.ChoiceNormalizer;
 import lombok.Getter;
 
+import java.util.Locale;
+import java.util.Objects;
+
 /**
  * Represents a single answer option available in a {@link QuestNode}.
  * <p>
@@ -39,7 +42,7 @@ public record Option(@Getter @JsonProperty("choice") String choice,
      * @throws NullPointerException if {@code choice} is null
      */
     public Option {
-        choice = java.util.Objects.requireNonNull(choice, "choice");
+        choice = Objects.requireNonNull(choice, "choice");
     }
 
     /**
@@ -49,7 +52,7 @@ public record Option(@Getter @JsonProperty("choice") String choice,
      * <ul>
      *   <li>Collapse consecutive whitespace into a single space.</li>
      *   <li>Trim leading/trailing whitespace.</li>
-     *   <li>Convert to lowercase using {@link java.util.Locale#ROOT}.</li>
+     *   <li>Convert to lowercase using {@link Locale#ROOT}.</li>
      * </ul>
      *
      * @return normalized choice text, never {@code null}

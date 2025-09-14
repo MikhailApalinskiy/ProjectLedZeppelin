@@ -185,9 +185,10 @@ class UserPublishedQuestsServletTest {
                 when(viewUser.getUserId()).thenReturn("U");
                 when(viewUser.getUserLogin()).thenReturn("loginU");
                 List<CustomQuest> all = List.of(q1, q2);
-                when(authoring.listOwnerFromCatalog("loginU")).thenReturn(all);
-                when(req.getSession()).thenReturn(mock(jakarta.servlet.http.HttpSession.class));
-                when(req.getSession().getAttribute(WebConst.Attr.USER)).thenReturn(me);
+                when(authoring.listOwnerFromCatalog("U")).thenReturn(all);
+                HttpSession session = mock(HttpSession.class);
+                when(req.getSession()).thenReturn(session);
+                when(session.getAttribute(WebConst.Attr.USER)).thenReturn(me);
                 when(me.getUserId()).thenReturn("U");
                 web.when(() -> Web.pullFlash(eq(req), anyString())).thenAnswer(inv -> null);
                 when(req.getContextPath()).thenReturn("/app");
@@ -199,7 +200,7 @@ class UserPublishedQuestsServletTest {
                 // when
                 subject.doGet(req, resp);
                 // then
-                verify(authoring).listOwnerFromCatalog("loginU");
+                verify(authoring).listOwnerFromCatalog("U");
                 verify(req).setAttribute("viewUser", viewUser);
                 verify(req).setAttribute("selfUrl", "/app/u/quests?id=U");
                 web.verify(() -> Web.attachQuestLists(eq(req), cap.capture()));
@@ -217,8 +218,10 @@ class UserPublishedQuestsServletTest {
                 web.when(() -> Web.trimOrNull("X")).thenReturn("X");
                 web.when(() -> Web.pullFlash(eq(req), anyString())).thenAnswer(inv -> null);
                 when(userService.findById("X")).thenReturn(Optional.of(viewUser));
+                when(viewUser.getUserId()).thenReturn("X");
                 when(viewUser.getUserLogin()).thenReturn("loginX");
-                when(authoring.listOwnerFromCatalog("loginX")).thenReturn(List.of(q1, q2));
+                when(authoring.listOwnerFromCatalog("X"))
+                        .thenReturn(List.of(q1, q2));
                 HttpSession session = mock(HttpSession.class);
                 when(req.getSession()).thenReturn(session);
                 when(session.getAttribute(WebConst.Attr.USER)).thenReturn(me);
@@ -245,7 +248,7 @@ class UserPublishedQuestsServletTest {
                 when(viewUser.getUserLogin()).thenReturn("loginA");
                 when(q1.isPublished()).thenReturn(true);
                 when(q2.isPublished()).thenReturn(false);
-                when(authoring.listOwnerFromCatalog("loginA")).thenReturn(List.of(q1, q2));
+                when(authoring.listOwnerFromCatalog("A")).thenReturn(List.of(q1, q2));
                 var session = mock(jakarta.servlet.http.HttpSession.class);
                 when(req.getSession()).thenReturn(session);
                 when(session.getAttribute(WebConst.Attr.USER)).thenReturn(me);

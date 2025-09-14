@@ -151,14 +151,11 @@ class AdminQuestsModerationServletTest {
         void approveCreate_ok() throws Exception {
             // given
             AdminQuestsModerationServlet s = newServletWithDeps();
-            doReturn("UID-42").when(s).resolveUserIdByLogin("owner");
-            doNothing().when(s).incCreatedByLogin("owner");
-            doNothing().when(s).notifyFriendsPublishedByLogin("owner", "QuestName");
             when(req.getParameter("action")).thenReturn("approveCreate");
             when(req.getParameter("id")).thenReturn("p1");
             when(pn.getPendingId()).thenReturn("p1");
             when(pn.getName()).thenReturn("QuestName");
-            when(pn.getOwnerLogin()).thenReturn("owner");
+            when(pn.getOwnerId()).thenReturn("owner");
             when(authoring.listPendingNew()).thenReturn(List.of(pn));
             when(authoring.approveCreate("p1")).thenReturn("NEW-ID");
             try (MockedStatic<Web> web = mockStatic(Web.class)) {
@@ -168,8 +165,6 @@ class AdminQuestsModerationServletTest {
                 s.doPost(req, resp);
                 // then
                 verify(authoring).approveCreate("p1");
-                verify(s).incCreatedByLogin("owner");
-                verify(s).notifyFriendsPublishedByLogin("owner", "QuestName");
                 verify(session).setAttribute(eq(WebConst.Attr.FLASH),
                         eq("The quest has been published (id=NEW-ID)."));
                 verify(resp).sendRedirect("/app" + WebConst.Path.QUESTS_MOD);
@@ -182,12 +177,11 @@ class AdminQuestsModerationServletTest {
         void rejectCreate_ok() throws Exception {
             // given
             AdminQuestsModerationServlet s = newServletWithDeps();
-            doReturn("UID-77").when(s).resolveUserIdByLogin("own");
             when(req.getParameter("action")).thenReturn("rejectCreate");
             when(req.getParameter("id")).thenReturn("pid");
             when(pn.getPendingId()).thenReturn("pid");
             when(pn.getName()).thenReturn("Q");
-            when(pn.getOwnerLogin()).thenReturn("own");
+            when(pn.getOwnerId()).thenReturn("own");
             when(authoring.listPendingNew()).thenReturn(List.of(pn));
             try (MockedStatic<Web> web = mockStatic(Web.class)) {
                 web.when(() -> Web.trimOrNull("rejectCreate")).thenReturn("rejectCreate");
@@ -207,12 +201,11 @@ class AdminQuestsModerationServletTest {
         void approveEdit_ok() throws Exception {
             // given
             AdminQuestsModerationServlet s = newServletWithDeps();
-            doReturn("UID-1").when(s).resolveUserIdByLogin("ol");
             when(req.getParameter("action")).thenReturn("approveEdit");
             when(req.getParameter("id")).thenReturn("q1");
             when(pe.getQuestId()).thenReturn("q1");
             when(pe.getName()).thenReturn("EditedQuest");
-            when(pe.getOwnerLogin()).thenReturn("ol");
+            when(pe.getOwnerId()).thenReturn("ol");
             when(authoring.listPendingEdits()).thenReturn(List.of(pe));
             try (MockedStatic<Web> web = mockStatic(Web.class)) {
                 web.when(() -> Web.trimOrNull("approveEdit")).thenReturn("approveEdit");
@@ -232,12 +225,11 @@ class AdminQuestsModerationServletTest {
         void rejectEdit_ok() throws Exception {
             // given
             AdminQuestsModerationServlet s = newServletWithDeps();
-            doReturn("UID-2").when(s).resolveUserIdByLogin("own2");
             when(req.getParameter("action")).thenReturn("rejectEdit");
             when(req.getParameter("id")).thenReturn("q2");
             when(pe.getQuestId()).thenReturn("q2");
             when(pe.getName()).thenReturn("Name2");
-            when(pe.getOwnerLogin()).thenReturn("own2");
+            when(pe.getOwnerId()).thenReturn("own2");
             when(authoring.listPendingEdits()).thenReturn(List.of(pe));
             try (MockedStatic<Web> web = mockStatic(Web.class)) {
                 web.when(() -> Web.trimOrNull("rejectEdit")).thenReturn("rejectEdit");

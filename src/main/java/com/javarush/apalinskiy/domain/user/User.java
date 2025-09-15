@@ -39,6 +39,7 @@ import java.util.UUID;
 @Getter
 public class User {
 
+    private static final int MAX_LENGTH = 20;
     /**
      * Role of the user (defaults to {@link Role#USER}).
      */
@@ -79,6 +80,11 @@ public class User {
     private User(Role role, String userName, String userLogin, String password, Instant createdAt, String userId) {
         if (StringUtils.isBlank(userName) || StringUtils.isBlank(userLogin) || StringUtils.isBlank(password)) {
             throw new IllegalArgumentException("Username or login or password are required");
+        }
+        if (userName.length() > MAX_LENGTH) {
+            throw new IllegalArgumentException("Username is too long");
+        }else if (userLogin.length() > MAX_LENGTH) {
+            throw new IllegalArgumentException("Login is too long");
         }
         this.role = (role == null) ? Role.USER : role;
         this.userId = Objects.requireNonNull(userId, "userId");

@@ -15,6 +15,8 @@ import java.util.Objects;
 @Getter
 public class CustomQuest {
 
+    private static final int MAX_QUESTS_NAME = 20;
+
     private final String id;
     private final String ownerId;
     private final String name;
@@ -33,6 +35,9 @@ public class CustomQuest {
     public CustomQuest(String id, String ownerId, String name, int startId,
                        List<QuestNode> nodes, boolean published, String version,
                        Instant createdAt, Instant updatedAt) {
+        if (name.length() > MAX_QUESTS_NAME){
+            throw new IllegalArgumentException("Name is too long");
+        }
         this.id = Objects.requireNonNull(id);
         this.ownerId = Objects.requireNonNull(ownerId);
         this.name = Objects.requireNonNull(name);

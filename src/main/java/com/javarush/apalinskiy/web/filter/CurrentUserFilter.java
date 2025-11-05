@@ -1,5 +1,6 @@
 package com.javarush.apalinskiy.web.filter;
 
+import com.javarush.apalinskiy.utils.CurrentUserContext;
 import com.javarush.apalinskiy.app.WebConst;
 import com.javarush.apalinskiy.domain.user.User;
 import com.javarush.apalinskiy.service.user.UserService;
@@ -13,15 +14,14 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 
 /**
- * Filter that refreshes the current user in request/session scope on each request.
- * <p>
- * If the session contains {@code WebConst.Attr.USER} as a {@link User} or as a user id {@link String},
- * the filter loads a fresh {@link User} via {@link UserService} and:
- * <ul>
- *   <li>puts it into the request attributes under {@code WebConst.Attr.USER};</li>
- *   <li>and, when the original value was a {@link User}, also updates the session attribute.</li>
- * </ul>
- * Then the request is passed down the chain.
+ * Servlet filter responsible for binding the currently authenticated user to the request context.
+ *
+ * <p>This filter retrieves the {@link User} object (or its ID) from the HTTP session,
+ * refreshes it using {@link UserService}, and attaches the latest version to both the
+ * request and session scopes. It also updates the {@link CurrentUserContext} thread-local
+ * for consistent access to the user ID during request processing.</p>
+ *
+ * <p>At the end of the request, the filter clears the user context to avoid leaks across threads.</p>
  */
 public class CurrentUserFilter implements Filter {
 
@@ -30,9 +30,10 @@ public class CurrentUserFilter implements Filter {
     private UserService userService;
 
     /**
-     * Resolves {@link UserService} from the {@link jakarta.servlet.ServletContext} using {@link Web#ctxBean}.
+     * Initializes the filter and retrieves the {@link UserService} bean from the servlet context.
      *
-     * @param cfg filter config provided by the container
+     * @param cfg filter configuration provided by the servlet container
+     * @throws UnavailableException if the {@link UserService} is not found in the context
      */
     @Override
     public void init(FilterConfig cfg) throws UnavailableException {
@@ -48,35 +49,55 @@ public class CurrentUserFilter implements Filter {
     }
 
     /**
-     * Refreshes the current user (if present in session) and continues the chain.
-     * <p>
-     * Supports two session formats for {@code WebConst.Attr.USER}: a {@link User} object or a {@link String} user id.
-     * The fresh user is attached to the request; when the session held a {@link User}, it is updated as well.
-     * </p>
+     * Resolves the current user for each request and populates both the servlet attributes
+     * and the thread-local {@link CurrentUserContext}.
      *
-     * @param request  incoming request
-     * @param response response
-     * @param chain    next filter in the chain
-     * @throws IOException      if an I/O error occurs during filtering
-     * @throws ServletException if the next filter/servlet throws it
+     * <p>If the session contains a {@link User} or a string user ID, it attempts to fetch the
+     * latest user object from the database. This ensures that the request always operates
+     * with an up-to-date user representation.</p>
+     *
+     * @param request incoming servlet request
+     * @param response outgoing servlet response
+     * @param chain filter chain for forwarding the request
+     * @throws IOException if an I/O error occurs
+     * @throws ServletException if request processing fails
      */
     @Override
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
             throws IOException, ServletException {
         HttpServletRequest req = (HttpServletRequest) request;
         HttpSession session = req.getSession(false);
+        String userIdForContext = null;
+        log.trace("CurrentUserFilter: path={} sessionPresent={}",
+                req.getRequestURI(), (session != null));
         if (session != null) {
             Object val = session.getAttribute(WebConst.Attr.USER);
             if (val instanceof User su) {
+                log.debug("CurrentUserFilter: session has User object id={}", su.getUserId());
                 userService.findById(su.getUserId()).ifPresent(fresh -> {
                     req.setAttribute(WebConst.Attr.USER, fresh);
                     session.setAttribute(WebConst.Attr.USER, fresh);
+                    log.trace("CurrentUserFilter: refreshed User in request & session id={}", fresh.getUserId());
                 });
+                userIdForContext = su.getUserId();
             } else if (val instanceof String uid) {
-                userService.findById(uid).ifPresent(fresh ->
-                        req.setAttribute(WebConst.Attr.USER, fresh));
+                log.debug("CurrentUserFilter: session has userId string id={}", uid);
+                userService.findById(uid).ifPresent(fresh -> {
+                    req.setAttribute(WebConst.Attr.USER, fresh);
+                    log.trace("CurrentUserFilter: attached fresh User to request id={}", fresh.getUserId());
+                });
+                userIdForContext = uid;
             }
         }
-        chain.doFilter(request, response);
+        if (userIdForContext != null && !userIdForContext.isBlank()) {
+            CurrentUserContext.set(userIdForContext);
+            log.trace("CurrentUserFilter: CurrentUserContext set id={}", userIdForContext);
+        }
+        try {
+            chain.doFilter(request, response);
+        } finally {
+            CurrentUserContext.clear();
+            log.trace("CurrentUserFilter: CurrentUserContext cleared");
+        }
     }
 }

@@ -17,7 +17,7 @@
     <c:set var="PATH_QUEST" value="/quest"/>
     <c:set var="PATH_QUESTS" value="/quests"/>
     <c:set var="PATH_LOGOUT" value="/logout"/>
-    <c:set var="PATH_CREATE" value="/create_quest"/>
+    <c:set var="PATH_CREATE" value="/drafts"/>
     <c:set var="PATH_MY_QUESTS" value="/my/quests"/>
     <c:set var="PATH_LOADS" value="/loads"/>
     <c:set var="PATH_USERS" value="/users"/>
@@ -41,7 +41,6 @@
     <c:url var="questUrl" value="${PATH_QUEST}"/>
     <c:url var="questsUrl" value="${PATH_QUESTS}"/>
     <c:url var="logoutUrl" value="${PATH_LOGOUT}"/>
-
     <c:url var="createNewUrl" value="${PATH_CREATE}">
         <c:param name="${PARAM_NEW}" value="1"/>
     </c:url>

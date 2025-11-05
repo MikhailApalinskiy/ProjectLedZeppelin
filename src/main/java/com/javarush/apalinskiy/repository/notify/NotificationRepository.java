@@ -5,68 +5,62 @@ import com.javarush.apalinskiy.domain.notify.Notification;
 import java.util.List;
 
 /**
- * Repository interface for managing {@link Notification} entities.
- * <p>
- * Provides persistence operations for storing, retrieving,
- * and updating notifications for a specific user.
- * </p>
+ * Repository interface for managing user {@link Notification} entities.
  *
- * <h3>Contract</h3>
- * <ul>
- *   <li>Each notification belongs to a single user (see {@link Notification#getUserId()}).</li>
- *   <li>Unread/read status must be preserved and retrievable.</li>
- *   <li>Implementations should return results sorted by creation time descending,
- *       unless explicitly documented otherwise.</li>
- *   <li>All methods must be thread-safe if the implementation is used concurrently.</li>
- * </ul>
+ * <p>Defines persistence operations for saving, listing, counting, and updating
+ * notification read states. Implementations may use Hibernate, JPA, or any other
+ * persistence backend.</p>
+ *
+ * <p>All operations are expected to run within an active transaction context
+ * provided by the service layer.</p>
  */
 public interface NotificationRepository {
 
     /**
-     * Persists the given notification.
-     * If a notification with the same ID already exists, it should be replaced or updated.
+     * Persists or updates a notification entity.
      *
      * @param n notification to save
      */
     void save(Notification n);
 
     /**
-     * Returns a paginated list of notifications for the given user.
+     * Retrieves a paginated list of notifications for a specific user,
+     * ordered by creation date (usually descending).
      *
      * @param userId user identifier
-     * @param limit  maximum number of items to return (if ≤ 0, implementation may apply a default)
-     * @param offset number of items to skip before starting to collect the result
-     * @return list of notifications, typically sorted by creation time (newest first)
+     * @param limit  maximum number of records to return
+     * @param offset starting offset for pagination
+     * @return list of notifications for the user
      */
     List<Notification> list(String userId, int limit, int offset);
 
     /**
-     * Returns the count of unread notifications for the given user.
+     * Counts all unread notifications for the given user.
      *
      * @param userId user identifier
-     * @return number of notifications not marked as read
+     * @return number of unread notifications
      */
     int unreadCount(String userId);
 
     /**
-     * Marks all notifications of the given user as read.
+     * Marks all notifications for the given user as read.
      *
      * @param userId user identifier
      */
     void markAllRead(String userId);
 
     /**
-     * Removes all notifications of the given user.
+     * Deletes all notifications associated with the given user.
      *
      * @param userId user identifier
      */
     void clearAll(String userId);
 
     /**
-     * Marks a single notification as read, if it exists.
+     * Marks a specific notification as read for the given user.
      *
      * @param userId user identifier
-     * @param id     notification identifier
+     * @param id     notification ID
      */
     void markRead(String userId, String id);
 }

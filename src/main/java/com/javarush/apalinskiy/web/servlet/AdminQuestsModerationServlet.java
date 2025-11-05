@@ -17,45 +17,38 @@ import java.io.IOException;
 import java.util.*;
 
 /**
- * Admin servlet responsible for moderating user-submitted Custom Quests.
- * <p>
- * <b>GET</b> shows a list of pending publications and edits.<br>
- * <b>POST</b> applies a moderation action to a specific item:
- * <ul>
- *   <li><code>approveCreate</code> — publish a new quest</li>
- *   <li><code>rejectCreate</code> — reject a new quest</li>
- *   <li><code>approveEdit</code> — apply a pending edit to an existing quest</li>
- *   <li><code>rejectEdit</code> — reject a pending edit</li>
- * </ul>
- * Side effects include updating repositories, incrementing per-user publication counters,
- * sending notifications to authors and their friends, storing flash messages in session,
- * and redirecting back to the moderation page.
- * <p>
- * <b>Security:</b> This servlet assumes access is guarded by an admin-only filter/interceptor.
- * It reads the current user from the HTTP session to attribute the moderation action.
+ * Administrative servlet for moderating user-submitted quests.
  *
- * @author Your Name
- * @since 1.0
+ * <p>This servlet allows administrators to review, approve, or reject quests and their edits.
+ * It supports moderation workflows for both newly created quests and edited versions of
+ * previously published quests.</p>
+ *
+ * <p>All moderation actions trigger notifications to the quest authors and optionally their
+ * friends. The servlet relies on the {@link CustomQuestRepository} and {@link com.javarush.apalinskiy.service.quest.QuestAuthoringService}
+ * for accessing pending quests and applying moderation results.</p>
+ *
+ * <p>Actions supported via POST requests:</p>
+ * <ul>
+ *     <li><b>approveCreate</b> — approve a new quest submission</li>
+ *     <li><b>rejectCreate</b> — reject a new quest submission</li>
+ *     <li><b>approveEdit</b> — approve an edit submission</li>
+ *     <li><b>rejectEdit</b> — reject an edit submission</li>
+ * </ul>
  */
 public class AdminQuestsModerationServlet extends BaseQuestAdminServlet {
 
     private static final Logger log = LoggerFactory.getLogger(AdminQuestsModerationServlet.class);
 
     /**
-     * Renders the moderation dashboard with two lists: pending new publications and pending edits.
-     * The method also resolves quest owners for display and injects:
-     * <ul>
-     *   <li><code>pendingNew</code> — {@code List<CustomQuestRepository.PendingNew>}</li>
-     *   <li><code>pendingEdit</code> — {@code List<CustomQuestRepository.PendingEdit>}</li>
-     *   <li><code>ownerById</code> — {@code Map<String, User>} for quick owner lookup</li>
-     * </ul>
-     * A previously stored flash message (if any) is pulled from the request/session scope.
-     * Finally, the request is forwarded to {@link WebConst.Jsp#QUESTS_MOD}.
+     * Handles GET requests by displaying all pending quests and edits awaiting moderation.
+     *
+     * <p>The servlet retrieves both pending new and pending edit submissions, resolves their
+     * corresponding owners, and forwards the data to the moderation JSP page for display.</p>
      *
      * @param req  current HTTP request
      * @param resp current HTTP response
-     * @throws ServletException if the JSP forward fails
-     * @throws IOException      if forwarding the request/response fails
+     * @throws ServletException if forwarding fails
+     * @throws IOException      if an I/O error occurs
      */
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp)
@@ -90,27 +83,22 @@ public class AdminQuestsModerationServlet extends BaseQuestAdminServlet {
     }
 
     /**
-     * Applies a moderation action to a pending quest publication or edit.
-     * <p>
-     * Required request parameters:
-     * <ul>
-     *   <li><code>action</code> — one of <em>approveCreate</em>, <em>rejectCreate</em>,
-     *       <em>approveEdit</em>, <em>rejectEdit</em></li>
-     *   <li><code>id</code> — pending item identifier (for create) or quest id (for edit)</li>
-     * </ul>
-     * Behavior:
-     * <ul>
-     *   <li>Validates parameters; on missing/unknown action responds with HTTP 400.</li>
-     *   <li>Resolves acting admin from the session for auditing/notifications.</li>
-     *   <li>Executes the requested operation via {@code authoring} service.</li>
-     *   <li>Sends user notifications (author & friends) when applicable.</li>
-     *   <li>Stores a flash message and redirects back to the moderation page.</li>
-     *   <li>On runtime errors, logs the exception and redirects with an error message.</li>
-     * </ul>
+     * Handles moderation actions sent via POST.
      *
-     * @param req  current HTTP request containing the action and id
-     * @param resp current HTTP response; used for 400 errors and redirects
-     * @throws IOException if sending an error or redirect fails
+     * <p>Supported actions:
+     * <ul>
+     *     <li>{@code approveCreate}</li>
+     *     <li>{@code rejectCreate}</li>
+     *     <li>{@code approveEdit}</li>
+     *     <li>{@code rejectEdit}</li>
+     * </ul></p>
+     *
+     * <p>Each action updates the quest’s moderation state, sends notifications to authors,
+     * and redirects back to the moderation list page with a flash message.</p>
+     *
+     * @param req  HTTP request
+     * @param resp HTTP response
+     * @throws IOException if redirect or response writing fails
      */
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws IOException {
@@ -183,10 +171,7 @@ public class AdminQuestsModerationServlet extends BaseQuestAdminServlet {
     }
 
     /**
-     * Finds a {@link CustomQuestRepository.PendingNew} item by its pending id.
-     *
-     * @param pendingId identifier of the pending new quest publication
-     * @return the matching pending item, or {@code null} if not found
+     * Finds a pending new quest submission by ID.
      */
     private CustomQuestRepository.PendingNew findPendingNew(String pendingId) {
         return authoring.listPendingNew().stream()
@@ -195,10 +180,7 @@ public class AdminQuestsModerationServlet extends BaseQuestAdminServlet {
     }
 
     /**
-     * Finds a {@link CustomQuestRepository.PendingEdit} item by quest id.
-     *
-     * @param questId identifier of the quest being edited
-     * @return the matching pending edit, or {@code null} if not found
+     * Finds a pending quest edit submission by quest ID.
      */
     private CustomQuestRepository.PendingEdit findPendingEdit(String questId) {
         return authoring.listPendingEdits().stream()
@@ -207,12 +189,7 @@ public class AdminQuestsModerationServlet extends BaseQuestAdminServlet {
     }
 
     /**
-     * Resolves a human-friendly quest name for an edit context.
-     * Prefers the pending edit's name; falls back to the catalog entry; defaults to {@code "Quest"}.
-     *
-     * @param questId quest identifier
-     * @param pe      pending edit (may be {@code null})
-     * @return a non-blank quest name suitable for UI and notifications
+     * Returns a safe quest name for moderation logs and notifications.
      */
     private String safeQuestNameForEdit(String questId, CustomQuestRepository.PendingEdit pe) {
         if (pe != null && pe.getName() != null) return pe.getName();
@@ -220,12 +197,7 @@ public class AdminQuestsModerationServlet extends BaseQuestAdminServlet {
     }
 
     /**
-     * Resolves the owner id for an edit context.
-     * Prefers the pending edit's owner id; falls back to the catalog entry; may return {@code null}.
-     *
-     * @param questId quest identifier
-     * @param pe      pending edit (may be {@code null})
-     * @return owner user id or {@code null} if unknown
+     * Returns a safe owner ID for moderation notifications.
      */
     private String safeOwnerIdForEdit(String questId, CustomQuestRepository.PendingEdit pe) {
         if (pe != null && pe.getOwnerId() != null) return pe.getOwnerId();
@@ -233,20 +205,13 @@ public class AdminQuestsModerationServlet extends BaseQuestAdminServlet {
     }
 
     /**
-     * Sends a {@link NotificationType#QUEST_MODERATED} event to the quest owner with a small payload.
-     * The payload includes:
-     * <ul>
-     *   <li><code>questName</code> — sanitized quest title</li>
-     *   <li><code>result</code> — moderation result keyword (e.g., {@code approved}, {@code rejected}, {@code edit-rejected})</li>
-     *   <li><code>questId</code> — optional quest id (present when a new quest is created)</li>
-     * </ul>
-     * If the notification service is not configured or the target user id is blank, the call is logged and skipped.
+     * Sends a notification to the quest owner about a moderation result.
      *
-     * @param actorId    user id of the admin performing the action (may be {@code null})
-     * @param targetUserId recipient user id (quest owner); must be non-blank to send
-     * @param questName  human-friendly quest name; sanitized to a default when blank
-     * @param result     result keyword (e.g., {@code approved}, {@code rejected}, {@code edit-rejected})
-     * @param questIdOpt optional quest id to include for linking newly published quests
+     * @param actorId      moderator user ID (can be null)
+     * @param targetUserId quest owner ID
+     * @param questName    quest title
+     * @param result       moderation result string (e.g., "approved", "rejected")
+     * @param questIdOpt   optional quest ID for approved quests
      */
     private void notifyModerationById(String actorId,
                                       String targetUserId,

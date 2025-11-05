@@ -12,34 +12,24 @@ import java.io.IOException;
 import java.util.Optional;
 
 /**
- * Servlet that implements the "Load Game" action for global save slots.
- * <p>
- * Inherits the common slots UI and routing from {@link AbstractSlotsServlet}. This subclass
- * defines the page endpoints and, on {@code GO}, resolves the selected slot and redirects
- * the user to the appropriate quest node URL.
- * </p>
+ * Servlet responsible for handling load-slot operations.
  *
- * <h3>Behavior</h3>
- * <ul>
- *   <li>{@link #path()} — base path for the loads page (used for redirects).</li>
- *   <li>{@link #listJsp()} — JSP used to render the list of slots.</li>
- *   <li>{@link #handleGo(HttpServletRequest, HttpServletResponse, String, String, int, String)} —
- *       loads the slot, posts a flash message, and redirects to the node URL.</li>
- * </ul>
+ * <p>Extends {@link AbstractSlotsServlet} and implements the logic for
+ * loading a saved slot (game state) and redirecting the player to the
+ * appropriate quest node.</p>
  *
- * @see AbstractSlotsServlet
- * @see SaveStateService.GlobalSlot
- * @see Web#questUrl(HttpServletRequest, int, String)
- * @see WebConst
+ * <p>When a user selects a slot, the servlet verifies that the slot exists
+ * and contains valid quest data, then redirects to the quest URL derived
+ * from the saved node ID and quest ID.</p>
+ *
+ * <p>Empty slots are ignored and cause a simple return to the slots list.</p>
  */
 public class GoLoadsServlet extends AbstractSlotsServlet {
 
     private static final Logger log = LoggerFactory.getLogger(GoLoadsServlet.class);
 
     /**
-     * Returns the servlet-relative path for the loads page.
-     *
-     * @return {@code WebConst.Path.LOADS}
+     * @return the relative servlet path used for redirects and navigation.
      */
     @Override
     protected String path() {
@@ -47,9 +37,7 @@ public class GoLoadsServlet extends AbstractSlotsServlet {
     }
 
     /**
-     * Returns the JSP used to render the list of slots for the "load game" page.
-     *
-     * @return {@code WebConst.Jsp.LOADS}
+     * @return the JSP path that renders the list of available load slots.
      */
     @Override
     protected String listJsp() {
@@ -57,25 +45,19 @@ public class GoLoadsServlet extends AbstractSlotsServlet {
     }
 
     /**
-     * Handles the {@code GO} operation for a selected slot:
-     * <ol>
-     *   <li>If the slot is empty, redirects back to {@link #path()} preserving slot
-     *       navigation parameters.</li>
-     *   <li>If present, composes a user-facing flash message with quest name and node title,
-     *       computes the target quest URL via {@link Web#questUrl}, and redirects there.</li>
-     * </ol>
-     * <p>
-     * The custom quest id passed to {@code questUrl} is {@code null} for the main quest and
-     * the normalized non-blank {@code questId} for custom quests.
-     * </p>
+     * Handles the “Go” action — attempts to load a game slot and start the quest
+     * from the corresponding node.
+     *
+     * <p>If the slot is empty, the user is redirected back to the loads page.
+     * Otherwise, the servlet constructs a quest URL and redirects the player to it.</p>
      *
      * @param req            HTTP request
      * @param resp           HTTP response
-     * @param userId         current user's id (stringified)
-     * @param questIdIgnored ignored for the load operation (slot already contains quest id)
-     * @param slot           zero-based slot index
-     * @param next           ignored for the load operation (we redirect to the quest URL)
-     * @throws IOException if sending a redirect fails
+     * @param userId         current user ID
+     * @param questIdIgnored unused parameter in this subclass
+     * @param slot           slot index being loaded
+     * @param next           optional next parameter from the UI (ignored here)
+     * @throws IOException if redirect fails
      */
     @Override
     protected void handleGo(HttpServletRequest req, HttpServletResponse resp,

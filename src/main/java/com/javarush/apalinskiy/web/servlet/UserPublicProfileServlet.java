@@ -1,7 +1,6 @@
 package com.javarush.apalinskiy.web.servlet;
 
 import com.javarush.apalinskiy.domain.user.User;
-import com.javarush.apalinskiy.domain.user.UserStats;
 import com.javarush.apalinskiy.service.user.UserService;
 import com.javarush.apalinskiy.service.user.UserStatsService;
 import com.javarush.apalinskiy.web.util.Web;
@@ -18,34 +17,18 @@ import java.io.IOException;
 import java.util.Optional;
 
 /**
- * Serves public, read-only user profile pages.
- * <p>
- * The servlet looks up a user by the {@code id} query parameter and renders a public profile
- * view. If available, aggregate statistics are also attached to the model.
+ * Servlet responsible for displaying public user profiles.
+ *
+ * <p>Accessible without authentication, this servlet retrieves a user's public
+ * information (and optional statistics, if available) by the user ID provided
+ * as a request parameter.</p>
+ *
+ * <p>Attributes set for JSP:
+ * <ul>
+ *   <li>{@code profileUser} — the {@link User} being viewed</li>
+ *   <li>{@code stats} — optional {@link com.javarush.apalinskiy.domain.user.UserStats}</li>
+ * </ul>
  * </p>
- *
- * <h3>Dependencies</h3>
- * <ul>
- *   <li><b>Required</b>: {@link UserService} (resolved from {@code WebConst.Ctx.USER_SERVICE}).</li>
- *   <li><b>Optional</b>: {@link UserStatsService} (resolved from {@code WebConst.Ctx.USER_STATS_SERVICE}).</li>
- * </ul>
- *
- * <h3>View</h3>
- * <ul>
- *   <li>Forwards to {@code WebConst.Jsp.USER_PUBLIC}.</li>
- *   <li>Request attributes:
- *     <ul>
- *       <li>{@code profileUser} — the user being viewed (may be {@code null} if not found).</li>
- *       <li>{@code stats} — optional {@link UserStats} for the viewed user.</li>
- *     </ul>
- *   </li>
- * </ul>
- *
- * <h3>Notes</h3>
- * <ul>
- *   <li>Authentication is not required; this is a public endpoint.</li>
- *   <li>Flash and query parameters ({@code OK}, {@code ERROR}) are copied to attributes for the view.</li>
- * </ul>
  */
 public class UserPublicProfileServlet extends HttpServlet {
 
@@ -55,10 +38,9 @@ public class UserPublicProfileServlet extends HttpServlet {
     private transient UserStatsService userStatsService;
 
     /**
-     * Resolves required and optional services from the servlet context.
+     * Initializes the servlet and resolves required services from the context.
      *
-     * @param config servlet config provided by the container
-     * @throws ServletException if required services are missing
+     * @throws ServletException if user service is missing
      */
     @Override
     public void init(ServletConfig config) throws ServletException {
@@ -72,21 +54,14 @@ public class UserPublicProfileServlet extends HttpServlet {
     }
 
     /**
-     * Renders a public profile for the user identified by the {@code id} query parameter.
-     * <p>
-     * Flow:
-     * <ol>
-     *   <li>Copy optional flash/query params ({@code OK}, {@code ERROR}) to request attributes.</li>
-     *   <li>Read {@code id}; if present, try {@link UserService#findById(String)}.</li>
-     *   <li>If found, set {@code profileUser} and (optionally) {@code stats} via {@link UserStatsService#statsOf(String)}.</li>
-     *   <li>Forward to {@code WebConst.Jsp.USER_PUBLIC} regardless of existence (view decides what to show).</li>
-     * </ol>
-     * </p>
+     * Displays the public profile of the specified user.
      *
-     * @param req  HTTP request (expects {@code id} query parameter)
+     * <p>Accepts {@code id} as a query parameter (user UUID). If the user
+     * does not exist or no ID is provided, the JSP is still rendered but with
+     * {@code profileUser=null}.</p>
+     *
+     * @param req  HTTP request (expects parameter {@code id})
      * @param resp HTTP response
-     * @throws ServletException if forwarding fails
-     * @throws IOException      on I/O errors
      */
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp)

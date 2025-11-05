@@ -23,71 +23,39 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Base servlet for administration of custom quests.
- * <p>
- * Provides common initialization and utility methods for servlets that
- * manage quest moderation, editing, publishing, and notifications.
- * This class centralizes access to backend services (authoring, users,
- * notifications, stats, friends) so that subclasses can focus on request handling.
- * <p>
- * On {@link #init(ServletConfig)}, it attempts to resolve all required
- * beans from the servlet context, logging which services are available.
- * Missing optional services ({@code UserStatsService}, {@code FriendService})
- * are tolerated and replaced with {@code null}.
- * <b>Subclasses:</b> Servlets such as {@code AdminQuestsModerationServlet}
- * extend this base to reuse initialization and helper methods.
+ * Abstract base servlet providing shared functionality for quest moderation and administration.
  *
- * @author Your Name
- * @since 1.0
+ * <p>This class is intended to be extended by administrative servlets that handle quest
+ * creation, moderation, approval, and user notification. It wires core service dependencies
+ * and offers helper methods for user statistics tracking and sending various notifications.</p>
+ *
+ * <p>Injected dependencies include:</p>
+ * <ul>
+ *     <li>{@link QuestAuthoringService} — access to quest authoring and moderation logic</li>
+ *     <li>{@link NotificationService} — dispatch of moderation and publication events</li>
+ *     <li>{@link UserService} — user profile resolution</li>
+ *     <li>{@link UserStatsService} — tracking quest creation and completion stats</li>
+ *     <li>{@link FriendService} — for notifying friends about published quests</li>
+ * </ul>
+ *
+ * <p>Child classes may safely use the protected methods provided for notifying users,
+ * updating statistics, and sending broadcast notifications to friends.</p>
  */
 public class BaseQuestAdminServlet extends HttpServlet {
 
     private static final Logger log = LoggerFactory.getLogger(BaseQuestAdminServlet.class);
 
-    /**
-     * Quest authoring and catalog operations.
-     */
     protected transient QuestAuthoringService authoring;
-
-    /**
-     * Notification delivery service for moderation, admin, and friend events.
-     */
     protected transient NotificationService notify;
-
-    /**
-     * Service for user lookup and profile access.
-     */
     protected transient UserService users;
-
-    /**
-     * Tracks per-user quest statistics (optional, may be {@code null}).
-     */
     protected transient UserStatsService userStats;
-
-    /**
-     * Manages friendship relations (optional, may be {@code null}).
-     */
     protected transient FriendService friendService;
 
     /**
-     * Initializes the servlet by resolving backend services from the servlet context.
-     * <p>
-     * Mandatory:
-     * <ul>
-     *   <li>{@link QuestAuthoringService}</li>
-     *   <li>{@link NotificationService}</li>
-     *   <li>{@link UserService}</li>
-     * </ul>
-     * Optional:
-     * <ul>
-     *   <li>{@link UserStatsService}</li>
-     *   <li>{@link FriendService}</li>
-     * </ul>
-     * If a required service is missing, the servlet is marked unavailable.
+     * Initializes required service dependencies for administrative quest management.
      *
-     * @param config servlet configuration
-     * @throws ServletException     if superclass initialization fails
-     * @throws UnavailableException if required services are missing
+     * @param config servlet configuration provided by the container
+     * @throws ServletException if one or more required services are not available
      */
     @Override
     public void init(ServletConfig config) throws ServletException {
@@ -121,19 +89,14 @@ public class BaseQuestAdminServlet extends HttpServlet {
     }
 
     /**
-     * Sends a {@link NotificationType#QUEST_ADMIN_CHANGED} event to the quest owner
-     * when an admin updates their quest.
-     * <p>
-     * Behavior:
-     * <ul>
-     *   <li>Skips notification if admin, target user, or notify service is missing.</li>
-     *   <li>Attaches quest name (defaulting to "Quest") and a fixed "what" message.</li>
-     *   <li>Logs the operation for auditing.</li>
-     * </ul>
+     * Sends a notification to a quest author when an admin modifies their quest.
      *
-     * @param admin        the admin user performing the action (may be {@code null})
-     * @param targetUserId id of the quest owner (must be non-blank)
-     * @param questName    human-readable quest name (defaults to "Quest" if blank)
+     * <p>This is typically used for cases where an administrator manually edits or
+     * adjusts a quest after publication.</p>
+     *
+     * @param admin        admin user performing the change
+     * @param targetUserId the affected quest owner's user ID
+     * @param questName    quest name (for message personalization)
      */
     protected void notifyQuestAdminChangedById(User admin, String targetUserId, String questName) {
         if (admin == null || notify == null || targetUserId == null || targetUserId.isBlank()) {
@@ -155,15 +118,11 @@ public class BaseQuestAdminServlet extends HttpServlet {
     }
 
     /**
-     * Increments the "created quests" counter for the given user.
-     * <p>
-     * Behavior:
-     * <ul>
-     *   <li>Skips if {@code userStats} is not configured or {@code userId} is blank.</li>
-     *   <li>Catches and logs exceptions thrown by {@code userStats.incCreated}.</li>
-     * </ul>
+     * Increments the “created quests” counter for a specific user.
      *
-     * @param userId identifier of the user whose counter should be incremented
+     * <p>Silently ignores missing statistics service or invalid user IDs.</p>
+     *
+     * @param userId user ID whose stats should be incremented
      */
     protected void incCreatedByUserId(String userId) {
         if (userStats == null || userId == null || userId.isBlank()) {
@@ -180,19 +139,13 @@ public class BaseQuestAdminServlet extends HttpServlet {
     }
 
     /**
-     * Notifies all friends of a user when that user publishes a quest.
-     * <p>
-     * Behavior:
-     * <ul>
-     *   <li>Skips if owner id, notification service, or friend service is missing.</li>
-     *   <li>Retrieves friend IDs via {@code friendService}; logs and aborts if failed.</li>
-     *   <li>Sends {@link NotificationType#FRIEND_PUBLISHED_QUEST} events to each friend,
-     *       excluding the owner themselves.</li>
-     *   <li>Quest name defaults to "Quest" if blank.</li>
-     * </ul>
+     * Notifies all friends of a user when they publish a new quest.
      *
-     * @param ownerUserId id of the user who published the quest
-     * @param questName   human-readable quest name (defaults to "Quest" if blank)
+     * <p>This method retrieves the list of friend IDs and sends a
+     * {@link NotificationType#FRIEND_PUBLISHED_QUEST} notification to each one.</p>
+     *
+     * @param ownerUserId the user who published a quest
+     * @param questName   the quest name for message personalization
      */
     protected void notifyFriendsPublishedByUserId(String ownerUserId, String questName) {
         if (ownerUserId == null || notify == null || friendService == null) {

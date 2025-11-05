@@ -10,44 +10,22 @@ import java.util.Locale;
 import java.util.regex.Pattern;
 
 /**
- * Utility class for parsing {@link QuestNode} objects from HTTP form submissions.
- * <p>
- * Supports two input formats:
- * <ul>
- *   <li><b>Textarea format:</b> multiple lines where each line is {@code choice -> nextId}.</li>
- *   <li><b>Indexed format:</b> individual fields {@code opt_choice_N}, {@code opt_next_N}.</li>
- * </ul>
- * Both formats can be used to populate a non-final node with options. Final nodes must not
- * contain options unless {@link #STRICT_FINAL} is set to {@code false}.
- * </p>
+ * Parses a quest node from an HTTP form.
  *
- * <h3>Responsibilities</h3>
+ * <p>Supports two ways to submit options:
  * <ul>
- *   <li>Read parameters such as {@code id}, {@code text}, {@code final}, {@code image} from request.</li>
- *   <li>Parse options either from a textarea or indexed fields.</li>
- *   <li>Handle cleanup of separators and normalization of boolean/number values.</li>
- *   <li>Throw detailed {@link IllegalArgumentException} when input is malformed.</li>
+ *   <li>Textarea: one option per line in the format {@code text -> nextId}</li>
+ *   <li>Indexed fields: {@code opt_choice_N} / {@code opt_next_N}</li>
  * </ul>
- *
- * <h3>Examples</h3>
- * <pre>
- * text = "Go left -> 2"
- * text = "Take sword -> 3"
- * </pre>
- * Each line creates an {@link Option} with a label and a next node id.
+ * If the "final" flag is set, options are ignored (or rejected in STRICT mode).</p>
  */
 public class FormQuestNodeParser {
 
-    /**
-     * Pattern for splitting lines (handles all newline styles).
-     */
     private static final Pattern NEWLINE = Pattern.compile("\\R+");
-    /**
-     * Maximum number of indexed options allowed.
-     */
     private static final int MAX_OPTS = 500;
+
     /**
-     * Enforces strict rule that final nodes cannot contain options.
+     * If true, a final node with any options will be rejected.
      */
     private static final boolean STRICT_FINAL = false;
 
@@ -55,11 +33,7 @@ public class FormQuestNodeParser {
     }
 
     /**
-     * Parse a {@link QuestNode} from HTTP form parameters.
-     *
-     * @param req the HTTP request containing node fields
-     * @return parsed {@link QuestNode}
-     * @throws IllegalArgumentException if required fields are missing or malformed
+     * Build {@link QuestNode} from request parameters.
      */
     public static QuestNode parseNode(HttpServletRequest req) {
         int id = parseInt(req.getParameter("id"), "id");
@@ -83,9 +57,6 @@ public class FormQuestNodeParser {
         return parseOptionsIndexed(req);
     }
 
-    /**
-     * Parses options from textarea-style format (lines with "choice -> nextId").
-     */
     private static List<Option> parseOptionsTextarea(String raw) {
         String[] lines = NEWLINE.split(raw);
         List<Option> res = new ArrayList<>();
@@ -107,9 +78,6 @@ public class FormQuestNodeParser {
         return res;
     }
 
-    /**
-     * Parses options from indexed parameters (opt_choice_N / opt_next_N).
-     */
     private static List<Option> parseOptionsIndexed(HttpServletRequest req) {
         List<Option> res = new ArrayList<>();
         for (int i = 1; i <= MAX_OPTS; i++) {
@@ -130,9 +98,6 @@ public class FormQuestNodeParser {
         return res;
     }
 
-    /**
-     * Checks if any options were provided in the request (textarea or indexed).
-     */
     private static boolean hasAnyOptions(String optionsTextarea, HttpServletRequest req) {
         if (!isBlank(optionsTextarea)) {
             for (String line : NEWLINE.split(optionsTextarea)) {
@@ -179,7 +144,7 @@ public class FormQuestNodeParser {
     }
 
     /**
-     * Normalizes different arrow symbols (→, =>, -->, —>, etc.) into a standard {@code "->"}.
+     * Normalizes common arrow-like separators to "->".
      */
     private static String cleanupSeparators(String line) {
         if (line == null) {

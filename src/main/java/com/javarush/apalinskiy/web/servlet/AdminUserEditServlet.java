@@ -23,69 +23,15 @@ import java.io.IOException;
 import java.util.*;
 
 /**
- * Admin-only servlet for viewing and editing user accounts.
- * <p>
- * Responsibilities:
- * <ul>
- *   <li>Resolve {@link UserService} and {@link NotificationService} from the servlet context.</li>
- *   <li>Render edit form for a target user (GET).</li>
- *   <li>Apply admin updates to a user (POST), optionally renewing the admin's own session
- *       if they edited their own sensitive data (login/name/password/role).</li>
- *   <li>Send a {@link NotificationType#USER_ADMIN_CHANGED} notification to the edited user
- *       when visible changes occur.</li>
- * </ul>
- * Authentication/authorization should be enforced upstream (e.g., an admin filter).
- * </p>
+ * Administrative servlet for editing user accounts.
  *
- * <h3>GET</h3>
- * <p>Parameters:</p>
- * <ul>
- *   <li><b>id</b> — required, target user id.</li>
- * </ul>
- * <p>Behavior:</p>
- * <ul>
- *   <li>Pulls flash messages ({@code OK}, {@code ERROR}).</li>
- *   <li>Fetches target user; redirects to {@code /users} with error flash if missing.</li>
- *   <li>Sets request attributes:
- *     <ul>
- *       <li>{@code editUser} — target {@link User};</li>
- *       <li>{@code roles} — fixed list of roles ({@link Role#USER}, {@link Role#ADMIN}).</li>
- *     </ul>
- *   </li>
- *   <li>Forwards to {@code WebConst.Jsp.USER_EDIT}.</li>
- * </ul>
+ * <p>This servlet allows administrators to view and update user details such as
+ * name, login, role, and password. It also automatically updates the active
+ * session if the admin edits their own account.</p>
  *
- * <h3>POST</h3>
- * <p>Parameters:</p>
- * <ul>
- *   <li><b>id</b> — required, target user id;</li>
- *   <li><b>userName</b>, <b>userLogin</b> — optional new name/login;</li>
- *   <li><b>role</b> — {@code USER} or {@code ADMIN} (case-insensitive; defaults to {@code USER});</li>
- *   <li><b>password</b> — optional new password (non-blank indicates change).</li>
- * </ul>
- * <p>Behavior:</p>
- * <ul>
- *   <li>Validates presence of {@code id}; redirects with error if missing.</li>
- *   <li>Reads the "before" snapshot (if present), performs {@link UserService#adminUpdate}.</li>
- *   <li>If the editor edits themselves and sensitive data changed, renews the session via
- *       {@link Web#renewSessionAndPut} to refresh authentication state; otherwise updates session user attribute.</li>
- *   <li>Builds human-readable summary and machine-readable diff via {@link Web#buildAdminChangeSummary}
- *       and {@link Web#buildMachineReadableDiff}. Sends {@code USER_ADMIN_CHANGED} notification if there are visible changes.</li>
- *   <li>On success, redirects back to the edit page with OK flash. On conflicts or invalid input,
- *       redirects with ERROR flash.</li>
- * </ul>
- *
- * <h3>Errors</h3>
- * <ul>
- *   <li>{@link DuplicateLoginException} → "The username is already occupied".</li>
- *   <li>{@link IllegalArgumentException}/{@link NoSuchElementException} → message propagated to error flash.</li>
- * </ul>
- *
- * <h3>Notes</h3>
- * <ul>
- *   <li>Logging includes actor id (if available) and target properties.</li>
- *   <li>Flash helpers: {@link Web#redirectOk}, {@link Web#redirectErr}.</li>
- * </ul>
+ * <p>When a user is modified, a {@link NotificationEvent} of type
+ * {@link NotificationType#USER_ADMIN_CHANGED} is sent to the affected user
+ * for audit and transparency.</p>
  */
 public class AdminUserEditServlet extends HttpServlet {
 
@@ -95,8 +41,10 @@ public class AdminUserEditServlet extends HttpServlet {
     private NotificationService notify;
 
     /**
-     * Resolves required services from the servlet context.
-     * <p>Expected context attributes: {@code USER_SERVICE}, {@code NOTIFY_SERVICE}.</p>
+     * Initializes the servlet and retrieves the necessary beans from the servlet context.
+     *
+     * @param config servlet configuration provided by the container
+     * @throws ServletException if one or more required beans are missing
      */
     @Override
     public void init(ServletConfig config) throws ServletException {
@@ -108,11 +56,14 @@ public class AdminUserEditServlet extends HttpServlet {
     }
 
     /**
-     * Renders the admin user edit page.
-     * <p>
-     * Required param: {@code id}. Redirects to {@code /users} with an error flash if missing or not found.
-     * Exposes {@code editUser} and {@code roles} to the JSP, then forwards to {@code WebConst.Jsp.USER_EDIT}.
-     * </p>
+     * Displays the user edit form for a given user ID.
+     *
+     * <p>If the user is not found, redirects back to the user list page with an error message.</p>
+     *
+     * @param req  HTTP request containing the user ID parameter
+     * @param resp HTTP response for forwarding or redirection
+     * @throws ServletException if forwarding to the JSP fails
+     * @throws IOException      if an I/O error occurs
      */
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
@@ -137,11 +88,17 @@ public class AdminUserEditServlet extends HttpServlet {
     }
 
     /**
-     * Applies admin-side updates to the target user and handles session/notifications.
-     * <p>
-     * Parameters: {@code id} (required), {@code userName}, {@code userLogin}, {@code role}, {@code password}.
-     * On success, redirects back to the edit page with an OK flash; otherwise redirects with error.
-     * </p>
+     * Handles user updates submitted via POST requests.
+     *
+     * <p>Allows administrators to modify user roles, names, logins, and passwords.
+     * If the administrator edits their own account, the active session is refreshed
+     * to maintain consistency.</p>
+     *
+     * <p>Additionally, any significant changes trigger a user notification for transparency.</p>
+     *
+     * @param req  HTTP request containing updated user data
+     * @param resp HTTP response for redirection
+     * @throws IOException if an I/O or redirection error occurs
      */
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws IOException {
@@ -194,7 +151,7 @@ public class AdminUserEditServlet extends HttpServlet {
             log.warn("POST user edit: duplicate login id={} login='{}'", id, login);
             Web.redirectErr(req, resp,
                     WebConst.Path.USER_EDIT + "?" + WebConst.Param.ID + "=" + id,
-                    "The username is already occupied");
+                    "The login is already occupied");
         } catch (IllegalArgumentException | NoSuchElementException e) {
             log.warn("POST user edit: invalid input or user not found id={} msg={}", id, e.getMessage());
             Web.redirectErr(req, resp,

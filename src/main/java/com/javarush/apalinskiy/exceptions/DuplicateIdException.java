@@ -1,20 +1,19 @@
 package com.javarush.apalinskiy.exceptions;
 
 /**
- * Exception thrown when a duplicate identifier is detected.
- * <p>
- * Typically used in repositories or quest structures to signal
- * that an entity with the same ID already exists and cannot be added again.
- * </p>
+ * Exception thrown when an attempt is made to create or register
+ * an entity with a duplicate identifier.
  *
- * <p>This is an unchecked exception (subclass of {@link RuntimeException}).</p>
+ * <p>This exception is typically used to indicate logical conflicts
+ * in domain-level operations such as quest creation, user registration,
+ * or database imports where unique IDs must be enforced.</p>
  */
 public class DuplicateIdException extends RuntimeException {
 
     /**
-     * Creates a new {@code DuplicateIdException} with the given message.
+     * Constructs a new {@code DuplicateIdException} with the specified detail message.
      *
-     * @param message description of the error
+     * @param message description of the duplication conflict
      */
     public DuplicateIdException(String message) {
         super(message);

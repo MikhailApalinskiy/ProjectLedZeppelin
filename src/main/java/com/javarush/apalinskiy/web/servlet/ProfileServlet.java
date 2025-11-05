@@ -18,33 +18,10 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 
 /**
- * Profile page controller for viewing basic account info and performing profile mutations
- * (display-name update and password change).
- * <p>
- * Authentication is required for mutations; the GET handler renders the profile page and,
- * if the user is authenticated, also attaches optional aggregate stats.
- * </p>
+ * Servlet responsible for displaying and updating the user profile.
  *
- * <h3>Injected services (from {@link ServletContext})</h3>
- * <ul>
- *   <li>{@code USER_SERVICE} → {@link UserService} (required)</li>
- *   <li>{@code USER_STATS_SERVICE} → {@link UserStatsService} (optional)</li>
- * </ul>
- *
- * <h3>Flash / view</h3>
- * <ul>
- *   <li>Reads flash messages ({@code OK}, {@code ERROR}) via {@link Web#pullFlash}.</li>
- *   <li>Forwards to {@code WebConst.Jsp.PROFILE}.</li>
- * </ul>
- *
- * <h3>Security notes</h3>
- * <ul>
- *   <li>Changing sensitive data should be CSRF-protected by an upstream filter.</li>
- *   <li>After password change the session user object is refreshed.</li>
- * </ul>
- *
- * @see Web
- * @see WebConst
+ * <p>Allows viewing profile information, updating the display name,
+ * and changing the password for authenticated users.</p>
  */
 public class ProfileServlet extends HttpServlet {
 
@@ -54,10 +31,7 @@ public class ProfileServlet extends HttpServlet {
     private UserStatsService userStats;
 
     /**
-     * Resolves required/optional services from the servlet context.
-     *
-     * @param config servlet config provided by the container
-     * @throws ServletException if initialization fails
+     * Initializes the {@link UserService} and {@link UserStatsService} beans from the context.
      */
     @Override
     public void init(ServletConfig config) throws ServletException {
@@ -75,21 +49,14 @@ public class ProfileServlet extends HttpServlet {
     }
 
     /**
-     * Renders the profile page, optionally attaching user and stats to the request.
-     * <p>
-     * Flow:
-     * <ol>
-     *   <li>Copies possible query params {@code OK}/{@code ERROR} to attributes and pulls flash.</li>
-     *   <li>If a {@link User} is present in session, exposes it as {@code WebConst.Attr.USER} and,
-     *       if available, attaches {@code stats} from {@link UserStatsService}.</li>
-     *   <li>Always forwards to {@code WebConst.Jsp.PROFILE} (unauthenticated users see a limited view).</li>
-     * </ol>
-     * </p>
+     * Displays the profile page with optional statistics.
+     *
+     * <p>If the user is not authenticated, redirects to the login page.</p>
      *
      * @param req  HTTP request
      * @param resp HTTP response
-     * @throws ServletException if forwarding fails
-     * @throws IOException      on I/O errors
+     * @throws ServletException on JSP forward failure
+     * @throws IOException      on redirect errors
      */
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp)
@@ -112,21 +79,13 @@ public class ProfileServlet extends HttpServlet {
     }
 
     /**
-     * Handles profile mutations: display-name update and password change.
-     * <p>
-     * Dispatches by {@code action}:
-     * <ul>
-     *   <li><b>updateName</b> → {@link #handleUpdateName(HttpServletRequest, User)}</li>
-     *   <li><b>changePassword</b> → {@link #handleChangePassword(HttpServletRequest, User)}</li>
-     * </ul>
-     * On success, redirects to {@code WebConst.Path.PROFILE} with an OK flash
-     * (the current implementation uses the message "Password changed successfully" for both flows).
-     * On validation/security issues, redirects with an ERROR flash.
-     * </p>
+     * Handles user profile update requests (display name or password).
      *
-     * @param req  HTTP request (expects {@code action})
-     * @param resp HTTP response used for redirects
-     * @throws IOException on redirect errors
+     * <p>Performs validation and redirects with success or error messages.</p>
+     *
+     * @param req  HTTP request
+     * @param resp HTTP response
+     * @throws IOException if redirect fails
      */
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp)
@@ -143,18 +102,18 @@ public class ProfileServlet extends HttpServlet {
                 case "updateName" -> {
                     handleUpdateName(req, user);
                     log.info("User updated display name userId={}", user.getUserId());
+                    Web.redirectOk(req, resp, WebConst.Path.PROFILE, "Display name changed successfully");
                 }
                 case "changePassword" -> {
                     handleChangePassword(req, user);
                     log.info("User changed password userId={}", user.getUserId());
+                    Web.redirectOk(req, resp, WebConst.Path.PROFILE, "Password changed successfully");
                 }
                 default -> {
                     log.warn("Unknown profile action userId={} action={}", user.getUserId(), action);
                     Web.redirectErr(req, resp, WebConst.Path.PROFILE, "Unknown action");
-                    return;
                 }
             }
-            Web.redirectOk(req, resp, WebConst.Path.PROFILE, "Password changed successfully");
         } catch (SecurityException se) {
             log.warn("Password change failed (wrong current password) userId={}", user.getUserId());
             Web.redirectErr(req, resp, WebConst.Path.PROFILE, "The current password is incorrect");
@@ -168,18 +127,7 @@ public class ProfileServlet extends HttpServlet {
     }
 
     /**
-     * Updates the user's display name and refreshes the session principal.
-     * <p>
-     * Parameters:
-     * <ul>
-     *   <li>{@code displayName} or {@code userName} — new display name (non-blank)</li>
-     * </ul>
-     * Throws {@link IllegalArgumentException} if the name is missing.
-     * </p>
-     *
-     * @param req  HTTP request with form fields
-     * @param user authenticated user
-     * @throws IllegalArgumentException if the new name is empty
+     * Handles updating the user's display name.
      */
     private void handleUpdateName(HttpServletRequest req, User user) {
         String newName = Web.trimOrNull(req.getParameter("displayName"));
@@ -194,26 +142,7 @@ public class ProfileServlet extends HttpServlet {
     }
 
     /**
-     * Changes the user's password after validating current password and basic rules.
-     * <p>
-     * Parameters:
-     * <ul>
-     *   <li>{@code currentPassword} — current password (required)</li>
-     *   <li>{@code newPassword} — new password (required, at least 6 chars, different from current)</li>
-     *   <li>{@code confirmPassword} — must match {@code newPassword}</li>
-     * </ul>
-     * Throws:
-     * <ul>
-     *   <li>{@link IllegalArgumentException} for validation errors;</li>
-     *   <li>{@link SecurityException} if the current password is incorrect (propagated from service layer);</li>
-     * </ul>
-     * On success, updates the session user with a fresh copy from the database.
-     * </p>
-     *
-     * @param req  HTTP request with form fields
-     * @param user authenticated user
-     * @throws IllegalArgumentException on validation errors
-     * @throws SecurityException        if current password is invalid
+     * Handles password change requests with full validation.
      */
     private void handleChangePassword(HttpServletRequest req, User user) {
         String current = Web.trimOrNull(req.getParameter(WebConst.Param.CURRENT_PASSWORD));

@@ -3,73 +3,60 @@ package com.javarush.apalinskiy.web.view;
 import lombok.Getter;
 
 /**
- * Immutable view-model for a directed edge segment drawn in the quest graph.
+ * Represents a directed edge segment in a quest graph model.
  * <p>
- * This class carries presentation-only data and is safe to expose to JSP/EL.
- * Coordinates are expected to be already laid out by the server-side layout
- * (e.g., graph router); no validation or geometry is performed here.
- * </p>
- *
- * <h3>Coordinate system</h3>
- * <ul>
- *   <li>Units: SVG user units (pixels).</li>
- *   <li>Origin: top-left corner ({@code 0,0}).</li>
- *   <li>{@code (sx, sy)} — start point of the edge; {@code (tx, ty)} — end point.</li>
- * </ul>
- *
- * <h3>Semantics</h3>
- * <ul>
- *   <li>{@code from} → {@code to} denotes the directed link between nodes.</li>
- *   <li>{@code label} is optional; may be {@code null} if the edge has no label.</li>
- * </ul>
- *
- * <p>
- * Note: Any domain-level validation (e.g., forbidding self-loops or ensuring
- * node IDs exist) should be performed upstream.
- * </p>
+ * Each edge connects two nodes ({@code from → to}) and contains
+ * both visual coordinates and a text label (choice).
+ * Used by the SVG rendering logic to draw connections between quest nodes.
  */
 @Getter
 public class EdgeSeg {
 
     /**
-     * Identifier of the source node this edge originates from.
+     * Source node ID.
      */
     private final int from;
+
     /**
-     * Identifier of the target node this edge points to.
+     * Target node ID.
      */
     private final int to;
+
     /**
-     * Optional text displayed near the edge; may be {@code null}.
+     * Label or choice text displayed along the edge.
      */
     private final String label;
+
     /**
-     * X coordinate of the edge's start point (pixels).
+     * Start X coordinate of the edge line.
      */
     private final double sx;
+
     /**
-     * Y coordinate of the edge's start point (pixels).
+     * Start Y coordinate of the edge line.
      */
     private final double sy;
+
     /**
-     * X coordinate of the edge's end point (pixels).
+     * End X coordinate of the edge line.
      */
     private final double tx;
+
     /**
-     * Y coordinate of the edge's end point (pixels).
+     * End Y coordinate of the edge line.
      */
     private final double ty;
 
     /**
-     * Creates a new directed edge segment between two nodes with given screen coordinates.
+     * Constructs an edge segment.
      *
-     * @param from  source node id
-     * @param to    target node id
-     * @param label optional edge label; may be {@code null}
-     * @param sx    start X (px)
-     * @param sy    start Y (px)
-     * @param tx    end X (px)
-     * @param ty    end Y (px)
+     * @param from  source node ID
+     * @param to    target node ID
+     * @param label edge label (e.g. option text)
+     * @param sx    start X coordinate
+     * @param sy    start Y coordinate
+     * @param tx    end X coordinate
+     * @param ty    end Y coordinate
      */
     public EdgeSeg(int from, int to, String label, double sx, double sy, double tx, double ty) {
         this.from = from;

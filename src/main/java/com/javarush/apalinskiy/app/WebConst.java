@@ -3,25 +3,13 @@ package com.javarush.apalinskiy.app;
 import java.nio.charset.StandardCharsets;
 
 /**
- * Central place for application-wide constants used in servlets, JSPs,
- * and service initialization.
- * <p>
- * This class contains nested groups of constants organized by purpose:
- * <ul>
- *   <li>{@link Charset} – encoding definitions.</li>
- *   <li>{@link Param} – request parameter names.</li>
- *   <li>{@link Op} – common operation values for form parameters.</li>
- *   <li>{@link Attr} – request/session attribute keys.</li>
- *   <li>{@link Ctx} – servlet context attribute keys for services.</li>
- *   <li>{@link Path} – servlet path mappings.</li>
- *   <li>{@link Jsp} – JSP view locations.</li>
- *   <li>{@link App} – application defaults and configuration values.</li>
- *   <li>{@link Msg} – common user-facing messages.</li>
- *   <li>{@link InitParam} – servlet context init parameter names.</li>
- *   <li>{@link ParamGroup} – predefined groups of parameters.</li>
- * </ul>
- * <p>
- * This class is {@code final} and cannot be instantiated.
+ * Global web application constants used across the TextQuest platform.
+ *
+ * <p>This utility class provides names, paths, and configuration constants
+ * used by servlets, JSP pages, and services. It is organized into nested
+ * static classes grouped by purpose (e.g. {@code Param}, {@code Attr}, {@code Path}).</p>
+ *
+ * <p>This class is not intended to be instantiated.</p>
  */
 public final class WebConst {
 
@@ -29,7 +17,7 @@ public final class WebConst {
     }
 
     /**
-     * Character set constants.
+     * Character encoding constants.
      */
     public static final class Charset {
         public static final String UTF8 = StandardCharsets.UTF_8.name();
@@ -39,7 +27,7 @@ public final class WebConst {
     }
 
     /**
-     * Common HTTP request parameter names used throughout the application.
+     * Character encoding constants.
      */
     public static final class Param {
         public static final String ROLE = "role";
@@ -72,7 +60,8 @@ public final class WebConst {
     }
 
     /**
-     * Operation codes used in forms and request parameters.
+     * Common operation identifiers used to distinguish servlet actions.
+     * <p>For example, {@code "go"}, {@code "delete"}, {@code "confirm"}, etc.</p>
      */
     public static final class Op {
         public static final String GO = "go";
@@ -85,7 +74,8 @@ public final class WebConst {
     }
 
     /**
-     * Request/session attribute keys.
+     * Attribute names used to store objects in {@link jakarta.servlet.ServletRequest}
+     * or {@link jakarta.servlet.http.HttpSession}.
      */
     public static final class Attr {
         public static final String EDITING_QUEST_ID = "editingQuestId";
@@ -103,7 +93,8 @@ public final class WebConst {
     }
 
     /**
-     * Keys for objects stored in {@link jakarta.servlet.ServletContext}.
+     * Keys for storing and retrieving shared services and repositories
+     * in the {@link jakarta.servlet.ServletContext}.
      */
     public static final class Ctx {
         public static final String USER_STATS_SERVICE = "userStatsService";
@@ -123,7 +114,8 @@ public final class WebConst {
     }
 
     /**
-     * Servlet path mappings for controllers.
+     * URL path constants for servlet mappings and navigation routes.
+     * <p>Used both in controllers and JSP links.</p>
      */
     public static final class Path {
         public static final String QUESTS_MOD = "/quests/moderation";
@@ -142,13 +134,15 @@ public final class WebConst {
         public static final String CREATE = "/create_quest";
         public static final String PUBLISH = "/quest/publish";
         public static final String MY_QUESTS = "/my/quests";
+        public static final String DRAFTS = "/drafts";
 
         private Path() {
         }
     }
 
     /**
-     * JSP view paths.
+     * JSP view file paths mapped to controller endpoints.
+     * <p>These constants reference files under {@code /WEB-INF/jsp/}.</p>
      */
     public static final class Jsp {
         public static final String USER_PUBLIC = "/WEB-INF/jsp/user_public.jsp";
@@ -171,13 +165,16 @@ public final class WebConst {
         public static final String GRAPH_SVG = "/WEB-INF/jsp/graph_svg.jsp";
         public static final String QUESTS_LIST = "/WEB-INF/jsp/quests_list.jsp";
         public static final String PUBLISH = "/WEB-INF/jsp/publish_confirm.jsp";
+        public static final String DRAFTS = "/WEB-INF/jsp/drafts.jsp";
 
         private Jsp() {
         }
     }
 
     /**
-     * Application defaults and configuration constants.
+     * Application-level constants and default settings.
+     * <p>Includes quest resource names, default admin credentials,
+     * and starting quest node ID.</p>
      */
     public static final class App {
         public static final String QUEST_RESOURCE = "quest.json";
@@ -191,12 +188,12 @@ public final class WebConst {
     }
 
     /**
-     * Number of save slots available per user.
+     * Default number of save slots available to each user.
      */
     public static final int SLOT_COUNT = 10;
 
     /**
-     * Common localized or user-facing messages.
+     * User-facing and internal message templates for UI and logs.
      */
     public static final class Msg {
         public static final String BAD_CREDENTIALS = "Incorrect login or password";
@@ -209,7 +206,7 @@ public final class WebConst {
     }
 
     /**
-     * Servlet context initialization parameter names.
+     * Servlet context initialization parameter names (defined in {@code web.xml}).
      */
     public static final class InitParam {
         public static final String CTX_UPLOADS_DIR = "uploads.base.dir";
@@ -219,13 +216,11 @@ public final class WebConst {
     }
 
     /**
-     * Predefined groups of request parameters.
+     * Logical parameter groupings reused in servlet request processing.
+     * <p>Example: {@code SLOT_NAV} defines parameters relevant to slot navigation.</p>
      */
     public static final class ParamGroup {
 
-        /**
-         * Parameters related to slot navigation (next step, purpose, node, custom).
-         */
         public static final String[] SLOT_NAV = {
                 Param.NEXT, Param.PURPOSE, Param.NODE, Param.CUSTOM
         };

@@ -1,5 +1,6 @@
 package com.javarush.apalinskiy.web.servlet;
 
+import com.javarush.apalinskiy.domain.quest.custom.CustomQuest;
 import com.javarush.apalinskiy.web.util.FormQuestNodeParser;
 import com.javarush.apalinskiy.domain.quest.Option;
 import com.javarush.apalinskiy.domain.quest.QuestNode;
@@ -19,6 +20,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -26,62 +28,28 @@ import java.util.Optional;
 import static com.javarush.apalinskiy.web.util.Uploads.resolveBaseDir;
 
 /**
- * Authoring servlet that powers the quest editor page (create/update draft nodes, upload images).
- * <p>
- * Responsibilities:
+ * Servlet powering the “Create/Edit Quest” editor.
+ *
+ * <p>Responsibilities:</p>
  * <ul>
- *   <li>Resolve {@link QuestAuthoringService} from the application context.</li>
- *   <li><b>GET</b>:
- *     <ul>
- *       <li>{@code ?new} — clears the current editor draft and removes {@code editingQuestId} from session;</li>
- *       <li>{@code ?load=<questId>} — loads an existing quest into the editor and stores {@code editingQuestId} in session;</li>
- *       <li>Prefills the form from {@code id} (node id) or restores the last form state from the session;</li>
- *       <li>Forwards to {@code WebConst.Jsp.CREATE}.</li>
- *     </ul>
- *   </li>
- *   <li><b>POST</b>:
- *     <ul>
- *       <li>{@code action=replaceNode} — validates input, optionally processes image upload, constructs {@link QuestNode}
- *           via {@link FormQuestNodeParser#parseNode(HttpServletRequest)}, persists it with {@link QuestAuthoringService#saveNode(QuestNode)};</li>
- *       <li>{@code action=deleteNode} — deletes a node from the draft by id;</li>
- *       <li>On errors, stashes user inputs to session and redirects back with an error flash.</li>
- *     </ul>
- *   </li>
+ *   <li>Initialize and load the in-browser editor draft</li>
+ *   <li>Prefill the form from an existing node or session-stashed values</li>
+ *   <li>Handle node save (replace) and node delete operations</li>
+ *   <li>Handle optional image uploads for nodes</li>
  * </ul>
  *
- * <h3>Image uploads</h3>
+ * <p>GET endpoints:</p>
  * <ul>
- *   <li>Accepted only for {@code multipart/*} requests; {@code Content-Type} must start with {@code image/}.</li>
- *   <li>Target directory is resolved via an application-specific method {@code resolveBaseDir(getServletContext())}.</li>
- *   <li>Filename is sanitized; extension inferred from original name or content type; stored under {@code /uploads/quest-<ts>.<ext>}.</li>
- *   <li>Requires multipart handling to be configured (e.g., {@code @MultipartConfig} or web.xml).</li>
+ *   <li>{@code ?new} — clears the current draft and starts a fresh one</li>
+ *   <li>{@code ?load=<questId>} — loads an existing quest into the editor</li>
+ *   <li>Otherwise renders the editor page, attempting to prefill the form</li>
  * </ul>
  *
- * <h3>Form prefill/restore (GET)</h3>
+ * <p>POST actions:</p>
  * <ul>
- *   <li>With {@code id}, attempts to prefill fields from the corresponding draft node.</li>
- *   <li>Otherwise restores the last submitted-but-failed form from session attributes: {@code form_id}, {@code form_text},
- *       {@code form_final}, {@code form_options}, {@code form_image}.</li>
+ *   <li>{@code replaceNode} — create/update a node (with validation and optional image)</li>
+ *   <li>{@code deleteNode} — remove a node by id</li>
  * </ul>
- *
- * <h3>Flash & redirects</h3>
- * <ul>
- *   <li>Uses {@link Web#redirectOk} and {@link Web#redirectErr} for user feedback.</li>
- *   <li>OK cases also set {@code clear=1} to present a clean form.</li>
- * </ul>
- *
- * <h3>Notes</h3>
- * <ul>
- *   <li>When replacing a non-final node without any options, the request is rejected with a helpful message.</li>
- *   <li>If no new image is uploaded, preserves the existing node image (if any).</li>
- * </ul>
- *
- * @see QuestAuthoringService
- * @see FormQuestNodeParser
- * @see QuestNode
- * @see Option
- * @see WebConst
- * @see Web
  */
 public class CreateQuestServlet extends HttpServlet {
 
@@ -90,9 +58,10 @@ public class CreateQuestServlet extends HttpServlet {
     private QuestAuthoringService authoring;
 
     /**
-     * Resolves {@link QuestAuthoringService} from the servlet context.
+     * Resolves the {@link QuestAuthoringService} from the application context.
      *
-     * @throws UnavailableException if the service is missing
+     * @param config servlet config
+     * @throws ServletException if the service bean is missing
      */
     @Override
     public void init(ServletConfig config) throws ServletException {
@@ -107,12 +76,22 @@ public class CreateQuestServlet extends HttpServlet {
     }
 
     /**
-     * Renders the editor page or performs draft management actions:
+     * Renders the editor page and handles draft lifecycle navigation.
+     *
+     * <p>Supported query parameters:</p>
      * <ul>
-     *   <li>{@code ?new}: clears the draft and resets {@code editingQuestId} in session, then redirects with OK flash;</li>
-     *   <li>{@code ?load=<questId>}: loads quest into editor, stores {@code editingQuestId} in session, redirects with OK flash;</li>
-     *   <li>Otherwise: optionally prefill form by {@code id} or restore from session, then forward to the editor JSP.</li>
+     *   <li>{@code new} — start an empty draft</li>
+     *   <li>{@code load} — quest id to load into the editor</li>
+     *   <li>{@code clear=1} — skip prefill logic and render an empty form</li>
+     *   <li>{@code id} — node id to prefill the form from</li>
      * </ul>
+     *
+     * <p>Prefill strategy (if not {@code clear=1}):</p>
+     * <ol>
+     *   <li>Try to prefill by the node id from {@code id}</li>
+     *   <li>Else restore stashed form values from session (after redirect)</li>
+     *   <li>Else prefill from the first node present in the draft</li>
+     * </ol>
      */
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp)
@@ -122,6 +101,7 @@ public class CreateQuestServlet extends HttpServlet {
             HttpSession s = req.getSession(false);
             if (s != null) {
                 s.removeAttribute("editingQuestId");
+                s.removeAttribute("editingQuestName");
             }
             log.info("Editor draft cleared (new). userSessionId={}", (s == null ? "null" : s.getId()));
             Web.redirectOk(req, resp, WebConst.Path.CREATE, "An empty draft of the quest has been created");
@@ -131,7 +111,15 @@ public class CreateQuestServlet extends HttpServlet {
         if (loadId != null) {
             try {
                 authoring.loadToEditor(loadId);
-                req.getSession(true).setAttribute("editingQuestId", loadId);
+                Optional<CustomQuest> opt = authoring.getFromCatalog(loadId);
+                HttpSession s = req.getSession(true);
+                if (opt.isPresent() && opt.get().getModerationStatus() == CustomQuest.ModerationStatus.LIVE) {
+                    s.setAttribute("editingQuestId", loadId);
+                    s.setAttribute("editingQuestName", opt.get().getName());
+                } else {
+                    s.removeAttribute("editingQuestId");
+                    s.removeAttribute("editingQuestName");
+                }
                 log.info("Quest loaded into editor questId={}", loadId);
                 Web.redirectOk(req, resp, WebConst.Path.CREATE, "The quest is uploaded to the editor");
             } catch (Exception e) {
@@ -142,50 +130,49 @@ public class CreateQuestServlet extends HttpServlet {
         }
         boolean clear = "1".equals(req.getParameter(WebConst.Param.CLEAR));
         if (!clear) {
+            boolean formAlreadySet = false;
             String idStr = req.getParameter(WebConst.Param.ID);
             if (idStr != null && !idStr.isBlank()) {
                 try {
                     int id = Integer.parseInt(idStr.trim());
                     QuestNode node = authoring.get(id);
                     if (node != null) {
-                        req.setAttribute("form_id", node.getId());
-                        req.setAttribute("form_text", node.getText());
-                        req.setAttribute("form_final", node.isFin());
-                        req.setAttribute("form_image", node.getImage());
-                        if (!node.isFin()) {
-                            StringBuilder sb = new StringBuilder();
-                            for (Option o : node.getOptions()) {
-                                if (o == null || o.next() == null) {
-                                    continue;
-                                }
-                                if (!sb.isEmpty()) {
-                                    sb.append('\n');
-                                }
-                                sb.append(o.choice()).append(" -> ").append(o.next());
-                            }
-                            req.setAttribute("form_options", sb.toString());
-                        }
+                        prefillFromNode(req, node);
+                        formAlreadySet = true;
                         log.debug("Prefilled form from node id={}", id);
                     }
                 } catch (NumberFormatException ignored) {
                     log.debug("Invalid node id for prefill: '{}'", idStr);
                 }
             }
-            HttpSession sess = req.getSession(false);
-            if (sess != null) {
-                Object fId = sess.getAttribute("form_id");
-                if (fId != null) {
-                    req.setAttribute("form_id", fId);
-                    req.setAttribute("form_text", sess.getAttribute("form_text"));
-                    req.setAttribute("form_final", sess.getAttribute("form_final"));
-                    req.setAttribute("form_options", sess.getAttribute("form_options"));
-                    req.setAttribute("form_image", sess.getAttribute("form_image"));
-                    sess.removeAttribute("form_id");
-                    sess.removeAttribute("form_text");
-                    sess.removeAttribute("form_final");
-                    sess.removeAttribute("form_options");
-                    sess.removeAttribute("form_image");
-                    log.debug("Restored form from session");
+            if (!formAlreadySet) {
+                HttpSession sess = req.getSession(false);
+                if (sess != null) {
+                    Object fId = sess.getAttribute("form_id");
+                    if (fId != null) {
+                        req.setAttribute("form_id", fId);
+                        req.setAttribute("form_text", sess.getAttribute("form_text"));
+                        req.setAttribute("form_final", sess.getAttribute("form_final"));
+                        req.setAttribute("form_options", sess.getAttribute("form_options"));
+                        req.setAttribute("form_image", sess.getAttribute("form_image"));
+                        sess.removeAttribute("form_id");
+                        sess.removeAttribute("form_text");
+                        sess.removeAttribute("form_final");
+                        sess.removeAttribute("form_options");
+                        sess.removeAttribute("form_image");
+                        formAlreadySet = true;
+                        log.debug("Restored form from session");
+                    }
+                }
+            }
+            if (!formAlreadySet) {
+                List<QuestNode> nodes = authoring.nodes();
+                if (nodes != null && !nodes.isEmpty()) {
+                    QuestNode first = nodes.getFirst();
+                    prefillFromNode(req, first);
+                    log.debug("Prefilled form from FIRST node id={}", first.getId());
+                } else {
+                    log.debug("No nodes in draft — leave form empty");
                 }
             }
         }
@@ -193,14 +180,23 @@ public class CreateQuestServlet extends HttpServlet {
     }
 
     /**
-     * Handles editor actions:
+     * Handles editor actions: replace node or delete node.
+     *
+     * <p>For {@code replaceNode}:</p>
      * <ul>
-     *   <li>{@code replaceNode}: validates final/non-final constraints, processes image upload if present,
-     *       merges with existing image if omitted, saves the node, redirects with OK;</li>
-     *   <li>{@code deleteNode}: validates id and removes node from the draft, redirects with OK;</li>
-     *   <li>Unknown action: redirects with an error.</li>
+     *   <li>Validates that non-final nodes have at least one option</li>
+     *   <li>Parses form values into a {@link QuestNode}</li>
+     *   <li>Handles optional image upload and merges with existing image if omitted</li>
+     *   <li>Saves the node via {@link QuestAuthoringService#saveNode(QuestNode)}</li>
      * </ul>
-     * On validation errors, stashes form inputs to session and redirects back with error flash.
+     *
+     * <p>For {@code deleteNode}:</p>
+     * <ul>
+     *   <li>Validates numeric node id</li>
+     *   <li>Deletes via {@link QuestAuthoringService#deleteNode(int)}</li>
+     * </ul>
+     *
+     * <p>On validation errors, stashes the form in session and redirects back with a message.</p>
      */
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws IOException {
@@ -241,7 +237,7 @@ public class CreateQuestServlet extends HttpServlet {
                         }
                     }
                     authoring.saveNode(node);
-                    log.info("Node saved id={} final={} hasImage={}", node.getId(), node.isFin(), (node.getImage() != null && !node.getImage().isBlank()));
+                    log.info("Node saved id={} final={} hasImage={}", node.getId(), node.getFin(), (node.getImage() != null && !node.getImage().isBlank()));
                     Web.redirect(req, resp, WebConst.Path.CREATE,
                             Map.of(WebConst.Param.CLEAR, "1", WebConst.Attr.OK, "Node #" + node.getId() + " saved"));
                 }
@@ -277,11 +273,15 @@ public class CreateQuestServlet extends HttpServlet {
     }
 
     /**
-     * Processes an image upload (if any) and stores it under the configured uploads directory.
-     * <p>
-     * Returns the web path (e.g., {@code /uploads/quest-<ts>.jpg}) or {@code null} if no upload present.
-     * Throws {@link ServletException} for invalid payloads (non-image, oversized).
-     * </p>
+     * Handles optional multipart image upload for a node.
+     *
+     * <p>Validates content type as {@code image/*} and saves the file under app’s uploads directory.
+     * Returns the public path (e.g., {@code /uploads/quest-<ts>.jpg}) or {@code null} if nothing uploaded.</p>
+     *
+     * @param req HTTP request (possibly multipart)
+     * @return public image path or {@code null}
+     * @throws IOException      if saving the file fails
+     * @throws ServletException if multipart size limits are exceeded or type is invalid
      */
     private String handleImageUpload(HttpServletRequest req) throws IOException, ServletException {
         String reqCt = req.getContentType();
@@ -325,10 +325,14 @@ public class CreateQuestServlet extends HttpServlet {
     }
 
     /**
-     * Returns a copy of {@link QuestNode} with its image path set, preserving its final/non-final shape.
+     * Returns a copy of the node that carries the provided image path.
+     *
+     * @param src       original node
+     * @param imagePath image path to set
+     * @return node with the image path applied (keeps final/non-final semantics)
      */
     private QuestNode withImage(QuestNode src, String imagePath) {
-        if (src.isFin()) {
+        if (src.getFin()) {
             return QuestNode.fin(src.getId(), src.getText(), imagePath);
         } else {
             return QuestNode.nonFin(src.getId(), src.getText(), src.getOptions(), imagePath);
@@ -336,7 +340,9 @@ public class CreateQuestServlet extends HttpServlet {
     }
 
     /**
-     * Saves current form fields to the session so they can be restored after a redirect on error.
+     * Stashes form values into the session to survive a redirect after validation errors.
+     *
+     * @param req HTTP request containing form fields
      */
     private void stashFormForRedirect(HttpServletRequest req) {
         HttpSession s = req.getSession(true);
@@ -347,11 +353,37 @@ public class CreateQuestServlet extends HttpServlet {
     }
 
     /**
-     * Redirects back to the editor with an encoded error message in the query string.
+     * Redirects to the editor with an URL-encoded error message.
+     *
+     * @param resp response to send the redirect
+     * @param msg  error message to show
+     * @throws IOException if redirect fails
      */
     private void sendError(HttpServletResponse resp, String msg) throws IOException {
         resp.sendRedirect(resp.encodeRedirectURL(
                 WebConst.Path.CREATE + "?" + WebConst.Attr.ERROR + "=" + Web.urlEncode(Objects.toString(msg, ""))
         ));
+    }
+
+    /**
+     * Prefills editor form attributes from a given node.
+     *
+     * @param req  request to receive attributes
+     * @param node node whose values are used
+     */
+    private static void prefillFromNode(HttpServletRequest req, QuestNode node) {
+        req.setAttribute("form_id", node.getId());
+        req.setAttribute("form_text", node.getText());
+        req.setAttribute("form_final", node.getFin());
+        req.setAttribute("form_image", node.getImage());
+        if (!node.getFin()) {
+            StringBuilder sb = new StringBuilder();
+            for (Option o : node.getOptions()) {
+                if (o == null || o.getNext() == null) continue;
+                if (!sb.isEmpty()) sb.append('\n');
+                sb.append(o.getChoice()).append(" -> ").append(o.getNext());
+            }
+            req.setAttribute("form_options", sb.toString());
+        }
     }
 }

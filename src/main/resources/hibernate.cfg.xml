@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<hibernate-configuration>
+    <session-factory>
+
+        <property name="hibernate.connection.driver_class">org.postgresql.Driver</property>
+        <property name="hibernate.connection.url">jdbc:postgresql://localhost:5432/questdb</property>
+        <property name="hibernate.connection.username">postgres</property>
+        <property name="hibernate.connection.password">postgres</property>
+        <property name="hibernate.dialect">org.hibernate.dialect.PostgreSQLDialect</property>
+        <property name="hibernate.hbm2ddl.auto">validate</property>
+        <property name="hibernate.show_sql">true</property>
+        <property name="hibernate.format_sql">true</property>
+        <property name="hibernate.use_sql_comments">true</property>
+        <property name="hibernate.current_session_context_class">thread</property>
+
+        <mapping class="com.javarush.apalinskiy.domain.user.User"/>
+        <mapping class="com.javarush.apalinskiy.domain.user.UserStats"/>
+        <mapping class="com.javarush.apalinskiy.domain.quest.Option"/>
+        <mapping class="com.javarush.apalinskiy.domain.quest.QuestNode"/>
+        <mapping class="com.javarush.apalinskiy.domain.quest.custom.CustomQuest"/>
+        <mapping class="com.javarush.apalinskiy.domain.quest.custom.PendingEditRow"/>
+        <mapping class="com.javarush.apalinskiy.domain.quest.custom.PendingNewRow"/>
+        <mapping class="com.javarush.apalinskiy.domain.quest.custom.DraftRow"/>
+        <mapping class="com.javarush.apalinskiy.domain.social.FriendRequest"/>
+        <mapping class="com.javarush.apalinskiy.domain.notify.Notification"/>
+        <mapping class="com.javarush.apalinskiy.domain.save.SaveState"/>
+        <mapping class="com.javarush.apalinskiy.domain.save.GlobalSlotId"/>
+        <mapping class="com.javarush.apalinskiy.domain.save.GlobalSlot"/>
+
+    </session-factory>
+</hibernate-configuration>

@@ -4,60 +4,50 @@ import com.javarush.apalinskiy.domain.quest.QuestNode;
 import com.javarush.apalinskiy.domain.quest.choice.ChooseResult;
 
 /**
- * High-level service for navigating quests.
- * <p>
- * Provides access to the start node, random access by ID,
- * navigation between nodes based on player choices,
- * and version information of the underlying quest.
- * </p>
+ * Core service interface that defines the runtime behavior of a quest instance.
  *
- * <h3>Responsibilities</h3>
- * <ul>
- *   <li>Expose the start node of the quest.</li>
- *   <li>Allow lookup of nodes by ID.</li>
- *   <li>Resolve transitions between nodes using a textual answer.</li>
- *   <li>Provide a version identifier of the quest content.</li>
- * </ul>
+ * <p>Implementations of this interface provide logic for navigating between
+ * quest nodes, evaluating player choices, and maintaining quest versioning.
+ * The interface is typically used by the gameplay engine during interactive
+ * sessions.</p>
  */
 public interface QuestService {
 
     /**
-     * Returns the start node of the quest.
+     * Returns the starting node of the quest (entry point).
      *
-     * @return the starting {@link QuestNode}, never {@code null}
+     * @return {@link QuestNode} representing the first node of the quest
      */
     QuestNode getStart();
 
     /**
-     * Returns a quest node by its unique ID.
+     * Retrieves a quest node by its numeric identifier.
      *
      * @param id node identifier
-     * @return the node if found, or {@code null} if absent
+     * @return {@link QuestNode} with the specified id, or {@code null} if not found
      */
     QuestNode getById(int id);
 
     /**
-     * Resolves the next node based on a choice from a given node.
-     * <ul>
-     *   <li>If the node does not exist or is a final node, an error is returned.</li>
-     *   <li>If the answer is invalid or no such option exists, an error is returned.</li>
-     *   <li>Otherwise, returns the result containing the next node.</li>
-     * </ul>
+     * Processes a player choice from the given node and returns the result.
      *
-     * @param fromId ID of the current node
-     * @param answer textual choice provided by the user
-     * @return a {@link ChooseResult} describing success (with next node) or failure (with error)
+     * <p>The method determines the next node based on the provided answer,
+     * applies any node-specific logic, and encapsulates the outcome in a
+     * {@link ChooseResult} object.</p>
+     *
+     * @param fromId identifier of the current node
+     * @param answer player-provided answer or choice text
+     * @return result of the choice evaluation, including next node and status
      */
     ChooseResult choose(int fromId, String answer);
 
     /**
-     * Returns a version string that identifies the current state of the quest.
-     * <p>
-     * The format and semantics of the version are implementation-specific,
-     * but typically it is a hash or timestamp indicating content changes.
-     * </p>
+     * Returns a stable version string identifying the quest’s content version.
      *
-     * @return quest version identifier (never {@code null})
+     * <p>This is typically a hash or revision tag that can be used for
+     * consistency checks, caching, or multiplayer synchronization.</p>
+     *
+     * @return version identifier string (e.g., {@code sha256:...})
      */
     String version();
 }

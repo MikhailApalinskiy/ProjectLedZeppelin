@@ -13,28 +13,14 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 
 /**
- * Servlet filter that attaches the number of unread notifications to each request.
- * <p>
- * This filter checks the current HTTP session for a logged-in {@link User} and,
- * if present, queries the {@link NotificationRepository} for the count of unread
- * notifications. The result is then stored as a request attribute {@code "unreadCount"},
- * making it available to JSPs, templates, and downstream servlets.
- * </p>
+ * Servlet filter responsible for attaching the unread notifications count to each request.
  *
- * <h3>Responsibilities</h3>
- * <ul>
- *   <li>Initialize the {@link NotificationRepository} from servlet context.</li>
- *   <li>Skip processing for static asset requests (under {@code /assets/}).</li>
- *   <li>Retrieve the current user from the HTTP session (if any).</li>
- *   <li>Query the repository for the unread notification count.</li>
- *   <li>Expose this count as request attribute {@code "unreadCount"}.</li>
- * </ul>
+ * <p>This filter queries the {@link NotificationRepository} for the number of unread notifications
+ * belonging to the currently logged-in user and exposes that count as a request attribute
+ * named {@code "unreadCount"}. This allows JSP pages and controllers to easily display
+ * notification badges in headers or navigation bars.</p>
  *
- * <h3>Usage</h3>
- * <p>
- * Typically mapped to all dynamic requests so that JSP pages can easily render
- * a badge with the number of unread notifications in the UI.
- * </p>
+ * <p>Static assets under {@code /assets/} are skipped to avoid unnecessary database lookups.</p>
  */
 public class NotificationsBadgeFilter implements Filter {
 
@@ -42,12 +28,30 @@ public class NotificationsBadgeFilter implements Filter {
 
     private NotificationRepository repo;
 
+    /**
+     * Initializes the filter and retrieves the {@link NotificationRepository} bean from the servlet context.
+     *
+     * @param cfg filter configuration provided by the servlet container
+     */
     @Override
     public void init(FilterConfig cfg) {
         this.repo = Web.ctxBean(cfg.getServletContext(), WebConst.Ctx.NOTIFY_REPO, NotificationRepository.class);
         log.debug("NotificationsBadgeFilter initialized with repo={}", repo.getClass().getSimpleName());
     }
 
+    /**
+     * Adds an {@code unreadCount} attribute to the request for logged-in users.
+     *
+     * <p>The filter skips requests to static resources under {@code /assets/} for efficiency.
+     * For authenticated users, it retrieves the number of unread notifications and attaches
+     * it to the current request scope.</p>
+     *
+     * @param request  incoming servlet request
+     * @param response outgoing servlet response
+     * @param chain    filter chain to continue processing
+     * @throws IOException      if an I/O error occurs
+     * @throws ServletException if request forwarding fails
+     */
     @Override
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException, ServletException {
         HttpServletRequest req = (HttpServletRequest) request;

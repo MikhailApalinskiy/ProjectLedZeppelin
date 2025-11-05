@@ -1,6 +1,7 @@
 <%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
 <%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core" %>
 <%@ taglib prefix="fmt" uri="http://java.sun.com/jsp/jstl/fmt" %>
+
 <!doctype html>
 <html lang="ru">
 <head>
@@ -51,7 +52,7 @@
             <input type="text"
                    name="${PARAM_Q}"
                    value="${param[PARAM_Q]}"
-                   placeholder="Поиск по нику или ID"
+                   placeholder="Поиск по логину или ID"
                    class="input search-input"
                    autocomplete="off"/>
             <div class="actions">
@@ -91,7 +92,7 @@
                         <c:set var="canAddFriend" value="${isAuth and not isSelf}"/>
 
                         <tr>
-                            <td><span class="pill">${st.index + 1}</span></td>
+                            <td><span class="pill">${offset + st.index + 1}</span></td>
                             <td><c:out value="${u.userName}"/></td>
                             <td><code><c:out value="${u.userLogin}"/></code></td>
                             <td><code><c:out value="${u.userId}"/></code></td>
@@ -123,6 +124,43 @@
                     </c:forEach>
                     </tbody>
                 </table>
+
+                <c:if test="${pages > 1}">
+                    <nav class="pagination" aria-label="Навигация по страницам"
+                         style="margin-top: 16px; display:flex; gap:6px; flex-wrap:wrap; justify-content:center;">
+                        <c:set var="baseUrl" value="${pageContext.request.contextPath}/users"/>
+                        <c:set var="qParam" value="${empty param.q ? '' : '&q=' += param.q}"/>
+
+                        <c:choose>
+                            <c:when test="${page > 1}">
+                                <a class="btn btn-ghost" href="${baseUrl}?page=${page - 1}${qParam}">« Назад</a>
+                            </c:when>
+                            <c:otherwise>
+                                <span class="btn btn-ghost muted" aria-disabled="true">« Назад</span>
+                            </c:otherwise>
+                        </c:choose>
+
+                        <c:forEach var="p" begin="1" end="${pages}">
+                            <c:choose>
+                                <c:when test="${p == page}">
+                                    <span class="btn btn-primary" aria-current="page">${p}</span>
+                                </c:when>
+                                <c:otherwise>
+                                    <a class="btn" href="${baseUrl}?page=${p}${qParam}">${p}</a>
+                                </c:otherwise>
+                            </c:choose>
+                        </c:forEach>
+
+                        <c:choose>
+                            <c:when test="${page < pages}">
+                                <a class="btn btn-ghost" href="${baseUrl}?page=${page + 1}${qParam}">Вперёд »</a>
+                            </c:when>
+                            <c:otherwise>
+                                <span class="btn btn-ghost muted" aria-disabled="true">Вперёд »</span>
+                            </c:otherwise>
+                        </c:choose>
+                    </nav>
+                </c:if>
             </c:otherwise>
         </c:choose>
     </section>

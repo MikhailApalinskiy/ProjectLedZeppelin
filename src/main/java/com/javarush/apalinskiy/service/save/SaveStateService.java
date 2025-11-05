@@ -6,70 +6,67 @@ import java.time.Instant;
 import java.util.Optional;
 
 /**
- * Service for managing persistent save states of quests for users.
- * <p>
- * Provides access to per-user save slots, allowing storing and restoring
- * progress across quests. Each user has multiple slots that can be
- * set, retrieved, or cleared independently.
- * </p>
+ * Service interface for managing user save states and global quest slots.
  *
- * <h3>Responsibilities</h3>
- * <ul>
- *   <li>Create and manage {@link SaveState} instances per user.</li>
- *   <li>Provide access to global save slots with metadata about quest progress.</li>
- *   <li>Allow updating or clearing slots for continuing or resetting progress.</li>
- * </ul>
+ * <p>This interface provides methods for creating, retrieving, and updating
+ * persistent save data related to quest progress. It also defines accessors
+ * for global save slots that store the player’s current quest position across
+ * multiple quests.</p>
  */
 public interface SaveStateService {
 
     /**
-     * Returns the {@link SaveState} for the given user,
-     * creating a new one if none exists yet.
+     * Retrieves an existing {@link SaveState} for the specified user or creates a new one if absent.
      *
      * @param userId unique identifier of the user
-     * @return existing or newly created save state
+     * @return an existing or newly created {@link SaveState}
      */
     SaveState getOrCreate(String userId);
 
     /**
-     * A lightweight projection of a save slot with metadata.
+     * Immutable record representing a global save slot.
      *
-     * @param index     slot index (0-based or 1-based depending on usage convention)
-     * @param nodeId    ID of the last visited quest node (may be {@code null})
-     * @param title     user-defined or quest-defined title of the save
-     * @param questId   identifier of the quest this slot belongs to
-     * @param questName display name of the quest
-     * @param updatedAt timestamp when the slot was last updated
+     * <p>A global slot acts as a lightweight checkpoint linking a user to a specific
+     * quest and node. It allows quick resume functionality across different quests.</p>
+     *
+     * @param index     slot index number
+     * @param nodeId    current quest node identifier
+     * @param title     short title or label for the saved state
+     * @param questId   quest identifier
+     * @param questName human-readable quest name
+     * @param updatedAt timestamp of the last update
      */
     record GlobalSlot(int index, Integer nodeId, String title, String questId, String questName, Instant updatedAt) {
     }
 
     /**
-     * Returns the global slot for the given user and slot index, if it exists.
+     * Retrieves a global save slot for the specified user and index.
      *
      * @param userId user identifier
-     * @param slot   slot index
-     * @return optional containing the slot metadata, or empty if not found
+     * @param slot   slot index number
+     * @return optional containing the slot if found; otherwise empty
      */
     Optional<GlobalSlot> getGlobalSlot(String userId, int slot);
 
     /**
-     * Stores or updates a global slot with quest progress.
+     * Updates or creates a global save slot for the given user.
+     *
+     * <p>This method associates the specified quest, node, and title with the given slot index.</p>
      *
      * @param userId    user identifier
-     * @param slot      slot index
+     * @param slot      slot index number
      * @param questId   quest identifier
-     * @param questName quest display name
-     * @param nodeId    ID of the current quest node
-     * @param title     descriptive title for the slot
+     * @param questName quest name
+     * @param nodeId    quest node identifier
+     * @param title     human-readable title or checkpoint label
      */
     void setGlobalSlot(String userId, int slot, String questId, String questName, int nodeId, String title);
 
     /**
-     * Clears the global slot for the given user, making it empty.
+     * Clears the data stored in the specified global slot for the user.
      *
      * @param userId user identifier
-     * @param slot   slot index
+     * @param slot   slot index to clear
      */
     void clearGlobalSlot(String userId, int slot);
 }

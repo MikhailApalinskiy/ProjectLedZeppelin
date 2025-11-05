@@ -3,7 +3,6 @@ package com.javarush.apalinskiy.web.servlet;
 import com.javarush.apalinskiy.domain.user.Role;
 import com.javarush.apalinskiy.domain.user.User;
 import com.javarush.apalinskiy.domain.quest.custom.CustomQuest;
-import com.javarush.apalinskiy.service.quest.QuestAuthoringService;
 import com.javarush.apalinskiy.web.util.Web;
 import com.javarush.apalinskiy.app.WebConst;
 import jakarta.servlet.ServletException;
@@ -19,67 +18,19 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Servlet responsible for publishing quests.
- * <p>
- * Provides both the publication form (via <b>GET</b>) and handles submission (via <b>POST</b>).
- * <p>
- * Workflow:
- * <ul>
- *   <li><b>GET</b>:
- *     <ul>
- *       <li>Validates the current draft via {@link QuestAuthoringService#validateCurrentDraft()}.</li>
- *       <li>If invalid, blocks navigation and redirects back to the graph view with an error message.</li>
- *       <li>If valid, forwards to the publish JSP.</li>
- *     </ul>
- *   </li>
- *   <li><b>POST</b>:
- *     <ul>
- *       <li>If editing an existing quest (session contains {@code EDITING_QUEST_ID}), updates it directly.</li>
- *       <li>If publishing a new quest:
- *         <ul>
- *           <li>Validates quest name (non-blank, max length 100).</li>
- *           <li>If admin:
- *             <ul>
- *               <li>Publishes immediately.</li>
- *               <li>Increments user stats and notifies friends.</li>
- *             </ul>
- *           </li>
- *           <li>If not admin:
- *             <ul>
- *               <li>Submits the quest for moderation.</li>
- *             </ul>
- *           </li>
- *         </ul>
- *       </li>
- *       <li>On error, redirects back to the publish form with a descriptive error message.</li>
- *     </ul>
- *   </li>
- * </ul>
+ * Servlet responsible for handling the publication process of a quest.
  *
- * <b>Security:</b> Requires an authenticated user in the session. Role {@link Role#ADMIN}
- * grants immediate publish rights, otherwise moderation is required.
- *
- * @author Your Name
- * @since 1.0
+ * <p>Validates the current draft before allowing publication. Depending on user role,
+ * it either publishes immediately (admin) or submits the quest for moderation (regular user).</p>
  */
 public class PublishServlet extends BaseQuestAdminServlet {
 
     private static final Logger log = LoggerFactory.getLogger(PublishServlet.class);
 
     /**
-     * Handles GET requests for the publish page.
-     * <p>
-     * Behavior:
-     * <ul>
-     *   <li>Validates the current draft.</li>
-     *   <li>If invalid, prevents navigation to publish page and redirects to graph view with error.</li>
-     *   <li>If valid, copies error/ok params and forwards to {@link WebConst.Jsp#PUBLISH}.</li>
-     * </ul>
+     * Validates the current draft and forwards to the publication confirmation page.
      *
-     * @param req  current HTTP request
-     * @param resp current HTTP response
-     * @throws ServletException if forwarding to JSP fails
-     * @throws IOException      if redirect/forward fails
+     * <p>If validation fails, the user is redirected back to the editor graph view with an error message.</p>
      */
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
@@ -104,35 +55,13 @@ public class PublishServlet extends BaseQuestAdminServlet {
     }
 
     /**
-     * Handles POST requests to publish or update a quest.
-     * <p>
-     * Behavior:
-     * <ul>
-     *   <li>Resolves current user and determines if they are admin.</li>
-     *   <li>If session contains {@code EDITING_QUEST_ID}, updates the existing quest.
-     *       Admin updates trigger notifications to the quest owner.</li>
-     *   <li>If no editing id is present:
-     *     <ul>
-     *       <li>Validates quest name (not blank, ≤100 chars).</li>
-     *       <li>Admin flow:
-     *         <ul>
-     *           <li>Publishes quest immediately.</li>
-     *           <li>Increments created-quests counter.</li>
-     *           <li>Notifies friends about the publication.</li>
-     *         </ul>
-     *       </li>
-     *       <li>User flow:
-     *         <ul>
-     *           <li>Submits quest for moderation.</li>
-     *         </ul>
-     *       </li>
-     *     </ul>
-     *   </li>
-     *   <li>On validation or state errors, redirects back to publish page with an error.</li>
-     * </ul>
+     * Handles quest publication or submission for moderation.
      *
-     * @param req  current HTTP request
-     * @param resp current HTTP response
+     * <p>If the quest is being edited and has an existing ID, the changes are updated.
+     * Otherwise, a new quest is published or sent for moderation based on user role.</p>
+     *
+     * @param req  HTTP request
+     * @param resp HTTP response
      * @throws IOException if redirect fails
      */
     @Override
@@ -169,7 +98,7 @@ public class PublishServlet extends BaseQuestAdminServlet {
             if (questName.length() > 100) {
                 log.warn("Publish POST: too long quest name (len={}) byUserId={}", questName.length(), ownerId);
                 Web.redirect(req, resp, WebConst.Path.PUBLISH,
-                        Map.of(WebConst.Attr.ERROR, "The name is too long (maximum 100 characters)",
+                        Map.of(WebConst.Attr.ERROR, "The name is too long, maximum length is 50 characters",
                                 "questName", questName));
                 return;
             }

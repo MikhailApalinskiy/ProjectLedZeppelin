@@ -4,24 +4,18 @@ import java.util.Locale;
 import java.util.regex.Pattern;
 
 /**
- * Utility class for normalizing user-provided choice text.
- * <p>
- * The normalization performs the following steps:
- * <ul>
- *   <li>Replaces any sequence of whitespace characters with a single space.</li>
- *   <li>Trims leading and trailing whitespace.</li>
- *   <li>Converts the string to lowercase using {@link Locale#ROOT}.</li>
- * </ul>
+ * Utility class for normalizing player choice input in quests.
  *
- * <p>This helps to ensure consistent comparison of answers regardless of
- * user input formatting.</p>
+ * <p>This class provides a single static method {@link #normalize(String)}
+ * that trims, lowercases, and collapses multiple whitespace characters into a single space.
+ * It ensures consistent text comparison between user input and stored quest options.</p>
  *
- * <p>The class is {@code final} and cannot be instantiated.</p>
+ * <p>This class is immutable and cannot be instantiated.</p>
  */
 public final class ChoiceNormalizer {
 
     /**
-     * Regular expression pattern that matches one or more whitespace characters.
+     * Precompiled pattern that matches one or more whitespace characters.
      */
     private static final Pattern WS = Pattern.compile("\\s+");
 
@@ -29,12 +23,16 @@ public final class ChoiceNormalizer {
     }
 
     /**
-     * Normalizes the given string for reliable comparison.
+     * Normalizes a given string by:
+     * <ul>
+     *   <li>replacing multiple spaces or whitespace sequences with a single space,</li>
+     *   <li>trimming leading and trailing spaces,</li>
+     *   <li>and converting all characters to lowercase using {@link Locale#ROOT}.</li>
+     * </ul>
      *
-     * @param s the input string (may be {@code null})
-     * @return a normalized version of the string:
-     * empty string if {@code null}, otherwise lowercased,
-     * trimmed, and with collapsed whitespace
+     * @param s the raw input string (may be {@code null})
+     * @return a normalized, lowercased, and trimmed string;
+     * returns an empty string if {@code s} is {@code null}
      */
     public static String normalize(String s) {
         if (s == null) return "";

@@ -1,7 +1,7 @@
 package com.javarush.apalinskiy.web.servlet;
 
 import com.javarush.apalinskiy.domain.quest.QuestNode;
-import com.javarush.apalinskiy.repository.inmemory.quest.InMemoryQuestStore;
+import com.javarush.apalinskiy.repository.hibernate.quest.InMemoryQuestStore;
 import com.javarush.apalinskiy.service.quest.QuestAuthoringService;
 import com.javarush.apalinskiy.web.util.Web;
 import com.javarush.apalinskiy.app.WebConst;
@@ -19,32 +19,14 @@ import java.io.IOException;
 import java.util.*;
 
 /**
- * Renders an SVG preview of the quest graph currently held in the in-memory editor store.
- * <p>
- * The servlet reads nodes and start id from {@link InMemoryQuestStore} and builds a view model
- * for an SVG diagram via {@link Web#buildQuestSvgModel(HttpServletRequest, List, int, boolean)}.
- * It can optionally load a quest from the catalog into the editor (when {@code load} parameter is provided)
- * using {@link QuestAuthoringService}, and keep editor metadata in the HTTP session.
- * </p>
+ * Servlet responsible for rendering the SVG graph of the quest currently open in the editor.
  *
- * <h3>Editor session metadata</h3>
- * <ul>
- *   <li>{@link WebConst.Attr#EDITING_QUEST_ID}</li>
- *   <li>{@link WebConst.Attr#EDITING_QUEST_NAME}</li>
- * </ul>
+ * <p>It retrieves quest nodes from the in-memory repository (usually the active editor draft),
+ * constructs an SVG model using {@link Web#buildQuestSvgModel}, and forwards the result
+ * to the corresponding JSP.</p>
  *
- * <h3>GET parameters</h3>
- * <ul>
- *   <li><b>load</b> — optional quest id to load from the catalog into the editor before rendering.</li>
- * </ul>
- *
- * <h3>View</h3>
- * Forwards to {@code WebConst.Jsp.GRAPH_SVG} after populating the SVG model attributes.
- *
- * @see InMemoryQuestStore
- * @see QuestAuthoringService
- * @see WebConst
- * @see Web
+ * <p>Additionally, it supports an optional {@code load} parameter that triggers
+ * loading of a quest from the catalog into the editor context before rendering.</p>
  */
 public class GraphSvgServlet extends HttpServlet {
 
@@ -53,14 +35,10 @@ public class GraphSvgServlet extends HttpServlet {
     private InMemoryQuestStore repo;
 
     /**
-     * Resolves {@link InMemoryQuestStore} from the {@link ServletContext}.
-     * <p>
-     * The store is expected to be under {@code WebConst.Ctx.EDITOR_REPOSITORY}. If it's missing
-     * or of an unexpected type, initialization fails.
-     * </p>
+     * Initializes servlet dependencies from the application context.
      *
-     * @param config servlet config provided by the container
-     * @throws ServletException if the editor repository is absent or invalid
+     * @param config servlet configuration
+     * @throws ServletException if repository is not found in context
      */
     @Override
     public void init(ServletConfig config) throws ServletException {
@@ -76,25 +54,24 @@ public class GraphSvgServlet extends HttpServlet {
     }
 
     /**
-     * Builds and renders the SVG graph for the current editor state.
-     * <p>
-     * Flow:
-     * <ol>
-     *   <li>Copies optional flash params ({@code ERROR}, {@code OK}) to request attributes.</li>
-     *   <li>If {@code load} parameter is present and an authoring service is available in context,
-     *       loads the quest into the editor, stores {@code EDITING_QUEST_ID/NAME} in session, and sets an OK/ERROR message.</li>
-     *   <li>If no {@code load}, but {@code EDITING_QUEST_ID} exists and {@code EDITING_QUEST_NAME} is blank,
-     *       tries to backfill the name from the catalog.</li>
-     *   <li>Reads nodes/start id from the in-memory store and calls
-     *       {@link Web#buildQuestSvgModel(HttpServletRequest, List, int, boolean)} with {@code readOnly=true}.</li>
-     *   <li>Forwards to {@code WebConst.Jsp.GRAPH_SVG}.</li>
-     * </ol>
-     * </p>
+     * Renders the quest graph as SVG.
      *
-     * @param req  HTTP request (may contain {@code load})
+     * <p>Optional query parameters:</p>
+     * <ul>
+     *   <li>{@code load} — quest ID to load into the editor before rendering</li>
+     * </ul>
+     *
+     * <p>If {@code load} is specified, the servlet attempts to load the quest
+     * into the {@link QuestAuthoringService} and update the session attributes
+     * {@code EDITING_QUEST_ID} and {@code EDITING_QUEST_NAME}.</p>
+     *
+     * <p>Then it reads nodes from the editor repository and builds
+     * the SVG model using {@link Web#buildQuestSvgModel(HttpServletRequest, List, int, boolean)}.</p>
+     *
+     * @param req  HTTP request
      * @param resp HTTP response
-     * @throws ServletException if forwarding fails
-     * @throws IOException      if I/O errors occur
+     * @throws ServletException on internal forward errors
+     * @throws IOException      on I/O or redirect issues
      */
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
@@ -131,10 +108,9 @@ public class GraphSvgServlet extends HttpServlet {
     }
 
     /**
-     * Safely retrieves the current node list from the editor repository.
-     * <p>Returns an empty list if the repository throws.</p>
+     * Safely retrieves quest nodes from the in-memory repository.
      *
-     * @return non-null list of nodes (possibly empty)
+     * @return list of quest nodes or empty list if repository read fails
      */
     private List<QuestNode> safeNodes() {
         try {

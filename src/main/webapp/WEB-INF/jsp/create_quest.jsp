@@ -104,6 +104,9 @@
                             <img id="imagePreview" alt="Картинка узла"/>
                         </div>
                         <small class="muted">Поддерживаются изображения (jpg, png, webp, gif, svg и др.).</small>
+                        <small class="muted">
+                            Максимальный размер файла — до 100 МБ. Более крупные изображения не загружаются.
+                        </small>
                         <div class="callout callout--tip u-mt-10">
                             <div class="callout__icon">💡</div>
                             <div>Чтобы поменять картинку, откройте сохранённую ветку в «Паутине»</div>

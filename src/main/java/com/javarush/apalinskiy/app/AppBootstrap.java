@@ -1,25 +1,27 @@
 package com.javarush.apalinskiy.app;
 
+import com.javarush.apalinskiy.utils.CurrentUserContext;
+import com.javarush.apalinskiy.utils.CurrentUserProvider;
+import com.javarush.apalinskiy.utils.HibernateUtil;
+import com.javarush.apalinskiy.repository.hibernate.quest.HDraftRepository;
 import com.javarush.apalinskiy.repository.quest.CustomQuestRepository;
 import com.javarush.apalinskiy.repository.user.UserRepository;
 import com.javarush.apalinskiy.service.impl.notify.DefaultNotificationService;
 import com.javarush.apalinskiy.service.impl.quest.DefaultQuestService;
 import com.javarush.apalinskiy.service.impl.social.DefaultFriendService;
 import com.javarush.apalinskiy.service.impl.user.DefaultUserService;
-import com.javarush.apalinskiy.service.impl.user.InMemoryUserStatsService;
+import com.javarush.apalinskiy.service.impl.user.HUserStatsService;
 import com.javarush.apalinskiy.service.save.SaveStateService;
 import com.javarush.apalinskiy.repository.social.FriendRepository;
-import com.javarush.apalinskiy.repository.inmemory.social.InMemoryFriendRepository;
-import com.javarush.apalinskiy.repository.inmemory.quest.InMemoryCustomQuestRepository;
-import com.javarush.apalinskiy.repository.inmemory.quest.InMemoryQuestStore;
-import com.javarush.apalinskiy.service.impl.save.InMemorySaveStateService;
-import com.javarush.apalinskiy.repository.inmemory.user.InMemoryUserRepository;
-import com.javarush.apalinskiy.repository.inmemory.notify.InMemoryNotificationRepository;
+import com.javarush.apalinskiy.repository.hibernate.social.HFriendRepository;
+import com.javarush.apalinskiy.repository.hibernate.quest.HCustomQuestRepository;
+import com.javarush.apalinskiy.repository.hibernate.quest.InMemoryQuestStore;
+import com.javarush.apalinskiy.service.impl.save.HSaveStateService;
+import com.javarush.apalinskiy.repository.hibernate.user.HUserRepository;
+import com.javarush.apalinskiy.repository.hibernate.notify.HNotificationRepository;
 import com.javarush.apalinskiy.repository.notify.NotificationRepository;
-import com.javarush.apalinskiy.domain.user.Role;
 import com.javarush.apalinskiy.service.notify.NotificationService;
 import com.javarush.apalinskiy.service.social.FriendService;
-import com.javarush.apalinskiy.service.user.UserStatsService;
 import com.javarush.apalinskiy.service.quest.QuestAuthoringService;
 import com.javarush.apalinskiy.service.quest.QuestService;
 import com.javarush.apalinskiy.service.user.UserService;
@@ -27,85 +29,76 @@ import com.javarush.apalinskiy.web.util.Uploads;
 import jakarta.servlet.ServletContext;
 import jakarta.servlet.ServletContextEvent;
 import jakarta.servlet.ServletContextListener;
+import org.hibernate.SessionFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 
 /**
- * Application bootstrap listener that wires core repositories and services
- * into the {@link jakarta.servlet.ServletContext} at application startup.
- * <p>
- * Responsibilities:
+ * Initializes and shuts down the core application infrastructure for the TextQuest web platform.
+ *
+ * <p>This {@link ServletContextListener} is automatically invoked by the servlet container
+ * (e.g. Tomcat) when the application is deployed or undeployed. During startup,
+ * it prepares and registers all primary services, repositories, and utilities
+ * as context attributes in the {@link ServletContext}.</p>
+ *
+ * <p>The listener builds and wires both in-memory and Hibernate-backed repositories,
+ * sets up quest authoring and notification systems, and configures upload directories.
+ * Upon shutdown, it ensures that {@link HibernateUtil#shutdown()} is called to release
+ * all database resources.</p>
+ *
+ * <h2>Registered context attributes</h2>
  * <ul>
- *   <li>Create a default admin user (if it does not already exist).</li>
- *   <li>Load the production quest resource and expose {@code QuestService} and repositories.</li>
- *   <li>Initialize editor repository and {@code QuestAuthoringService}.</li>
- *   <li>Register save-state, notification, friend, and user-stats services.</li>
- *   <li>Resolve uploads base directory.</li>
+ *   <li>{@code WebConst.Ctx.USER_SERVICE} — {@link UserService}</li>
+ *   <li>{@code WebConst.Ctx.PROD_REPOSITORY} — {@link InMemoryQuestStore}</li>
+ *   <li>{@code WebConst.Ctx.QUEST_SERVICE} — {@link QuestService}</li>
+ *   <li>{@code WebConst.Ctx.EDITOR_REPOSITORY} — {@link InMemoryQuestStore}</li>
+ *   <li>{@code WebConst.Ctx.AUTHORING_SERVICE} — {@link QuestAuthoringService}</li>
+ *   <li>{@code WebConst.Ctx.SAVE_STATE_SERVICE} — {@link SaveStateService}</li>
+ *   <li>{@code WebConst.Ctx.NOTIFY_REPO} — {@link NotificationRepository}</li>
+ *   <li>{@code WebConst.Ctx.NOTIFY_SERVICE} — {@link NotificationService}</li>
+ *   <li>{@code WebConst.Ctx.FRIEND_REPOSITORY} — {@link FriendRepository}</li>
+ *   <li>{@code WebConst.Ctx.FRIEND_SERVICE} — {@link FriendService}</li>
+ *   <li>{@code WebConst.Ctx.USER_STATS_SERVICE} — {@link HUserStatsService}</li>
  * </ul>
- * All created components are stored under keys defined in {@code WebConst.Ctx}.
  *
- * <p><strong>Error handling:</strong> if the default admin already exists, the condition is logged
- * at WARN level and startup continues. Critical initialization failures (e.g. quest resource
- * loading or uploads directory resolution) are logged and rethrown to fail fast.</p>
+ * <h2>Lifecycle summary</h2>
+ * <ul>
+ *   <li><b>{@link #contextInitialized(ServletContextEvent)}:</b> Creates and binds all beans to the servlet context.</li>
+ *   <li><b>{@link #contextDestroyed(ServletContextEvent)}:</b> Shuts down Hibernate and logs cleanup completion.</li>
+ * </ul>
  *
- * @see WebConst.Ctx
- * @see WebConst.App
- * @see jakarta.servlet.ServletContextListener
+ * @see ServletContext
+ * @see HibernateUtil
+ * @see QuestAuthoringService
+ * @see InMemoryQuestStore
+ * @see DefaultUserService
+ * @see DefaultNotificationService
+ * @see DefaultFriendService
  */
 public class AppBootstrap implements ServletContextListener {
 
+    /**
+     * Application logger instance.
+     */
     private static final Logger log = LoggerFactory.getLogger(AppBootstrap.class);
 
     /**
-     * Initializes and registers application services in the servlet context.
+     * Called when the web application context is being initialized.
+     * <p>Registers all major application services, repositories, and supporting
+     * infrastructure components into the {@link ServletContext}.</p>
      *
-     * <p>Registers (keys from {@link WebConst.Ctx}):</p>
-     * <ul>
-     *   <li>{@code USER_SERVICE} – {@link UserService}</li>
-     *   <li>{@code PROD_REPOSITORY} – production {@code InMemoryQuestStore}</li>
-     *   <li>{@code QUEST_SERVICE} – {@code QuestService}</li>
-     *   <li>{@code EDITOR_REPOSITORY} – editor {@code InMemoryQuestStore}</li>
-     *   <li>{@code AUTHORING_SERVICE} – {@code QuestAuthoringService}</li>
-     *   <li>{@code SAVE_STATE_SERVICE} – {@code SaveStateService}</li>
-     *   <li>{@code NOTIFY_REPO} – {@code NotificationRepository}</li>
-     *   <li>{@code NOTIFY_SERVICE} – {@code NotificationService}</li>
-     *   <li>{@code FRIEND_REPOSITORY} – {@code FriendRepository}</li>
-     *   <li>{@code FRIEND_SERVICE} – {@code FriendService}</li>
-     *   <li>{@code USER_STATS_SERVICE} – {@code UserStatsService}</li>
-     * </ul>
-     *
-     * <p>Also attempts to create a default admin user using values from
-     * {@link WebConst.App#DEFAULT_ADMIN_NAME}, {@link WebConst.App#DEFAULT_ADMIN_LOGIN},
-     * and {@link WebConst.App#DEFAULT_ADMIN_PASS}.</p>
-     *
-     * @param sce the servlet context event providing access to {@link jakarta.servlet.ServletContext}
-     * @throws RuntimeException if the quest resource cannot be loaded
-     *                          or if the uploads base directory cannot be resolved
+     * @param sce the {@link ServletContextEvent} containing the servlet context
+     * @throws RuntimeException if any critical service (e.g. quest resources)
+     *                          cannot be loaded or initialized
      */
     @Override
     public void contextInitialized(ServletContextEvent sce) {
         log.info("App context initialization started");
         ServletContext ctx = sce.getServletContext();
-        UserRepository userRepo = new InMemoryUserRepository();
+        UserRepository userRepo = new HUserRepository();
         UserService userService = new DefaultUserService(userRepo);
-        try {
-            userService.register(
-                    Role.ADMIN,
-                    WebConst.App.DEFAULT_ADMIN_NAME,
-                    WebConst.App.DEFAULT_ADMIN_LOGIN,
-                    WebConst.App.DEFAULT_ADMIN_PASS
-            );
-            log.info("Default admin created login={}", WebConst.App.DEFAULT_ADMIN_LOGIN);
-        } catch (RuntimeException e) {
-            if (!"DuplicateLoginException".equals(e.getClass().getSimpleName())) {
-                log.error("Failed to register default admin login={}", WebConst.App.DEFAULT_ADMIN_LOGIN, e);
-                throw e;
-            } else {
-                log.warn("Default admin already exists login={}", WebConst.App.DEFAULT_ADMIN_LOGIN);
-            }
-        }
         ctx.setAttribute(WebConst.Ctx.USER_SERVICE, userService);
         log.debug("UserService registered in servlet context key={}", WebConst.Ctx.USER_SERVICE);
         final InMemoryQuestStore prodRepo;
@@ -128,44 +121,48 @@ public class AppBootstrap implements ServletContextListener {
                 WebConst.Ctx.PROD_REPOSITORY, WebConst.Ctx.QUEST_SERVICE);
         InMemoryQuestStore editorRepo = InMemoryQuestStore.empty(WebConst.App.QUEST_START_ID);
         ctx.setAttribute(WebConst.Ctx.EDITOR_REPOSITORY, editorRepo);
-        CustomQuestRepository catalog = new InMemoryCustomQuestRepository();
+        CustomQuestRepository catalog = new HCustomQuestRepository();
         QuestAuthoringService authoring = new QuestAuthoringService(editorRepo, prodRepo, catalog);
+        SessionFactory sf = HibernateUtil.getSessionFactory();
+        HDraftRepository draftRepo = new HDraftRepository(sf);
+        CurrentUserProvider currentUser = CurrentUserContext::require;
+        authoring.enableDrafts(draftRepo, currentUser);
         ctx.setAttribute(WebConst.Ctx.AUTHORING_SERVICE, authoring);
-        log.debug("EditorRepo and AuthoringService registered keys=[{}, {}]",
-                WebConst.Ctx.EDITOR_REPOSITORY, WebConst.Ctx.AUTHORING_SERVICE);
-        SaveStateService saveStateService = new InMemorySaveStateService();
+        log.debug("Registered: EDITOR_REPOSITORY, AUTHORING_SERVICE (drafts enabled)");
+        SaveStateService saveStateService = new HSaveStateService();
         ctx.setAttribute(WebConst.Ctx.SAVE_STATE_SERVICE, saveStateService);
-        NotificationRepository notifyRepo = new InMemoryNotificationRepository();
+        NotificationRepository notifyRepo = new HNotificationRepository();
         ctx.setAttribute(WebConst.Ctx.NOTIFY_REPO, notifyRepo);
         NotificationService notifyService = new DefaultNotificationService(notifyRepo, userService);
         ctx.setAttribute(WebConst.Ctx.NOTIFY_SERVICE, notifyService);
-        log.debug("SaveState/Notify registered keys=[{}, {}, {}]",
-                WebConst.Ctx.SAVE_STATE_SERVICE, WebConst.Ctx.NOTIFY_REPO, WebConst.Ctx.NOTIFY_SERVICE);
-        FriendRepository friendRepo = new InMemoryFriendRepository();
+        FriendRepository friendRepo = new HFriendRepository();
         ctx.setAttribute(WebConst.Ctx.FRIEND_REPOSITORY, friendRepo);
         FriendService friendService = new DefaultFriendService(friendRepo, userService, notifyService);
         ctx.setAttribute(WebConst.Ctx.FRIEND_SERVICE, friendService);
-        UserStatsService userStats = new InMemoryUserStatsService();
+        com.javarush.apalinskiy.service.user.UserStatsService userStats = new HUserStatsService();
         ctx.setAttribute(WebConst.Ctx.USER_STATS_SERVICE, userStats);
-        log.debug("Friends/UserStats registered keys=[{}, {}]",
-                WebConst.Ctx.FRIEND_REPOSITORY, WebConst.Ctx.USER_STATS_SERVICE);
+        log.debug("Registered: SAVE_STATE_SERVICE, NOTIFY_REPO, NOTIFY_SERVICE, FRIEND_REPOSITORY, FRIEND_SERVICE, USER_STATS_SERVICE");
         try {
             Uploads.resolveBaseDir(ctx);
-            log.info("Uploads base directory resolved");
+            log.info("Uploads base dir resolved");
         } catch (RuntimeException e) {
-            log.error("Failed to resolve uploads base directory", e);
+            log.error("Uploads base dir resolve failed", e);
             throw e;
         }
-        log.info("App context initialization finished successfully");
+        log.info("App context init: done");
     }
 
     /**
-     * Logs that the application context is being destroyed.
+     * Called when the web application context is about to be destroyed.
+     * <p>Ensures that Hibernate is properly shut down and all allocated
+     * resources are released before the application stops.</p>
      *
-     * @param sce the servlet context event
+     * @param sce the {@link ServletContextEvent} associated with this shutdown
      */
     @Override
     public void contextDestroyed(ServletContextEvent sce) {
+        log.info("App context destroy: shutting down Hibernate");
+        HibernateUtil.shutdown();
         log.info("App context is being destroyed");
     }
 }

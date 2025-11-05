@@ -19,57 +19,26 @@ import java.io.IOException;
 import java.util.*;
 
 /**
- * Servlet responsible for displaying quests owned by the currently authenticated user.
- * <p>
- * Provides a personalized view into the quest catalog, listing only the quests
- * created by the user. The list is enriched with owner display names and
- * forwarded to the shared JSP for rendering.
- * <p>
- * <b>Initialization:</b><br>
- * Requires {@link QuestAuthoringService} and {@link UserService} to be present
- * in the servlet context. If either is missing, the servlet is marked unavailable.
- * <p>
- * <b>GET:</b><br>
- * Displays all quests owned by the logged-in user. Anonymous access is denied
- * and redirected to the login page.
- * <p>
- * Request attributes set for the view:
- * <ul>
- *   <li>{@code pageTitleKey} = "my.quests"</li>
- *   <li>{@code showOwnerActions} = true (so that edit/delete actions are visible)</li>
- *   <li>{@code selfUrl} = current servlet URL</li>
- * </ul>
+ * Servlet responsible for displaying the list of quests created by the current user.
  *
- * @author Your Name
- * @since 1.0
+ * <p>Accessible only to authenticated users. Retrieves paged results from
+ * {@link QuestAuthoringService} and applies pagination parameters
+ * via {@link Web#applyPagedList}.</p>
+ *
+ * <p>Forwards the result to the standard quest list JSP view.</p>
  */
 public class MyCustomQuestsServlet extends HttpServlet {
 
     private static final Logger log = LoggerFactory.getLogger(MyCustomQuestsServlet.class);
 
-    /**
-     * Provides access to quest catalog operations.
-     */
     private QuestAuthoringService authoring;
-
-    /**
-     * Provides user lookup for attaching owner names to quests.
-     */
     private UserService userService;
 
     /**
-     * Initializes backend services from the servlet context.
-     * <p>
-     * Required:
-     * <ul>
-     *   <li>{@link QuestAuthoringService}</li>
-     *   <li>{@link UserService}</li>
-     * </ul>
-     * If either service is missing, the servlet is marked unavailable.
+     * Initializes required services from the servlet context.
      *
      * @param config servlet configuration
-     * @throws ServletException     if superclass initialization fails
-     * @throws UnavailableException if required services are not found
+     * @throws ServletException if required beans are missing
      */
     @Override
     public void init(ServletConfig config) throws ServletException {
@@ -85,45 +54,35 @@ public class MyCustomQuestsServlet extends HttpServlet {
     }
 
     /**
-     * Handles GET requests by displaying the list of quests owned by the current user.
-     * <p>
-     * Behavior:
-     * <ul>
-     *   <li>Checks session for {@link User}; redirects to login if absent.</li>
-     *   <li>Pulls flash and error messages from the request/session.</li>
-     *   <li>Retrieves quests owned by the current user from {@code authoring}.</li>
-     *   <li>Attaches owner names to quests via {@code userService}.</li>
-     *   <li>Logs the number of items retrieved.</li>
-     *   <li>Applies filtering and attaches quests using
-     *       {@link Web#filterAndAttachQuests(HttpServletRequest, List)}.</li>
-     *   <li>Sets view attributes: {@code pageTitleKey}, {@code showOwnerActions}, {@code selfUrl}.</li>
-     *   <li>Forwards to {@link WebConst.Jsp#QUESTS_LIST}.</li>
-     * </ul>
+     * Displays a paginated list of quests belonging to the current user.
      *
-     * @param req  current HTTP request
-     * @param resp current HTTP response
-     * @throws ServletException if forwarding fails
-     * @throws IOException      if forwarding or redirect fails
+     * <p>If the user is not authenticated, redirects to the login page.</p>
+     *
+     * @param req  HTTP request
+     * @param resp HTTP response
+     * @throws ServletException on forward errors
+     * @throws IOException      on redirect or I/O failure
      */
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp)
             throws ServletException, IOException {
-        User user = (User) req.getSession().getAttribute(WebConst.Attr.USER);
-        if (user == null) {
-            log.warn("Unauthorized access attempt to my quests, redirecting to login");
+        User me = (User) req.getSession().getAttribute(WebConst.Attr.USER);
+        if (me == null) {
+            log.warn("Unauthorized access to my quests -> redirect to login");
             Web.redirect(req, resp, WebConst.Path.LOGIN, Map.of());
             return;
         }
         Web.pullFlash(req, WebConst.Attr.FLASH);
         Web.pullFlash(req, WebConst.Attr.ERROR);
-        List<CustomQuest> items = authoring.listOwnerFromCatalog(user.getUserId());
-        Web.attachOwnerNamesById(req, items, userService);
-        log.info("User {} (id={}) requested their quests, found {} item(s)",
-                user.getUserLogin(), user.getUserId(), items.size());
-        Web.filterAndAttachQuests(req, items);
+        Web.Params params = Web.extract(req);
+        QuestAuthoringService.Paged<CustomQuest> paged =
+                authoring.listOwnerFromCatalogPaged(me.getUserId(), params.q, params.page, params.size, true);
+        Web.applyPagedList(req, paged, userService, params.q);
         req.setAttribute("pageTitleKey", "my.quests");
         req.setAttribute("showOwnerActions", Boolean.TRUE);
         req.setAttribute("selfUrl", req.getContextPath() + req.getServletPath());
+        log.info("My quests paged: userId={} q='{}' page={}/{} total={}",
+                me.getUserId(), params.q, paged.getPage(), paged.getPages(), paged.getTotal());
         Web.forward(req, resp, WebConst.Jsp.QUESTS_LIST);
     }
 }

@@ -7,62 +7,48 @@ import com.javarush.apalinskiy.domain.quest.QuestNode;
 import java.util.*;
 
 /**
- * Index structure for resolving the next node in a quest
- * based on a player's normalized answer.
- * <p>
- * Internally maintains a map of keys in the form
- * {@code "fromNodeId:normalizedAnswer"} → {@code nextNodeId}.
- * <br/>
- * The index is immutable and built from a list of {@link QuestNode}.
- * </p>
+ * Immutable index that maps normalized player answers to quest node transitions.
  *
- * <h3>Responsibilities</h3>
- * <ul>
- *   <li>Builds a lookup map from {@link QuestNode} options using {@link #from(List)}.</li>
- *   <li>Resolves the next node ID from a given node and user input via {@link #nextId(int, String)}.</li>
- *   <li>Ensures no duplicate normalized answers exist within the same node,
- *       otherwise throws {@link IllegalStateException}.</li>
- * </ul>
+ * <p>{@code QuestChoiceIndex} is a precomputed lookup table that associates each
+ * normalized player answer (choice text) with the corresponding next node ID.
+ * It allows fast and deterministic resolution of quest navigation based on user input.</p>
  *
- * <h3>Normalization</h3>
- * User input is normalized using {@link ChoiceNormalizer#normalize(String)}
- * before lookup, so answers differing only in case/spacing are treated as equal.
+ * <p>The index is built once from a list of {@link QuestNode} objects and their
+ * {@link Option} definitions using {@link #from(List)}.
+ * All choice keys are normalized using {@link ChoiceNormalizer} to ensure
+ * consistent matching regardless of case or whitespace differences.</p>
+ *
+ * <p>This class is immutable and thread-safe.</p>
  */
 public final class QuestChoiceIndex {
 
     /**
-     * Immutable mapping of "fromNodeId:normalizedAnswer" → nextNodeId.
+     * Map of normalized choice keys ("fromId:normalizedAnswer") to target node IDs.
      */
     private final Map<String, Integer> jump;
 
-    /**
-     * Constructs a new immutable {@code QuestChoiceIndex}.
-     *
-     * @param jump prebuilt choice map
-     */
     private QuestChoiceIndex(Map<String, Integer> jump) {
         this.jump = Map.copyOf(jump);
     }
 
     /**
-     * Builds a {@code QuestChoiceIndex} from a list of quest nodes.
-     * <p>
-     * Iterates through all {@link QuestNode#getOptions()} of each node,
-     * mapping the normalized choice text to the option's next node ID.
-     * </p>
+     * Builds a new {@code QuestChoiceIndex} from a list of quest nodes.
      *
-     * @param nodes list of quest nodes (non-null)
-     * @return new immutable {@code QuestChoiceIndex}
-     * @throws NullPointerException  if {@code nodes} is null
-     * @throws IllegalStateException if duplicate normalized answers are found
-     *                               within the same node
+     * <p>For each node and its {@link Option} list, this method extracts
+     * the normalized choice text and associates it with the next node ID.
+     * Duplicate normalized choices within the same node cause an {@link IllegalStateException}.</p>
+     *
+     * @param nodes list of quest nodes to process (must not be {@code null})
+     * @return a fully constructed, immutable {@code QuestChoiceIndex}
+     * @throws IllegalStateException if duplicate normalized choices are found within a node
+     * @throws NullPointerException  if {@code nodes} is {@code null}
      */
     public static QuestChoiceIndex from(List<QuestNode> nodes) {
         Objects.requireNonNull(nodes, "nodes");
         Map<String, Integer> m = new HashMap<>();
         for (QuestNode from : nodes) {
             for (Option o : from.getOptions()) {
-                Integer next = o.next();
+                Integer next = o.getNext();
                 if (next == null) {
                     continue;
                 }
@@ -70,7 +56,7 @@ public final class QuestChoiceIndex {
                 Integer prev = m.put(key, next);
                 if (prev != null) {
                     throw new IllegalStateException(
-                            "Duplicate choice in node #" + from.getId() + " for answer: '" + o.choice() + "'"
+                            "Duplicate choice in node #" + from.getId() + " for answer: '" + o.getChoice() + "'"
                     );
                 }
             }
@@ -79,11 +65,14 @@ public final class QuestChoiceIndex {
     }
 
     /**
-     * Resolves the ID of the next node given a starting node and user input.
+     * Resolves the next node ID based on the player's current node and answer.
+     *
+     * <p>The input answer is normalized via {@link ChoiceNormalizer#normalize(String)}
+     * before lookup. If no matching choice exists, this method returns {@code null}.</p>
      *
      * @param fromId     ID of the current node
-     * @param userAnswer raw user input answer (may be null or empty)
-     * @return the ID of the next node, or {@code null} if no matching option exists
+     * @param userAnswer raw user input (may be unnormalized)
+     * @return the next node ID, or {@code null} if no match is found
      */
     public Integer nextId(int fromId, String userAnswer) {
         String norm = ChoiceNormalizer.normalize(userAnswer);
@@ -91,11 +80,11 @@ public final class QuestChoiceIndex {
     }
 
     /**
-     * Creates a unique key for mapping a choice in a node.
+     * Constructs a unique key for the given node ID and normalized answer.
      *
      * @param fromId     ID of the current node
-     * @param normAnswer normalized user answer
-     * @return concatenated map key
+     * @param normAnswer normalized answer text
+     * @return composite key in the format {@code "<fromId>:<normAnswer>"}
      */
     private static String key(int fromId, String normAnswer) {
         return fromId + ":" + normAnswer;

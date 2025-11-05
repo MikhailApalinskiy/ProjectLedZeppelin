@@ -1,0 +1,136 @@
+databaseChangeLog:
+  - changeSet:
+      id: testdata-001-users
+      author: misha
+      context: test
+      changes:
+        - insert:
+            tableName: users
+            columns:
+              - column: { name: user_id,   value: "11111111-2222-3333-4444-555555555555" }
+              - column: { name: role,       value: "ADMIN" }
+              - column: { name: user_name,  value: "Misha Admin" }
+              - column: { name: user_login, value: "admin" }
+              - column: { name: password,   value: "test" }  # если нужен хэш — подставь хэш
+        - insert:
+            tableName: users
+            columns:
+              - column: { name: user_id,   value: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee" }
+              - column: { name: role,       value: "USER" }
+              - column: { name: user_name,  value: "Alice User" }
+              - column: { name: user_login, value: "alice" }
+              - column: { name: password,   value: "test" }
+  - changeSet:
+      id: testdata-002-user-stats
+      author: misha
+      context: test
+      changes:
+        - insert:
+            tableName: user_stats
+            columns:
+              - column: { name: user_stats_id,    valueNumeric: 1 }
+              - column: { name: quests_created,   valueNumeric: 1 }
+              - column: { name: quests_completed, valueNumeric: 0 }
+              - column: { name: endings_unlocked, valueNumeric: 0 }
+              - column: { name: user_id,          value: "11111111-2222-3333-4444-555555555555" }
+        - insert:
+            tableName: user_stats
+            columns:
+              - column: { name: user_stats_id,    valueNumeric: 2 }
+              - column: { name: quests_created,   valueNumeric: 0 }
+              - column: { name: quests_completed, valueNumeric: 0 }
+              - column: { name: endings_unlocked, valueNumeric: 0 }
+              - column: { name: user_id,          value: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee" }
+  - changeSet:
+      id: testdata-003-quest
+      author: misha
+      context: test
+      changes:
+        - insert:
+            tableName: custom_quests
+            columns:
+              - column: { name: quest_id,           value: "99999999-1111-2222-3333-444444444444" }
+              - column: { name: name,               value: "Demo Quest" }
+              - column: { name: start_id,           valueNumeric: 1 }
+              - column: { name: moderation_status,  value: "APPROVED" }
+              - column: { name: version,            value: "v1" }
+              - column: { name: user_id,            value: "11111111-2222-3333-4444-555555555555" }
+        - insert:
+            tableName: quest_nodes
+            columns:
+              - column: { name: db_quest_node_id, valueNumeric: 1001 }
+              - column: { name: quest_node_id,    valueNumeric: 1 }
+              - column: { name: text,             value: "Вы в начале пути." }
+              - column: { name: fin,              valueBoolean: false }
+              - column: { name: quest_id,         value: "99999999-1111-2222-3333-444444444444" }
+        - insert:
+            tableName: quest_nodes
+            columns:
+              - column: { name: db_quest_node_id, valueNumeric: 1002 }
+              - column: { name: quest_node_id,    valueNumeric: 2 }
+              - column: { name: text,             value: "Финал! Поздравляем." }
+              - column: { name: fin,              valueBoolean: true }
+              - column: { name: quest_id,         value: "99999999-1111-2222-3333-444444444444" }
+        - insert:
+            tableName: options
+            columns:
+              - column: { name: choice_id,        valueNumeric: 2001 }
+              - column: { name: choice,           value: "Идти дальше" }
+              - column: { name: next,             valueNumeric: 2 }
+              - column: { name: quest_node_db_id, valueNumeric: 1001 }
+        - sql:
+            splitStatements: false
+            sql: |
+              SELECT setval(pg_get_serial_sequence('quest_nodes','db_quest_node_id'),
+                            GREATEST((SELECT COALESCE(MAX(db_quest_node_id),0) FROM quest_nodes),1), true);
+              SELECT setval(pg_get_serial_sequence('options','choice_id'),
+                            GREATEST((SELECT COALESCE(MAX(choice_id),0) FROM options),1), true);
+  - changeSet:
+      id: testdata-004-friends-notify
+      author: misha
+      context: test
+      changes:
+        - insert:
+            tableName: friend_requests
+            columns:
+              - column: { name: friend_request_id, value: "00000000-0000-0000-0000-000000000001" }
+              - column: { name: from_user_id,      value: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee" }
+              - column: { name: to_user_id,        value: "11111111-2222-3333-4444-555555555555" }
+              - column: { name: status,            value: "PENDING" }
+
+        - insert:
+            tableName: user_friends
+            columns:
+              - column: { name: user_id,   value: "11111111-2222-3333-4444-555555555555" }
+              - column: { name: friend_id, value: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee" }
+
+        - insert:
+            tableName: notifications
+            columns:
+              - column: { name: notification_id, value: "00000000-0000-0000-0000-000000000101" }
+              - column: { name: user_id,         value: "11111111-2222-3333-4444-555555555555" }
+              - column: { name: type,            value: "INFO" }
+              - column: { name: title,           value: "Добро пожаловать!" }
+              - column: { name: body,            value: "Тестовые данные успешно загружены." }
+              - column: { name: is_read,         valueBoolean: false }
+  - changeSet:
+      id: testdata-005-save-states
+      author: misha
+      context: test
+      changes:
+        - insert:
+            tableName: save_states
+            columns:
+              - column: { name: user_id,    value: "11111111-2222-3333-4444-555555555555" }
+              - column: { name: slot_count, valueNumeric: 10 }
+              - column: { name: version,    valueNumeric: 3 }
+
+        - insert:
+            tableName: save_state_global_slots
+            columns:
+              - column: { name: user_id,    value: "11111111-2222-3333-4444-555555555555" }
+              - column: { name: slot_index, valueNumeric: 0 }
+              - column: { name: quest_id,   value: "99999999-1111-2222-3333-444444444444" }
+              - column: { name: quest_name, value: "Demo Quest" }
+              - column: { name: node_id,    valueNumeric: 1 }
+              - column: { name: title,      value: "Старт" }

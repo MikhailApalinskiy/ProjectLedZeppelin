@@ -34,3 +34,7 @@ build/
 
 ### Mac OS ###
 .DS_Store
+
+### Liquibase ###
+liquibase-dev.properties
+liquibase-*.log

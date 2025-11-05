@@ -1,79 +1,69 @@
 package com.javarush.apalinskiy.repository.quest;
 
 import com.javarush.apalinskiy.domain.quest.QuestNode;
-import com.javarush.apalinskiy.domain.quest.choice.ChoiceNormalizer;
 
 import java.util.List;
 import java.util.Optional;
 
 /**
- * Read-only view of a quest repository.
- * <p>
- * Provides access to the quest structure (nodes, start node, navigation),
- * but does not allow modification. Implementations may represent either:
- * <ul>
- *   <li>a published quest (immutable, used in production runtime), or</li>
- *   <li>a snapshot of a draft (read-only representation).</li>
- * </ul>
- * </p>
+ * Represents a read-only quest data store that provides access
+ * to a fully constructed quest graph and its navigation logic.
  *
- * <h3>Contract</h3>
- * <ul>
- *   <li>All node IDs must be unique within a store.</li>
- *   <li>{@link #start()} must return a valid, non-null start node
- *       if the store is initialized, otherwise may return {@code null}.</li>
- *   <li>{@link #choose(int, String)} must respect {@link ChoiceNormalizer} rules
- *       when matching user answers to options.</li>
- * </ul>
+ * <p>Implementations may represent immutable quest states — such as
+ * published quests, in-memory parsed JSON quests, or deserialized
+ * database entities. The {@code QuestStore} interface exposes
+ * only read and navigation operations, without allowing modification.</p>
+ *
+ * <p>See {@link com.javarush.apalinskiy.repository.quest.QuestDraftStore}
+ * for a mutable variant used in quest editing.</p>
  */
 public interface QuestStore {
 
     /**
-     * Returns the version identifier of the current quest snapshot.
-     * <p>
-     * Implementations may use semantic versioning, timestamps, or
-     * hash-based identifiers (e.g., SHA-256).
-     * </p>
+     * Returns the current version identifier of this quest store.
+     * <p>The version can be a hash, timestamp, or symbolic label that
+     * indicates the data’s revision for caching or synchronization purposes.</p>
      *
-     * @return version string (never {@code null})
+     * @return version string, never {@code null}
      */
     String version();
 
     /**
-     * Returns the start node of the quest.
+     * Returns the starting node of the quest.
      *
-     * @return start node, or {@code null} if the store is empty
+     * @return the start node, or {@code null} if the store is empty
      */
     QuestNode start();
 
     /**
-     * Returns the node with the given ID, or {@code null} if not found.
+     * Retrieves a quest node by its unique ID.
      *
-     * @param id quest node ID
-     * @return quest node, or {@code null} if not found
+     * @param id node identifier
+     * @return the corresponding node, or {@code null} if not found
      */
     QuestNode get(int id);
 
     /**
-     * Chooses the next node based on the current node ID and user answer.
+     * Resolves the next node based on the provided answer from a given node.
      *
-     * @param fromId current node ID
-     * @param answer raw user input
-     * @return optional containing the next node, or empty if no match found
+     * @param fromId ID of the current node
+     * @param answer player's chosen answer text
+     * @return optional next node if the answer is valid
      */
     Optional<QuestNode> choose(int fromId, String answer);
 
     /**
-     * Returns the ID of the start node.
+     * Returns the ID of the quest's starting node.
      *
      * @return start node ID
      */
     int startId();
 
     /**
-     * Returns an immutable list of all quest nodes in this store.
+     * Returns all nodes currently contained in this quest store.
+     * <p>The order of nodes is not guaranteed unless specified by implementation.</p>
      *
-     * @return list of nodes (never {@code null})
+     * @return list of all quest nodes; never {@code null}
      */
     List<QuestNode> nodes();
 }

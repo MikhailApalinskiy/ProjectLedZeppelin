@@ -5,49 +5,38 @@ import com.javarush.apalinskiy.domain.quest.QuestNode;
 import java.util.*;
 
 /**
- * Immutable index for fast lookup of {@link QuestNode} instances by ID.
- * <p>
- * This index is built once from a list of nodes and provides efficient
- * access by node ID, validation of duplicates, and convenient helpers.
- * </p>
+ * Immutable index that maps quest node identifiers to their corresponding {@link QuestNode} instances.
  *
- * <h3>Responsibilities</h3>
- * <ul>
- *   <li>Ensures all nodes have unique IDs at construction time.</li>
- *   <li>Provides safe and unsafe lookup methods ({@link #get(int)} vs {@link #require(int)}).</li>
- *   <li>Exposes the total number of nodes and all registered IDs.</li>
- * </ul>
+ * <p>{@code QuestIdIndex} provides fast lookup and validation of quest nodes by ID.
+ * It is typically constructed once from a list of nodes when loading or parsing
+ * a quest definition and remains immutable afterward.</p>
  *
- * <h3>Immutability</h3>
- * The internal map is defensively copied and wrapped in an unmodifiable
- * view; the index cannot be modified after creation.
+ * <p>This class ensures data integrity by preventing duplicate node IDs
+ * and offers convenience methods to retrieve, validate, and iterate through nodes.</p>
+ *
+ * <p>This class is thread-safe and designed for concurrent read access.</p>
  */
 public final class QuestIdIndex {
 
     /**
-     * Immutable mapping of node ID → node.
+     * Immutable mapping of node IDs to their corresponding quest nodes.
      */
     private final Map<Integer, QuestNode> byId;
 
-    /**
-     * Constructs a new immutable {@code QuestIdIndex}.
-     *
-     * @param byId prebuilt mapping of node IDs to nodes
-     */
     private QuestIdIndex(Map<Integer, QuestNode> byId) {
         this.byId = Map.copyOf(byId);
     }
 
     /**
-     * Builds a {@code QuestIdIndex} from a list of nodes.
-     * <p>
-     * Validates that all nodes are non-null and have unique IDs.
-     * </p>
+     * Builds a {@code QuestIdIndex} from a list of quest nodes.
      *
-     * @param nodes list of quest nodes (non-null, elements non-null)
-     * @return new immutable {@code QuestIdIndex}
-     * @throws NullPointerException  if {@code nodes} or any element is {@code null}
-     * @throws IllegalStateException if duplicate node IDs are found
+     * <p>Ensures that all node IDs are unique and non-null. If any duplicate
+     * IDs are found, an {@link IllegalStateException} is thrown.</p>
+     *
+     * @param nodes list of quest nodes (must not be {@code null})
+     * @return a fully initialized, immutable {@code QuestIdIndex}
+     * @throws NullPointerException  if {@code nodes} or any node in the list is {@code null}
+     * @throws IllegalStateException if duplicate node IDs are detected
      */
     public static QuestIdIndex from(List<QuestNode> nodes) {
         Objects.requireNonNull(nodes, "nodes");
@@ -63,21 +52,21 @@ public final class QuestIdIndex {
     }
 
     /**
-     * Returns the quest node with the given ID, or {@code null} if not found.
+     * Retrieves a quest node by its unique ID.
      *
-     * @param id node ID
-     * @return the {@link QuestNode}, or {@code null} if not present
+     * @param id the ID of the node
+     * @return the corresponding {@link QuestNode}, or {@code null} if not found
      */
     public QuestNode get(int id) {
         return byId.get(id);
     }
 
     /**
-     * Returns the quest node with the given ID, throwing if not found.
+     * Retrieves a quest node by ID, throwing an exception if not found.
      *
-     * @param id node ID
-     * @return the {@link QuestNode}, never {@code null}
-     * @throws IllegalArgumentException if the node ID is not present
+     * @param id the ID of the node to retrieve
+     * @return the corresponding {@link QuestNode}
+     * @throws IllegalArgumentException if no node with the given ID exists
      */
     public QuestNode require(int id) {
         QuestNode n = byId.get(id);
@@ -88,18 +77,18 @@ public final class QuestIdIndex {
     }
 
     /**
-     * Returns the number of nodes in this index.
+     * Returns the total number of nodes indexed.
      *
-     * @return total size of the index
+     * @return the count of indexed quest nodes
      */
     public int size() {
         return byId.size();
     }
 
     /**
-     * Returns an unmodifiable view of all node IDs.
+     * Returns an unmodifiable view of all node IDs contained in this index.
      *
-     * @return unmodifiable set of node IDs
+     * @return immutable set of all node identifiers
      */
     public Set<Integer> allIds() {
         return Collections.unmodifiableSet(byId.keySet());

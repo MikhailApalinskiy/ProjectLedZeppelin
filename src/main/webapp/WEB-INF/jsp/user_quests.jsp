@@ -9,9 +9,7 @@
 <c:set var="PATH_DELETE" value="/quest/delete"/>
 <c:set var="PATH_USER" value="/user"/>
 
-<c:set var="KEY_TITLE" value="user.quests"/>
 <c:set var="DATE_FMT" value="dd.MM.yyyy HH:mm"/>
-
 <c:set var="PARAM_ID" value="id"/>
 
 <!doctype html>
@@ -24,21 +22,16 @@
     <c:url var="cssList" value="/assets/css/quests-list.css"/>
     <link rel="stylesheet" href="${cssMain}"/>
     <link rel="stylesheet" href="${cssList}"/>
-
-    <c:url var="homeUrl" value="${PATH_HOME}"/>
-    <c:url var="deleteUrl" value="${PATH_DELETE}"/>
 </head>
 <body class="page-quests">
 
-<c:set var="u" value="${empty viewUser ? user : viewUser}"/>
+<c:set var="u" value="${viewUser}"/>
 
 <c:set var="ROLE_ADMIN" value="ADMIN"/>
 <c:set var="me" value="${sessionScope.user}"/>
 <c:set var="isAuth" value="${not empty me}"/>
 <c:set var="isAdmin" value="${isAuth and me.role eq ROLE_ADMIN}"/>
 <c:set var="isOwner" value="${isAuth and not empty u and me.userId eq u.userId}"/>
-<c:set var="selfUrl"
-       value="${pageContext.request.contextPath}${pageContext.request.servletPath}?${PARAM_ID}=${u.userId}"/>
 
 <main class="container fade-in" role="main">
     <article class="card" aria-labelledby="pageTitle">
@@ -53,7 +46,9 @@
                 </c:choose>
             </h1>
             <nav class="header-actions" aria-label="Действия">
+                <c:url var="homeUrl" value="${PATH_HOME}"/>
                 <a class="btn btn-ghost" href="${homeUrl}">На главную</a>
+
                 <c:if test="${not empty u}">
                     <c:url var="userProfileUrl" value="${PATH_USER}">
                         <c:param name="${PARAM_ID}" value="${u.userId}"/>
@@ -65,6 +60,35 @@
 
         <section class="card-body">
             <%@ include file="/WEB-INF/jsp/fragments/alerts.jspf" %>
+
+            <form method="get"
+                  action="${selfPathOnly}"
+                  class="ql-search"
+                  role="search"
+                  aria-label="Поиск квестов по названию">
+                <input type="hidden" name="id" value="${u.userId}"/>
+                <input type="text"
+                       name="q"
+                       value="${fn:escapeXml(param.q)}"
+                       placeholder="Поиск по названию"
+                       class="input ql-search__input"
+                       autocomplete="off"/>
+                <div class="actions">
+                    <button type="submit" class="btn btn-primary">Искать</button>
+                    <c:if test="${not empty param.q}">
+                        <c:url var="resetUrl" value="${selfPathOnly}">
+                            <c:param name="id" value="${u.userId}"/>
+                        </c:url>
+                        <a class="btn btn-ghost" href="${resetUrl}">Сбросить</a>
+                    </c:if>
+                </div>
+            </form>
+
+            <c:if test="${not empty param.q}">
+                <p class="notice" style="margin-top:10px">
+                    Запрос: «<strong><c:out value="${param.q}"/></strong>»
+                </p>
+            </c:if>
 
             <c:choose>
                 <c:when test="${empty items}">
@@ -78,10 +102,23 @@
                                     <h2 id="q-${q.id}-title" class="ql-name">
                                         <c:out value="${q.name}"/>
                                     </h2>
-                                    <span class="ql-badge <c:out value='${q.published ? "ok" : "muted"}'/>">
+
+                                    <c:set var="isLive" value="${q.moderationStatus eq 'LIVE'}"/>
+                                    <c:set var="isPending"
+                                           value="${q.moderationStatus eq 'PENDING_NEW' or q.moderationStatus eq 'PENDING_EDIT'}"/>
+                                    <c:set var="isRejected" value="${q.moderationStatus eq 'REJECTED'}"/>
+                                    <c:set var="isArchived" value="${q.moderationStatus eq 'ARCHIVED'}"/>
+
+                                    <span class="ql-badge
+                                        ${isLive ? 'ok' :
+                                        (isPending ? 'warn' :
+                                        (isRejected ? 'danger' : 'muted'))}">
                                         <c:choose>
-                                            <c:when test="${q.published}">Опубликован</c:when>
-                                            <c:otherwise>Черновик</c:otherwise>
+                                            <c:when test="${isLive}">Опубликован</c:when>
+                                            <c:when test="${isPending}">На модерации</c:when>
+                                            <c:when test="${isRejected}">Отклонён</c:when>
+                                            <c:when test="${isArchived}">Архив</c:when>
+                                            <c:otherwise>Неизвестно</c:otherwise>
                                         </c:choose>
                                     </span>
                                 </header>
@@ -89,26 +126,32 @@
                                 <p class="ql-meta">
                                     <c:set var="__ownerName" value="${ownerNameById[q.ownerId]}"/>
                                     <span class="ql-meta-item">
-                                        Автор: <strong><c:out value="${empty __ownerName ? q.ownerId : __ownerName}"/></strong>
+                                        Автор:
+                                        <strong><c:out value="${empty __ownerName ? q.ownerId : __ownerName}"/></strong>
                                     </span>
                                     <span class="ql-dot" aria-hidden="true">·</span>
-                                    <span class="ql-meta-item">Узлов: <strong><c:out
-                                            value="${fn:length(q.nodes)}"/></strong></span>
+                                    <span class="ql-meta-item">Узлов:
+                                        <strong>
+                                            <c:out value="${fn:length(q.nodes)}"/>
+                                        </strong>
+                                    </span>
                                     <span class="ql-dot" aria-hidden="true">·</span>
-                                    <span class="ql-meta-item">Стартовый узел: <strong>#<c:out
-                                            value="${q.startId}"/></strong></span>
+                                    <span class="ql-meta-item">Стартовый узел:
+                                        <strong>#<c:out value="${q.startId}"/></strong>
+                                    </span>
                                 </p>
 
                                 <p class="ql-dates">
                                     <c:if test="${not empty createdMap[q.id]}">
                                         <span class="ql-date">
-                                            Создан: <fmt:formatDate value="${createdMap[q.id]}" pattern="${DATE_FMT}"/>
+                                            Создан:
+                                            <fmt:formatDate value="${createdMap[q.id]}" pattern="${DATE_FMT}"/>
                                         </span>
                                     </c:if>
                                     <c:if test="${not empty updatedMap[q.id]}">
                                         <span class="ql-date">
-                                            Обновлён: <fmt:formatDate value="${updatedMap[q.id]}"
-                                                                      pattern="${DATE_FMT}"/>
+                                            Обновлён:
+                                            <fmt:formatDate value="${updatedMap[q.id]}" pattern="${DATE_FMT}"/>
                                         </span>
                                     </c:if>
                                 </p>
@@ -125,9 +168,19 @@
                                         </c:url>
                                         <a class="btn" href="${editUrl}">Редактировать</a>
 
+                                        <c:url var="delNext" value="${selfPathOnly}">
+                                            <c:param name="id" value="${u.userId}"/>
+                                            <c:if test="${not empty param.q}">
+                                                <c:param name="q" value="${param.q}"/>
+                                            </c:if>
+                                            <c:if test="${page > 1}">
+                                                <c:param name="page" value="${page}"/>
+                                            </c:if>
+                                        </c:url>
+                                        <c:url var="deleteUrl" value="${PATH_DELETE}"/>
                                         <form method="post" action="${deleteUrl}" class="ql-delform">
                                             <input type="hidden" name="id" value="${q.id}"/>
-                                            <input type="hidden" name="next" value="${selfUrl}"/>
+                                            <input type="hidden" name="next" value="${delNext}"/>
                                             <button type="submit" class="btn btn-danger">Удалить</button>
                                         </form>
                                     </c:if>
@@ -135,6 +188,65 @@
                             </article>
                         </c:forEach>
                     </div>
+
+                    <c:if test="${pages > 1}">
+                        <nav class="pagination"
+                             aria-label="Навигация по страницам"
+                             style="margin-top:16px; display:flex; gap:6px; flex-wrap:wrap; justify-content:center;">
+
+                            <c:choose>
+                                <c:when test="${page > 1}">
+                                    <c:url var="prevUrl" value="${selfPathOnly}">
+                                        <c:param name="id" value="${viewUserId}"/>
+                                        <c:param name="page" value="${page - 1}"/>
+                                        <c:if test="${not empty param.q}">
+                                            <c:param name="q" value="${param.q}"/>
+                                        </c:if>
+                                    </c:url>
+                                    <a class="btn btn-ghost" href="${prevUrl}">« Назад</a>
+                                </c:when>
+                                <c:otherwise>
+                                    <span class="btn btn-ghost muted" aria-disabled="true">« Назад</span>
+                                </c:otherwise>
+                            </c:choose>
+
+                            <c:forEach var="p" begin="1" end="${pages}">
+                                <c:choose>
+                                    <c:when test="${p == page}">
+                                        <span class="btn btn-primary" aria-current="page">${p}</span>
+                                    </c:when>
+                                    <c:otherwise>
+                                        <c:url var="pUrl" value="${selfPathOnly}">
+                                            <c:param name="id" value="${viewUserId}"/>
+                                            <c:param name="page" value="${p}"/>
+                                            <c:if test="${not empty param.q}">
+                                                <c:param name="q" value="${param.q}"/>
+                                            </c:if>
+                                        </c:url>
+                                        <a class="btn" href="${pUrl}">${p}</a>
+                                    </c:otherwise>
+                                </c:choose>
+                            </c:forEach>
+
+                            <c:choose>
+                                <c:when test="${page < pages}">
+                                    <c:url var="nextUrl" value="${selfPathOnly}">
+                                        <c:param name="id" value="${viewUserId}"/>
+                                        <c:param name="page" value="${page + 1}"/>
+                                        <c:if test="${not empty param.q}">
+                                            <c:param name="q" value="${param.q}"/>
+                                        </c:if>
+                                    </c:url>
+                                    <a class="btn btn-ghost" href="${nextUrl}">Вперёд »</a>
+                                </c:when>
+                                <c:otherwise>
+                                    <span class="btn btn-ghost muted" aria-disabled="true">Вперёд »</span>
+                                </c:otherwise>
+                            </c:choose>
+
+                        </nav>
+                    </c:if>
+
                 </c:otherwise>
             </c:choose>
         </section>

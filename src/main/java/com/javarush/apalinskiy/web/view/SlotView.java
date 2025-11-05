@@ -5,65 +5,55 @@ import lombok.Getter;
 import java.io.Serializable;
 
 /**
- * Read-only view model representing a single save slot entry in the UI.
+ * Represents a single save slot view in the user’s save-state interface.
  * <p>
- * Instances are created via factory methods:
- * <ul>
- *   <li>{@link #empty(int, String, String)} — an unoccupied slot.</li>
- *   <li>{@link #filled(int, int, String, String, String, String)} — a slot with an existing save.</li>
- * </ul>
- * The model is intended for presentation (JSP/EL) and does not perform validation.
- * </p>
- *
- * <h3>Fields</h3>
- * <ul>
- *   <li>{@code index} — position of the slot in the user's save list (UI defines 0/1-based semantics).</li>
- *   <li>{@code nodeId} — node identifier where the save points to; {@code null} for an empty slot.</li>
- *   <li>{@code title} — human-readable title/caption for the save; {@code null} for an empty slot.</li>
- *   <li>{@code updatedAtText} — localized/pretty-printed timestamp string; {@code null} for an empty slot.</li>
- *   <li>{@code questId} — identifier of the quest this slot belongs to (never {@code null}).</li>
- *   <li>{@code questName} — display name of the quest (never {@code null}).</li>
- * </ul>
- *
- * <h3>Nullability &amp; invariants</h3>
- * <ul>
- *   <li>Empty slots: {@code nodeId}, {@code title}, {@code updatedAtText} are {@code null}.</li>
- *   <li>Filled slots: {@code nodeId}, {@code title}, {@code updatedAtText} must be non-null.</li>
- *   <li>{@code questId} and {@code questName} should always be provided by the caller.</li>
- * </ul>
- *
- * <p>
- * Note: The class is serializable to support session storage or caching in the web layer.
- * </p>
+ * A {@code SlotView} holds minimal display data about a saved quest position,
+ * including the quest ID, node ID, title, and timestamp text.
+ * Instances are immutable and serializable.
  */
 @Getter
 public final class SlotView implements Serializable {
 
     /**
-     * Positional index of the slot in the UI.
+     * Zero-based slot index within the user’s save state.
      */
     private final int index;
+
     /**
-     * Node id of the saved position; {@code null} for empty slots.
+     * Current quest node ID, or {@code null} if the slot is empty.
      */
     private final Integer nodeId;
+
     /**
-     * Title/caption of the save; {@code null} for empty slots.
+     * Optional node title or caption.
      */
     private final String title;
+
     /**
-     * Localized last-updated text (e.g., "Today 14:32"); {@code null} for empty slots.
+     * Human-readable “last updated” timestamp text.
      */
     private final String updatedAtText;
+
     /**
-     * Owning quest identifier (never {@code null}).
+     * Associated quest identifier.
      */
     private final String questId;
+
     /**
-     * Human-readable quest name (never {@code null}).
+     * Associated quest display name.
      */
     private final String questName;
 
+    /**
+     * Constructs a new immutable slot view.
+     *
+     * @param index         slot index
+     * @param nodeId        node ID, may be {@code null} for empty slot
+     * @param title         optional node title
+     * @param updatedAtText formatted update timestamp
+     * @param questId       quest identifier
+     * @param questName     quest display name
+     */
     private SlotView(int index,
                      Integer nodeId,
                      String title,
@@ -79,27 +69,27 @@ public final class SlotView implements Serializable {
     }
 
     /**
-     * Creates an empty (unoccupied) slot.
+     * Creates an empty slot representation with no saved node.
      *
-     * @param index     position of the slot in the UI
-     * @param questId   owning quest id (non-null)
-     * @param questName owning quest name (non-null)
-     * @return empty slot view
+     * @param index     slot index
+     * @param questId   quest identifier
+     * @param questName quest display name
+     * @return an empty {@code SlotView} instance
      */
     public static SlotView empty(int index, String questId, String questName) {
         return new SlotView(index, null, null, null, questId, questName);
     }
 
     /**
-     * Creates a filled slot with save metadata.
+     * Creates a filled slot representation with stored node data.
      *
-     * @param index         position of the slot in the UI
-     * @param nodeId        node id where the save points
-     * @param title         human-readable title/caption
-     * @param updatedAtText localized/pretty-printed "last updated" text
-     * @param questId       owning quest id (non-null)
-     * @param questName     owning quest name (non-null)
-     * @return filled slot view
+     * @param index         slot index
+     * @param nodeId        saved quest node ID
+     * @param title         node title
+     * @param updatedAtText formatted update timestamp
+     * @param questId       quest identifier
+     * @param questName     quest display name
+     * @return a filled {@code SlotView} instance
      */
     public static SlotView filled(int index, int nodeId, String title, String updatedAtText,
                                   String questId, String questName) {

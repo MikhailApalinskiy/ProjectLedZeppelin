@@ -1,6 +1,7 @@
 package com.javarush.apalinskiy.web.servlet;
 
 import com.javarush.apalinskiy.domain.user.User;
+import com.javarush.apalinskiy.service.impl.user.DefaultUserService;
 import com.javarush.apalinskiy.service.user.UserService;
 import com.javarush.apalinskiy.web.util.Web;
 import com.javarush.apalinskiy.app.WebConst;
@@ -18,29 +19,21 @@ import java.util.Locale;
 import java.util.Optional;
 
 /**
- * Admin/user-directory controller that lists users or searches by id/login.
- * <p>
- * <b>GET</b> without a query parameter returns the full list from {@link UserService#findAll()}.
- * When the optional query parameter {@code q} is provided, the servlet attempts to resolve it
- * first as a user <i>id</i>, then (on miss) as a user <i>login</i> (case-insensitive),
- * and forwards a single-element list on hit or an empty list on miss.
+ * Servlet responsible for displaying and searching users.
+ *
+ * <p>Supports:
+ * <ul>
+ *   <li>Paginated listing of all users (default mode)</li>
+ *   <li>Search by user ID or login (case-insensitive)</li>
+ * </ul>
  * </p>
  *
- * <h3>Request parameter</h3>
+ * <p>Expected query parameters:
  * <ul>
- *   <li><b>q</b> — optional; user id or login to search for.</li>
+ *   <li>{@code q} — search term (optional)</li>
+ *   <li>{@code page} — page number (optional, defaults to 1)</li>
  * </ul>
- *
- * <h3>Model / view</h3>
- * <ul>
- *   <li>Sets request attribute {@code users} with the resulting list.</li>
- *   <li>Copies/pulls flashes for {@code OK} and {@code ERROR} into attributes.</li>
- *   <li>Forwards to {@code WebConst.Jsp.USERS}.</li>
- * </ul>
- *
- * @see UserService
- * @see Web
- * @see WebConst
+ * </p>
  */
 public class UsersServlet extends HttpServlet {
 
@@ -49,10 +42,7 @@ public class UsersServlet extends HttpServlet {
     private UserService userService;
 
     /**
-     * Resolves {@link UserService} from the servlet context.
-     *
-     * @param config servlet config provided by the container
-     * @throws ServletException if initialization fails
+     * Initializes the servlet and resolves required services.
      */
     @Override
     public void init(ServletConfig config) throws ServletException {
@@ -62,22 +52,10 @@ public class UsersServlet extends HttpServlet {
     }
 
     /**
-     * Lists users or searches by id/login based on the {@code q} parameter.
-     * <p>
-     * Flow:
-     * <ol>
-     *   <li>Copy/pull flash messages ({@code OK}, {@code ERROR}).</li>
-     *   <li>If {@code q} is absent → load all users via {@link UserService#findAll()}.</li>
-     *   <li>If {@code q} is present → try {@link UserService#findById(String)}; on miss, try
-     *       {@link UserService#findByLogin(String)} with {@code q.toLowerCase(Locale.ROOT)}.</li>
-     *   <li>Attach the resulting list to {@code users} and forward to {@code WebConst.Jsp.USERS}.</li>
-     * </ol>
-     * </p>
+     * Handles user listing or search requests.
      *
-     * @param req  HTTP request (optional {@code q})
+     * @param req  HTTP request (expects optional {@code q} and {@code page})
      * @param resp HTTP response
-     * @throws ServletException if forwarding fails
-     * @throws IOException      on I/O errors
      */
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp)
@@ -86,11 +64,25 @@ public class UsersServlet extends HttpServlet {
         Web.pullFlash(req, WebConst.Attr.OK);
         Web.pullFlash(req, WebConst.Attr.ERROR);
         String q = Web.trimOrNull(req.getParameter("q"));
-        List<User> result;
+        int page = 1;
+        try {
+            String p = req.getParameter("page");
+            if (p != null) page = Math.max(1, Integer.parseInt(p));
+        } catch (NumberFormatException ignored) {
+        }
+        final int size = 10;
         if (q == null) {
-            result = userService.findAll();
-            log.info("Users list requested: all users count={}", result.size());
+            DefaultUserService.PagedResult<User> pg = userService.findPage(page, size);
+            req.setAttribute("users", pg.items());
+            req.setAttribute("page", pg.page());
+            req.setAttribute("size", pg.size());
+            req.setAttribute("total", pg.total());
+            req.setAttribute("pages", pg.totalPages());
+            req.setAttribute("offset", pg.offset());
+            log.info("Users page requested: page={} size={} total={} pages={}",
+                    pg.page(), pg.size(), pg.total(), pg.totalPages());
         } else {
+            List<User> result;
             Optional<User> byId = userService.findById(q);
             if (byId.isPresent()) {
                 result = List.of(byId.get());
@@ -104,8 +96,14 @@ public class UsersServlet extends HttpServlet {
                     log.warn("Users search miss q={}", q);
                 }
             }
+            req.setAttribute("users", result);
+            req.setAttribute("page", 1);
+            req.setAttribute("size", result.size());
+            req.setAttribute("total", result.size());
+            req.setAttribute("pages", 1);
+            req.setAttribute("offset", 0);
+            req.setAttribute("q", q);
         }
-        req.setAttribute("users", result);
         Web.forward(req, resp, WebConst.Jsp.USERS);
     }
 }

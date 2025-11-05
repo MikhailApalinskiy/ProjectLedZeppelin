@@ -2,48 +2,41 @@ package com.javarush.apalinskiy.service.impl.quest;
 
 import com.javarush.apalinskiy.repository.quest.QuestStore;
 import com.javarush.apalinskiy.domain.quest.QuestNode;
-import com.javarush.apalinskiy.service.quest.QuestAuthoringService;
 
 
 import java.util.Objects;
 
 /**
- * Default quest service backed by a {@link QuestStore}.
- * <p>
- * This class delegates all read and navigation operations to the underlying store
- * and uses the base logic from {@link AbstractQuestService} for handling choices.
- * </p>
+ * Default implementation of {@link com.javarush.apalinskiy.service.quest.QuestService}
+ * that operates on an immutable {@link QuestStore}.
  *
- * <h3>Responsibilities</h3>
- * <ul>
- *   <li>Expose quest metadata such as {@link #version()}.</li>
- *   <li>Provide access to the start node via {@link #getStart()}.</li>
- *   <li>Lookup quest nodes by ID via {@link #getById(int)}.</li>
- *   <li>Resolve navigation to the next node using {@link QuestStore#choose(int, String)}.</li>
- * </ul>
+ * <p>This service provides basic quest navigation logic by delegating all read operations
+ * to the underlying {@link QuestStore}. It does not perform any persistence,
+ * synchronization, or modification of quest data.</p>
  *
- * <p>
- * In authoring scenarios this service is typically complemented by
- * {@link QuestAuthoringService}, which manages editing and publishing.
- * </p>
+ * <p>All navigation behavior (retrieving nodes, starting point, version, and transitions)
+ * is determined entirely by the state of the provided store instance.</p>
  */
 public class DefaultQuestService extends AbstractQuestService {
+
     private final QuestStore store;
 
     /**
-     * Creates a new quest service backed by the given store.
+     * Constructs a quest service based on the given {@link QuestStore}.
      *
-     * @param store quest store (must not be {@code null})
-     * @throws NullPointerException if {@code store} is {@code null}
+     * @param store underlying quest store; must not be {@code null}
+     * @throws NullPointerException if {@code store} is null
      */
     public DefaultQuestService(QuestStore store) {
         this.store = Objects.requireNonNull(store);
     }
 
     /**
-     * Returns the start node of the quest from the underlying store.
+     * Returns the starting quest node.
      *
-     * @return start node, or {@code null} if store is empty
+     * <p>Delegates to {@link QuestStore#start()}.</p>
+     *
+     * @return the starting {@link QuestNode}, or {@code null} if none defined
      */
     @Override
     public QuestNode getStart() {
@@ -51,10 +44,12 @@ public class DefaultQuestService extends AbstractQuestService {
     }
 
     /**
-     * Returns a node by its ID from the underlying store.
+     * Retrieves a quest node by its identifier.
      *
-     * @param id node ID
-     * @return quest node, or {@code null} if not found
+     * <p>Delegates to {@link QuestStore#get(int)}.</p>
+     *
+     * @param id node identifier
+     * @return the corresponding {@link QuestNode}, or {@code null} if not found
      */
     @Override
     public QuestNode getById(int id) {
@@ -62,9 +57,11 @@ public class DefaultQuestService extends AbstractQuestService {
     }
 
     /**
-     * Returns the version string of the underlying quest store.
+     * Returns the version string representing the current quest state.
      *
-     * @return version string (never {@code null})
+     * <p>Delegates to {@link QuestStore#version()}.</p>
+     *
+     * @return store version string (format depends on implementation)
      */
     @Override
     public String version() {
@@ -72,11 +69,14 @@ public class DefaultQuestService extends AbstractQuestService {
     }
 
     /**
-     * Resolves the next quest node by delegating to the store.
+     * Resolves the next quest node based on the current node and player’s answer.
      *
-     * @param fromId current node ID
-     * @param answer user input
-     * @return next node, or {@code null} if no option matches
+     * <p>Delegates to {@link QuestStore#choose(int, String)} and unwraps
+     * the optional result, returning {@code null} if no match exists.</p>
+     *
+     * @param fromId current quest node ID
+     * @param answer user’s answer text
+     * @return the resolved {@link QuestNode}, or {@code null} if no valid transition exists
      */
     @Override
     protected QuestNode resolveNext(int fromId, String answer) {

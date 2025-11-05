@@ -3,59 +3,91 @@ package com.javarush.apalinskiy.domain.quest;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.javarush.apalinskiy.domain.quest.choice.ChoiceNormalizer;
+import jakarta.persistence.*;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
-import java.util.Locale;
 import java.util.Objects;
 
 /**
- * Represents a single answer option available in a {@link QuestNode}.
- * <p>
- * An {@code Option} contains the raw choice text shown to the player
- * and the ID of the next node to jump to if selected.
- * </p>
+ * Represents a single answer option within a {@link QuestNode}.
  *
- * <h3>JSON mapping</h3>
- * <ul>
- *   <li>{@code choice} → user-facing answer text</li>
- *   <li>{@code next} → ID of the next node (may be {@code null} for final nodes)</li>
- * </ul>
- * Unknown JSON properties are ignored during deserialization.
+ * <p>Each {@code Option} defines one possible player choice and the corresponding
+ * next node to navigate to. Choices are stored in the {@code options} table and
+ * linked to their parent node via {@link #node}.</p>
  *
- * <h3>Normalization</h3>
- * The {@link #normalizedChoice()} method provides a lowercased,
- * trimmed, and whitespace-collapsed version of {@link #choice},
- * making user input comparison reliable.
+ * <p>Each option may optionally specify a {@code next} node ID. If {@code next} is {@code null},
+ * the option leads to a terminal or undefined branch. Choice text is normalized
+ * using {@link ChoiceNormalizer} for consistent player input matching.</p>
  *
- * @param choice raw answer text (non-null)
- * @param next   ID of the next node, or {@code null} if this option does not lead anywhere
+ * <p>This entity is also serialized to JSON for quest editing and export.</p>
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
-public record Option(@Getter @JsonProperty("choice") String choice,
-                     @Getter @JsonProperty("next") Integer next) {
+@Getter
+@Setter
+@NoArgsConstructor
+@Entity
+@Table(name = "options")
+public class Option {
 
     /**
-     * Compact constructor that validates the {@code choice} is non-null.
-     *
-     * @param choice raw answer text
-     * @param next   ID of the next node (nullable)
-     * @throws NullPointerException if {@code choice} is null
+     * Maximum allowed length of a choice text.
      */
-    public Option {
-        choice = Objects.requireNonNull(choice, "choice");
+    private static final int MAX_CHOICE_LENGTH = 255;
+
+    /**
+     * Unique database identifier of the choice.
+     */
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "choice_id", nullable = false)
+    private Long choiceId;
+
+    /**
+     * Player-visible text of the choice.
+     */
+    @JsonProperty("choice")
+    @Column(name = "choice", nullable = false)
+    private String choice;
+
+    /**
+     * ID of the next quest node reached if this choice is selected (nullable).
+     */
+    @JsonProperty("next")
+    @Column(name = "next")
+    private Integer next;
+
+    /**
+     * Parent quest node that owns this choice.
+     */
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "quest_node_db_id", nullable = false)
+    private QuestNode node;
+
+    /**
+     * Constructs a new {@code Option} instance with the given text and next node ID.
+     *
+     * @param choice text of the player choice (non-null, max {@value #MAX_CHOICE_LENGTH} characters)
+     * @param next   ID of the next node to navigate to (nullable)
+     * @throws NullPointerException     if {@code choice} is {@code null}
+     * @throws IllegalArgumentException if {@code choice} exceeds {@value #MAX_CHOICE_LENGTH} characters
+     */
+    public Option(String choice, Integer next) {
+        if (choice.length() > MAX_CHOICE_LENGTH) {
+            throw new IllegalArgumentException("Choice is too long, it must be less than 255 symbols.");
+        }
+        this.choice = Objects.requireNonNull(choice, "choice");
+        this.next = next;
     }
 
     /**
-     * Returns the normalized version of {@link #choice}.
-     * <p>
-     * Normalization rules:
-     * <ul>
-     *   <li>Collapse consecutive whitespace into a single space.</li>
-     *   <li>Trim leading/trailing whitespace.</li>
-     *   <li>Convert to lowercase using {@link Locale#ROOT}.</li>
-     * </ul>
+     * Returns a normalized version of the choice text.
      *
-     * @return normalized choice text, never {@code null}
+     * <p>Normalization includes trimming, lowercasing, and collapsing
+     * whitespace sequences using {@link ChoiceNormalizer}.</p>
+     *
+     * @return normalized lowercase string used for comparison
      */
     public String normalizedChoice() {
         return ChoiceNormalizer.normalize(choice);

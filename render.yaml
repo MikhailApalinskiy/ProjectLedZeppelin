@@ -7,6 +7,12 @@ services:
     dockerfilePath: ./Dockerfile
     dockerContext: .
     healthCheckPath: /
+    disks:
+      - name: data
+        mountPath: /var/data
+        sizeGB: 1
     envVars:
+      - key: TEXTQUEST_UPLOADS_DIR
+        value: /var/data/uploads
       - key: JAVA_TOOL_OPTIONS
-        value: -XX:MaxRAMPercentage=75.0 -Duploads.dir=/tmp/uploads
+        value: -XX:MaxRAMPercentage=75.0

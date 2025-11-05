@@ -13,35 +13,25 @@ import java.io.IOException;
 import java.util.Optional;
 
 /**
- * Implements the "Save Game" flow for global slots.
- * <p>
- * Extends {@link AbstractSlotsServlet} to reuse listing/routing. This subclass:
+ * Servlet responsible for handling “save slot” operations in quests.
+ *
+ * <p>Extends {@link AbstractSlotsServlet} and provides logic for saving
+ * the current quest progress to a selected slot. Supports both
+ * creating new saves and overwriting existing ones with confirmation.</p>
+ *
+ * <p>When the user selects a slot:
  * <ul>
- *   <li>Defines paths/JSPs for the save UI;</li>
- *   <li>Supports a confirmation step when overwriting a non-empty slot;</li>
- *   <li>Writes/overwrites a global slot and redirects back to the quest node.</li>
+ *   <li>If it’s empty — a new save is immediately recorded.</li>
+ *   <li>If it already contains data — a confirmation prompt is displayed
+ *       before overwriting.</li>
  * </ul>
- *
- * <h3>Flow</h3>
- * <ol>
- *   <li>User clicks "Save" on a node → {@link #handleGo(HttpServletRequest, HttpServletResponse, String, String, int, String)}.</li>
- *   <li>If the target slot is empty → save immediately.</li>
- *   <li>If the target slot is occupied → forward to confirm JSP ({@link #confirmJsp()}).</li>
- *   <li>Confirm POST → {@link #handleConfirm(HttpServletRequest, HttpServletResponse, String, String, int, String)} overwrites the slot.</li>
- * </ol>
- *
- * @see AbstractSlotsServlet
- * @see SaveStateService
- * @see SaveStateService.GlobalSlot
- * @see WebConst
- * @see Web
  */
 public class GoSavesServlet extends AbstractSlotsServlet {
 
     private static final Logger log = LoggerFactory.getLogger(GoSavesServlet.class);
 
     /**
-     * @return base path for the saves page (used for redirects).
+     * @return servlet path used for redirection and page context.
      */
     @Override
     protected String path() {
@@ -49,7 +39,7 @@ public class GoSavesServlet extends AbstractSlotsServlet {
     }
 
     /**
-     * @return JSP used to render the list of save slots.
+     * @return JSP path for the saves list page.
      */
     @Override
     protected String listJsp() {
@@ -57,7 +47,7 @@ public class GoSavesServlet extends AbstractSlotsServlet {
     }
 
     /**
-     * @return JSP used for the overwrite confirmation dialog.
+     * @return JSP path for the confirmation dialog when overwriting a save.
      */
     @Override
     protected String confirmJsp() {
@@ -65,29 +55,21 @@ public class GoSavesServlet extends AbstractSlotsServlet {
     }
 
     /**
-     * Handles initial "save" intent for a given slot.
-     * <p>
-     * Behavior:
-     * <ul>
-     *   <li>Reads the target node id from {@code node} parameter and normalizes {@code questId} (defaults to {@code main}).</li>
-     *   <li>If the slot already has a value, forwards to the confirm JSP with both "old" and "new" titles set as attributes.</li>
-     *   <li>If the slot is empty, writes it immediately via {@link SaveStateService#setGlobalSlot} and redirects to the
-     *       quest URL derived from {@code next} and the node id.</li>
-     * </ul>
+     * Handles a “Go” action: saves the current quest progress into the chosen slot.
      *
-     * <p>Request attributes set for confirm view:</p>
-     * <ul>
-     *   <li>{@code slotIndex}, {@code newNodeId}, {@code newNodeTitle}, {@code oldNodeId}, {@code oldNodeTitle}, {@code next}, {@code purpose}</li>
-     * </ul>
+     * <p>If the target slot already contains a save, forwards to the confirmation
+     * JSP with old and new node info for user approval.</p>
+     * <p>If the slot is empty, immediately creates a new save and redirects back
+     * to the quest node.</p>
      *
-     * @param req     HTTP request (expects {@code node}, optional {@code purpose})
+     * @param req     HTTP request
      * @param resp    HTTP response
-     * @param userId  current user id (stringified)
-     * @param questId quest id (nullable → treated as {@code main})
-     * @param slot    zero-based slot index
-     * @param next    next URL hint used to compute redirect after saving
+     * @param userId  current user ID
+     * @param questId quest ID (or null for main quest)
+     * @param slot    slot index
+     * @param next    optional redirect parameter from the quest screen
      * @throws IOException      if redirect fails
-     * @throws ServletException if forwarding to confirm JSP fails
+     * @throws ServletException if forwarding to confirmation JSP fails
      */
     @Override
     protected void handleGo(HttpServletRequest req, HttpServletResponse resp,
@@ -122,18 +104,17 @@ public class GoSavesServlet extends AbstractSlotsServlet {
     }
 
     /**
-     * Handles the overwrite confirmation step.
-     * <p>
-     * Normalizes {@code questId}, computes display name and node title, writes the slot via
-     * {@link SaveStateService#setGlobalSlot}, sets a flash message, and redirects to the computed quest URL.
-     * </p>
+     * Handles confirmation submission when overwriting an existing save slot.
      *
-     * @param req     HTTP request (expects {@code node})
+     * <p>Replaces previous save data with new quest position and redirects
+     * the user back to the quest node.</p>
+     *
+     * @param req     HTTP request
      * @param resp    HTTP response
-     * @param userId  current user id (stringified)
-     * @param questId quest id (nullable → treated as {@code main})
-     * @param slot    zero-based slot index to overwrite
-     * @param next    next URL hint used to compute redirect after saving
+     * @param userId  current user ID
+     * @param questId quest ID (or null for main quest)
+     * @param slot    slot index to overwrite
+     * @param next    optional redirect target from quest screen
      * @throws IOException if redirect fails
      */
     @Override

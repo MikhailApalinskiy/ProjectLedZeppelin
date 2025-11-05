@@ -19,69 +19,32 @@ import java.io.IOException;
 import java.util.Optional;
 
 /**
- * Authentication servlet handling both login and registration flows.
- * <p>
- * This servlet is mapped to two paths (typically {@code /login} and {@code /register})
- * and dispatches by {@link HttpServletRequest#getServletPath()}:
+ * Servlet responsible for handling authentication-related actions such as
+ * user login and registration.
+ *
+ * <p>This servlet processes both GET and POST requests for {@code /login}
+ * and {@code /register} paths. It interacts with {@link UserService}
+ * to perform credential verification, user creation, and session management.</p>
+ *
+ * <p>Features:</p>
  * <ul>
- *   <li><b>GET</b> — forwards to corresponding JSP pages;</li>
- *   <li><b>POST</b> — performs login or registration.</li>
+ *     <li>Displays login and registration pages</li>
+ *     <li>Validates credentials and initializes authenticated sessions</li>
+ *     <li>Handles duplicate logins and invalid input gracefully</li>
+ *     <li>Redirects users back to intended target (via {@code next} parameter) after successful auth</li>
  * </ul>
- * User session is renewed on successful authentication to prevent session fixation.
- * </p>
- *
- * <h3>Lifecycle</h3>
- * <ul>
- *   <li>On {@link #init(ServletConfig)} resolves {@link UserService} from {@code ServletContext}.</li>
- *   <li>If the service is not available, initialization fails with {@link UnavailableException}.</li>
- * </ul>
- *
- * <h3>Security notes</h3>
- * <ul>
- *   <li>Passwords are accepted via form parameters and passed to {@link UserService} for verification/creation.</li>
- *   <li>On successful login/registration, session is recreated using {@link Web#renewSessionAndPut}.</li>
- *   <li>Authorization to protected resources should be enforced by upstream filters.</li>
- * </ul>
- *
- * <h3>Views</h3>
- * <ul>
- *   <li>Login page: {@code WebConst.Jsp.LOGIN}</li>
- *   <li>Register page: {@code WebConst.Jsp.REGISTER}</li>
- * </ul>
- *
- * <h3>Redirection</h3>
- * <p>
- * After successful login/registration, user is redirected to {@link Web#safeNextOrHome},
- * honoring the optional {@code next} parameter if safe.
- * </p>
- *
- * <h3>Error handling</h3>
- * <ul>
- *   <li>Unknown servlet path → 404.</li>
- *   <li>Login failure → sets {@code WebConst.Attr.ERROR = WebConst.Msg.BAD_CREDENTIALS} and forwards to login JSP.</li>
- *   <li>Registration failures:
- *     <ul>
- *       <li>{@link DuplicateLoginException}/{@link IllegalArgumentException} → message shown on the register page;</li>
- *       <li>{@link IllegalStateException} → generic internal error message.</li>
- *     </ul>
- *   </li>
- * </ul>
- *
- * @see UserService
- * @see Web
- * @see WebConst
  */
 public class AuthServlet extends HttpServlet {
 
     private static final Logger log = LoggerFactory.getLogger(AuthServlet.class);
 
-    /** Resolved from the servlet context; marked transient to avoid accidental serialization. */
     private transient UserService userService;
 
     /**
-     * Resolves {@link UserService} from the servlet context.
+     * Initializes the servlet by retrieving the {@link UserService} bean from the servlet context.
      *
-     * @throws UnavailableException if the service cannot be found
+     * @param config servlet configuration provided by the container
+     * @throws ServletException if the service cannot be loaded
      */
     @Override
     public void init(ServletConfig config) throws ServletException {
@@ -96,12 +59,18 @@ public class AuthServlet extends HttpServlet {
     }
 
     /**
-     * Serves authentication pages.
+     * Handles GET requests for authentication-related pages.
+     *
+     * <p>Supported endpoints:</p>
      * <ul>
-     *   <li><b>/login</b> → forwards to {@code WebConst.Jsp.LOGIN}</li>
-     *   <li><b>/register</b> → forwards to {@code WebConst.Jsp.REGISTER}</li>
+     *     <li>{@code /login} — renders the login form</li>
+     *     <li>{@code /register} — renders the registration form</li>
      * </ul>
-     * Unknown paths respond with 404.
+     *
+     * @param req  current HTTP request
+     * @param resp current HTTP response
+     * @throws ServletException if JSP forwarding fails
+     * @throws IOException      if an I/O error occurs
      */
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp)
@@ -120,12 +89,18 @@ public class AuthServlet extends HttpServlet {
     }
 
     /**
-     * Dispatches POST requests to the appropriate handler by path.
+     * Handles POST requests for authentication actions.
+     *
+     * <p>Supported endpoints:</p>
      * <ul>
-     *   <li><b>/login</b> → {@link #handleLogin(HttpServletRequest, HttpServletResponse)}</li>
-     *   <li><b>/register</b> → {@link #handleRegister(HttpServletRequest, HttpServletResponse)}</li>
+     *     <li>{@code /login} — verifies credentials and logs the user in</li>
+     *     <li>{@code /register} — registers a new user account</li>
      * </ul>
-     * Unknown paths respond with 404.
+     *
+     * @param req  current HTTP request
+     * @param resp current HTTP response
+     * @throws ServletException if forwarding fails
+     * @throws IOException      if an I/O error occurs
      */
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp)
@@ -142,18 +117,15 @@ public class AuthServlet extends HttpServlet {
     }
 
     /**
-     * Handles the login flow.
-     * <p>
-     * Parameters:
-     * <ul>
-     *   <li>{@code userLogin} — user login (username);</li>
-     *   <li>{@code password} — user password.</li>
-     * </ul>
-     * Behavior:
-     * <ul>
-     *   <li>On success: renews session with the authenticated {@link User} and redirects to a safe {@code next} or home.</li>
-     *   <li>On failure: forwards back to login with error and echoes {@code userLogin}.</li>
-     * </ul>
+     * Processes user login attempts.
+     *
+     * <p>On successful authentication, the session is renewed to prevent fixation attacks,
+     * and the user is redirected either to their requested page (via {@code next}) or to the home page.</p>
+     *
+     * @param req  current HTTP request containing login credentials
+     * @param resp current HTTP response used for redirection
+     * @throws IOException      if redirect fails
+     * @throws ServletException if forwarding to the login form fails
      */
     private void handleLogin(HttpServletRequest req, HttpServletResponse resp)
             throws IOException, ServletException {
@@ -174,20 +146,15 @@ public class AuthServlet extends HttpServlet {
     }
 
     /**
-     * Handles the registration flow for a new user (role defaults to {@link Role#USER}).
-     * <p>
-     * Parameters:
-     * <ul>
-     *   <li>{@code userName} — display name;</li>
-     *   <li>{@code userLogin} — desired username (must be unique);</li>
-     *   <li>{@code password} — desired password.</li>
-     * </ul>
-     * Behavior:
-     * <ul>
-     *   <li>On success: registers the user, renews session, redirects to a safe {@code next} or home.</li>
-     *   <li>On validation conflict: forwards back to the register page with an error and echoes inputs.</li>
-     *   <li>On internal failures: forwards with a generic internal error message.</li>
-     * </ul>
+     * Processes user registration requests.
+     *
+     * <p>Registers a new user with role {@link Role#USER}. Handles duplicate login errors
+     * and invalid input by redisplaying the registration form with an appropriate message.</p>
+     *
+     * @param req  HTTP request containing registration parameters
+     * @param resp HTTP response used for redirection
+     * @throws IOException      if redirect fails
+     * @throws ServletException if forwarding fails
      */
     private void handleRegister(HttpServletRequest req, HttpServletResponse resp)
             throws IOException, ServletException {

@@ -2,39 +2,41 @@ package com.javarush.apalinskiy.service.notify;
 
 import com.javarush.apalinskiy.domain.notify.NotificationEvent;
 import com.javarush.apalinskiy.domain.notify.NotificationType;
-import com.javarush.apalinskiy.repository.notify.NotificationRepository;
 
 /**
- * Service for managing user notifications.
- * <p>
- * Defines operations to create and deliver notifications
- * either directly ({@link #add(String, NotificationType, String, String)})
- * or via higher-level events ({@link #notify(NotificationEvent)}).
- * </p>
+ * Service responsible for creating and delivering user notifications.
  *
- * <h3>Responsibilities</h3>
- * <ul>
- *   <li>Create notifications targeted at specific users.</li>
- *   <li>Translate domain events into user-facing notifications.</li>
- *   <li>Delegate persistence and delivery to the underlying {@link NotificationRepository} implementation.</li>
- * </ul>
+ * <p>This interface defines operations for adding new notifications and
+ * generating them automatically from higher-level {@link NotificationEvent} objects.
+ * Implementations typically persist notifications via a repository and may
+ * also trigger real-time delivery mechanisms (e.g. WebSocket, e-mail, etc.).</p>
  */
 public interface NotificationService {
 
     /**
-     * Adds a new notification for a specific user.
+     * Creates and saves a new notification for a specific user.
      *
-     * @param userId the ID of the target user
-     * @param type   the type of notification
-     * @param title  the notification title
-     * @param body   the notification body (may contain HTML)
+     * <p>The notification includes a type, title, and body, and is typically
+     * marked as unread upon creation. Implementations should ensure that
+     * notifications are properly linked to the target user.</p>
+     *
+     * @param userId target user identifier
+     * @param type   logical type of notification (e.g., FRIEND_REQUEST, QUEST_MODERATED)
+     * @param title  short title describing the event
+     * @param body   detailed HTML-safe text of the message body
+     * @throws IllegalArgumentException if {@code userId} or {@code type} is null
      */
     void add(String userId, NotificationType type, String title, String body);
 
     /**
-     * Processes a domain event and generates the corresponding notification(s).
+     * Processes a structured {@link NotificationEvent} and generates
+     * one or more user notifications based on its type and data.
      *
-     * @param ev the notification event describing actor, target, type, and additional data
+     * <p>This method is typically called from other services (e.g., friend or quest services)
+     * when a domain event occurs that requires notifying users.</p>
+     *
+     * @param ev event descriptor containing type, target user, actor user, and additional data
+     * @throws IllegalArgumentException if event is null or invalid
      */
     void notify(NotificationEvent ev);
 }

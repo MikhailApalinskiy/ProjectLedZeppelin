@@ -1,0 +1,898 @@
+databaseChangeLog:
+- changeSet:
+    id: 1762345732971-1
+    author: misha (generated)
+    changes:
+    - createTable:
+        columns:
+        - column:
+            constraints:
+              nullable: false
+              primaryKey: true
+              primaryKeyName: users_pk
+            name: user_id
+            type: VARCHAR(36)
+        - column:
+            constraints:
+              nullable: false
+            name: role
+            type: VARCHAR(10)
+        - column:
+            constraints:
+              nullable: false
+            name: user_name
+            type: VARCHAR(50)
+        - column:
+            constraints:
+              nullable: false
+            name: user_login
+            type: VARCHAR(50)
+        - column:
+            constraints:
+              nullable: false
+            name: password
+            type: VARCHAR(255)
+        - column:
+            constraints:
+              nullable: false
+            defaultValueComputed: now()
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+        tableName: users
+- changeSet:
+    id: 1762345732971-2
+    author: misha (generated)
+    changes:
+    - createTable:
+        columns:
+        - column:
+            autoIncrement: true
+            constraints:
+              nullable: false
+              primaryKey: true
+              primaryKeyName: user_stats_pk
+            name: user_stats_id
+            type: BIGINT
+        - column:
+            constraints:
+              nullable: false
+            defaultValueNumeric: 0
+            name: quests_created
+            type: BIGINT
+        - column:
+            constraints:
+              nullable: false
+            defaultValueNumeric: 0
+            name: quests_completed
+            type: BIGINT
+        - column:
+            constraints:
+              nullable: false
+            defaultValueNumeric: 0
+            name: endings_unlocked
+            type: BIGINT
+        - column:
+            constraints:
+              nullable: false
+            name: user_id
+            type: VARCHAR(36)
+        tableName: user_stats
+- changeSet:
+    id: 1762345732971-3
+    author: misha (generated)
+    changes:
+    - createTable:
+        columns:
+        - column:
+            constraints:
+              nullable: false
+              primaryKey: true
+              primaryKeyName: custom_quests_pkey
+            name: quest_id
+            type: VARCHAR(36)
+        - column:
+            constraints:
+              nullable: false
+            name: name
+            type: VARCHAR(50)
+        - column:
+            constraints:
+              nullable: false
+            name: start_id
+            type: INTEGER
+        - column:
+            constraints:
+              nullable: false
+            name: moderation_status
+            type: VARCHAR(20)
+        - column:
+            constraints:
+              nullable: false
+            name: version
+            type: VARCHAR(255)
+        - column:
+            constraints:
+              nullable: false
+            defaultValueComputed: now()
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+        - column:
+            constraints:
+              nullable: false
+            defaultValueComputed: now()
+            name: updated_at
+            type: TIMESTAMP WITH TIME ZONE
+        - column:
+            constraints:
+              nullable: false
+            name: user_id
+            type: VARCHAR(36)
+        tableName: custom_quests
+- changeSet:
+    id: 1762345732971-4
+    author: misha (generated)
+    changes:
+    - createTable:
+        columns:
+        - column:
+            autoIncrement: true
+            constraints:
+              nullable: false
+              primaryKey: true
+              primaryKeyName: quest_nodes_pkey
+            name: db_quest_node_id
+            type: BIGINT
+        - column:
+            constraints:
+              nullable: false
+            name: quest_node_id
+            type: INTEGER
+        - column:
+            constraints:
+              nullable: false
+            name: text
+            type: VARCHAR(10000)
+        - column:
+            constraints:
+              nullable: false
+            name: fin
+            type: BOOLEAN
+        - column:
+            name: image
+            type: VARCHAR
+        - column:
+            constraints:
+              nullable: false
+            name: quest_id
+            type: VARCHAR(36)
+        tableName: quest_nodes
+- changeSet:
+    id: 1762345732971-5
+    author: misha (generated)
+    changes:
+    - createTable:
+        columns:
+        - column:
+            autoIncrement: true
+            constraints:
+              nullable: false
+              primaryKey: true
+              primaryKeyName: options_pkey
+            name: choice_id
+            type: BIGINT
+        - column:
+            constraints:
+              nullable: false
+            name: choice
+            type: VARCHAR(255)
+        - column:
+            name: next
+            type: INTEGER
+        - column:
+            constraints:
+              nullable: false
+            name: quest_node_db_id
+            type: BIGINT
+        tableName: options
+- changeSet:
+    id: 1762345732971-6
+    author: misha (generated)
+    changes:
+    - createTable:
+        columns:
+        - column:
+            constraints:
+              nullable: false
+              primaryKey: true
+              primaryKeyName: custom_quest_drafts_pkey
+            name: draft_id
+            type: VARCHAR(50)
+        - column:
+            constraints:
+              nullable: false
+            name: owner_id
+            type: VARCHAR(36)
+        - column:
+            name: target_quest_id
+            type: VARCHAR(36)
+        - column:
+            constraints:
+              nullable: false
+            name: name
+            type: VARCHAR(50)
+        - column:
+            constraints:
+              nullable: false
+            name: start_id
+            type: INTEGER
+        - column:
+            constraints:
+              nullable: false
+            name: nodes_json
+            type: TEXT
+        - column:
+            constraints:
+              nullable: false
+            defaultValue: ''
+            name: version_note
+            type: VARCHAR(255)
+        - column:
+            constraints:
+              nullable: false
+            name: updated_at
+            type: TIMESTAMP WITH TIME ZONE
+        tableName: custom_quest_drafts
+- changeSet:
+    id: 1762345732971-7
+    author: misha (generated)
+    changes:
+    - createTable:
+        columns:
+        - column:
+            constraints:
+              nullable: false
+              primaryKey: true
+              primaryKeyName: friend_requests_pkey
+            name: friend_request_id
+            type: VARCHAR(36)
+        - column:
+            constraints:
+              nullable: false
+            name: from_user_id
+            type: VARCHAR(36)
+        - column:
+            constraints:
+              nullable: false
+            name: to_user_id
+            type: VARCHAR(36)
+        - column:
+            constraints:
+              nullable: false
+            defaultValue: PENDING
+            name: status
+            type: VARCHAR(16)
+        - column:
+            constraints:
+              nullable: false
+            defaultValueComputed: now()
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+        - column:
+            name: responded_at
+            type: TIMESTAMP WITH TIME ZONE
+        tableName: friend_requests
+- changeSet:
+    id: 1762345732971-8
+    author: misha (generated)
+    changes:
+    - createTable:
+        columns:
+        - column:
+            constraints:
+              nullable: false
+            name: user_id
+            type: VARCHAR(36)
+        - column:
+            constraints:
+              nullable: false
+            name: friend_id
+            type: VARCHAR(36)
+        tableName: user_friends
+- changeSet:
+    id: 1762345732971-9
+    author: misha (generated)
+    changes:
+    - createTable:
+        columns:
+        - column:
+            constraints:
+              nullable: false
+              primaryKey: true
+              primaryKeyName: notifications_pkey
+            name: notification_id
+            type: VARCHAR(36)
+        - column:
+            constraints:
+              nullable: false
+            name: user_id
+            type: VARCHAR(36)
+        - column:
+            constraints:
+              nullable: false
+            name: type
+            type: VARCHAR(50)
+        - column:
+            constraints:
+              nullable: false
+            name: title
+            type: VARCHAR(200)
+        - column:
+            name: body
+            type: TEXT
+        - column:
+            constraints:
+              nullable: false
+            defaultValueComputed: now()
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+        - column:
+            constraints:
+              nullable: false
+            defaultValueBoolean: false
+            name: is_read
+            type: BOOLEAN
+        tableName: notifications
+- changeSet:
+    id: 1762345732971-10
+    author: misha (generated)
+    changes:
+    - createTable:
+        columns:
+        - column:
+            constraints:
+              nullable: false
+              primaryKey: true
+              primaryKeyName: save_states_pkey
+            name: user_id
+            type: VARCHAR(36)
+        - column:
+            constraints:
+              nullable: false
+            defaultValueNumeric: 10
+            name: slot_count
+            type: INTEGER
+        - column:
+            constraints:
+              nullable: false
+            defaultValueComputed: now()
+            name: updated_at
+            type: TIMESTAMP WITH TIME ZONE
+        - column:
+            constraints:
+              nullable: false
+            defaultValueNumeric: 3
+            name: version
+            type: INTEGER
+        tableName: save_states
+- changeSet:
+    id: 1762345732971-11
+    author: misha (generated)
+    changes:
+    - createTable:
+        columns:
+        - column:
+            constraints:
+              nullable: false
+              primaryKey: true
+              primaryKeyName: save_state_global_slots_pkey
+            name: user_id
+            type: VARCHAR(36)
+        - column:
+            constraints:
+              nullable: false
+              primaryKey: true
+              primaryKeyName: save_state_global_slots_pkey
+            name: slot_index
+            type: INTEGER
+        - column:
+            constraints:
+              nullable: false
+            name: quest_id
+            type: VARCHAR(36)
+        - column:
+            name: quest_name
+            type: VARCHAR(100)
+        - column:
+            constraints:
+              nullable: false
+            name: node_id
+            type: INTEGER
+        - column:
+            name: title
+            type: VARCHAR(200)
+        - column:
+            constraints:
+              nullable: false
+            defaultValueComputed: now()
+            name: updated_at
+            type: TIMESTAMP WITH TIME ZONE
+        tableName: save_state_global_slots
+- changeSet:
+    id: 1762345732971-12
+    author: misha (generated)
+    changes:
+    - createTable:
+        columns:
+        - column:
+            constraints:
+              nullable: false
+              primaryKey: true
+              primaryKeyName: custom_quests_pending_edit_pkey
+            name: quest_id
+            type: VARCHAR(36)
+        - column:
+            constraints:
+              nullable: false
+            name: owner_id
+            type: VARCHAR(36)
+        - column:
+            constraints:
+              nullable: false
+            name: name
+            type: VARCHAR(50)
+        - column:
+            constraints:
+              nullable: false
+            name: start_id
+            type: INTEGER
+        - column:
+            constraints:
+              nullable: false
+            name: nodes_json
+            type: TEXT
+        - column:
+            constraints:
+              nullable: false
+            name: version_note
+            type: VARCHAR(255)
+        - column:
+            constraints:
+              nullable: false
+            name: submitted_at
+            type: TIMESTAMP WITH TIME ZONE
+        tableName: custom_quests_pending_edit
+- changeSet:
+    id: 1762345732971-13
+    author: misha (generated)
+    changes:
+    - createTable:
+        columns:
+        - column:
+            constraints:
+              nullable: false
+              primaryKey: true
+              primaryKeyName: custom_quests_pending_new_pkey
+            name: pending_id
+            type: VARCHAR(50)
+        - column:
+            constraints:
+              nullable: false
+            name: owner_id
+            type: VARCHAR(36)
+        - column:
+            constraints:
+              nullable: false
+            name: name
+            type: VARCHAR(50)
+        - column:
+            constraints:
+              nullable: false
+            name: start_id
+            type: INTEGER
+        - column:
+            constraints:
+              nullable: false
+            name: nodes_json
+            type: TEXT
+        - column:
+            constraints:
+              nullable: false
+            name: version_note
+            type: VARCHAR(255)
+        - column:
+            constraints:
+              nullable: false
+            name: submitted_at
+            type: TIMESTAMP WITH TIME ZONE
+        tableName: custom_quests_pending_new
+- changeSet:
+    id: 1762345732971-14
+    author: misha (generated)
+    changes:
+    - addUniqueConstraint:
+        columnNames: user_login
+        constraintName: users_pk_2
+        tableName: users
+- changeSet:
+    id: 1762345732971-15
+    author: misha (generated)
+    changes:
+    - addUniqueConstraint:
+        columnNames: user_id
+        constraintName: user_stats_pk_2
+        tableName: user_stats
+- changeSet:
+    id: 1762345732971-16
+    author: misha (generated)
+    changes:
+    - createIndex:
+        columns:
+        - column:
+            name: user_id
+        indexName: idx_customquests_userid
+        tableName: custom_quests
+- changeSet:
+    id: 1762345732971-17
+    author: misha (generated)
+    changes:
+    - createIndex:
+        columns:
+        - column:
+            name: quest_id
+        indexName: idx_questnodes_questid
+        tableName: quest_nodes
+- changeSet:
+    id: 1762345732971-18
+    author: misha (generated)
+    changes:
+    - createIndex:
+        columns:
+        - column:
+            name: quest_node_db_id
+        indexName: idx_options_nodeid
+        tableName: options
+- changeSet:
+    id: 1762345732971-19
+    author: misha (generated)
+    changes:
+    - createIndex:
+        columns:
+        - column:
+            name: owner_id
+        - column:
+            name: updated_at
+        indexName: ix_drafts_owner_updated
+        tableName: custom_quest_drafts
+- changeSet:
+    id: 1762345732971-20
+    author: misha (generated)
+    changes:
+    - createIndex:
+        columns:
+        - column:
+            name: owner_id
+        - column:
+            name: target_quest_id
+        - column:
+            name: updated_at
+        indexName: ix_drafts_owner_target_updated
+        tableName: custom_quest_drafts
+- changeSet:
+    id: 1762345732971-21
+    author: misha (generated)
+    changes:
+    - createIndex:
+        columns:
+        - column:
+            name: from_user_id
+        indexName: idx_friend_req_from
+        tableName: friend_requests
+- changeSet:
+    id: 1762345732971-22
+    author: misha (generated)
+    changes:
+    - createIndex:
+        columns:
+        - column:
+            name: to_user_id
+        indexName: idx_friend_req_to
+        tableName: friend_requests
+- changeSet:
+    id: 1762345732971-23
+    author: misha (generated)
+    changes:
+    - addUniqueConstraint:
+        columnNames: from_user_id, to_user_id, status
+        constraintName: uq_friend_req_pair_active
+        tableName: friend_requests
+- changeSet:
+    id: 1762345732971-24
+    author: misha (generated)
+    changes:
+    - createIndex:
+        columns:
+        - column:
+            name: user_id
+        indexName: idx_user_friends_user
+        tableName: user_friends
+- changeSet:
+    id: 1762345732971-25
+    author: misha (generated)
+    changes:
+    - createIndex:
+        columns:
+        - column:
+            name: friend_id
+        indexName: idx_user_friends_friend
+        tableName: user_friends
+- changeSet:
+    id: 1762345732971-26
+    author: misha (generated)
+    changes:
+    - addUniqueConstraint:
+        columnNames: user_id, friend_id
+        constraintName: uq_user_friend_pair_canonical
+        tableName: user_friends
+- changeSet:
+    id: 1762345732971-27
+    author: misha (generated)
+    changes:
+    - createIndex:
+        columns:
+        - column:
+            name: user_id
+        - column:
+            descending: true
+            name: created_at
+        indexName: idx_notifications_user_created
+        tableName: notifications
+- changeSet:
+    id: 1762345732971-28
+    author: misha (generated)
+    changes:
+    - createIndex:
+        columns:
+        - column:
+            name: user_id
+        - column:
+            defaultValueBoolean: false
+            name: is_read
+        indexName: idx_notifications_user_unread
+        tableName: notifications
+- changeSet:
+    id: 1762345732971-29
+    author: misha (generated)
+    changes:
+    - createIndex:
+        columns:
+        - column:
+            descending: true
+            name: created_at
+        indexName: idx_notifications_created
+        tableName: notifications
+- changeSet:
+    id: 1762345732971-30
+    author: misha (generated)
+    changes:
+    - createIndex:
+        columns:
+        - column:
+            name: owner_id
+        - column:
+            name: submitted_at
+        indexName: ix_pending_edit_owner_submitted
+        tableName: custom_quests_pending_edit
+- changeSet:
+    id: 1762345732971-31
+    author: misha (generated)
+    changes:
+    - createIndex:
+        columns:
+        - column:
+            name: owner_id
+        - column:
+            name: submitted_at
+        indexName: ix_pending_new_owner_submitted
+        tableName: custom_quests_pending_new
+- changeSet:
+    id: 1762345732971-32
+    author: misha (generated)
+    changes:
+    - createTable:
+        columns:
+        - column:
+            constraints:
+              nullable: false
+              primaryKey: true
+              primaryKeyName: pk_user_main_endings
+            name: user_id
+            type: VARCHAR(36)
+        - column:
+            constraints:
+              nullable: false
+              primaryKey: true
+              primaryKeyName: pk_user_main_endings
+            name: final_node_id
+            type: INTEGER
+        tableName: user_main_endings
+- changeSet:
+    id: 1762345732971-33
+    author: misha (generated)
+    changes:
+    - addForeignKeyConstraint:
+        baseColumnNames: user_id
+        baseTableName: custom_quests
+        constraintName: fk_customquests_user
+        deferrable: false
+        initiallyDeferred: false
+        onDelete: CASCADE
+        onUpdate: NO ACTION
+        referencedColumnNames: user_id
+        referencedTableName: users
+        validate: true
+- changeSet:
+    id: 1762345732971-34
+    author: misha (generated)
+    changes:
+    - addForeignKeyConstraint:
+        baseColumnNames: from_user_id
+        baseTableName: friend_requests
+        constraintName: fk_friend_req_from
+        deferrable: false
+        initiallyDeferred: false
+        onDelete: CASCADE
+        onUpdate: NO ACTION
+        referencedColumnNames: user_id
+        referencedTableName: users
+        validate: true
+- changeSet:
+    id: 1762345732971-35
+    author: misha (generated)
+    changes:
+    - addForeignKeyConstraint:
+        baseColumnNames: to_user_id
+        baseTableName: friend_requests
+        constraintName: fk_friend_req_to
+        deferrable: false
+        initiallyDeferred: false
+        onDelete: CASCADE
+        onUpdate: NO ACTION
+        referencedColumnNames: user_id
+        referencedTableName: users
+        validate: true
+- changeSet:
+    id: 1762345732971-36
+    author: misha (generated)
+    changes:
+    - addForeignKeyConstraint:
+        baseColumnNames: user_id
+        baseTableName: save_state_global_slots
+        constraintName: fk_global_slots_state
+        deferrable: false
+        initiallyDeferred: false
+        onDelete: CASCADE
+        onUpdate: NO ACTION
+        referencedColumnNames: user_id
+        referencedTableName: save_states
+        validate: true
+- changeSet:
+    id: 1762345732971-37
+    author: misha (generated)
+    changes:
+    - addForeignKeyConstraint:
+        baseColumnNames: user_id
+        baseTableName: notifications
+        constraintName: fk_notifications_user
+        deferrable: false
+        initiallyDeferred: false
+        onDelete: CASCADE
+        onUpdate: NO ACTION
+        referencedColumnNames: user_id
+        referencedTableName: users
+        validate: true
+- changeSet:
+    id: 1762345732971-38
+    author: misha (generated)
+    changes:
+    - addForeignKeyConstraint:
+        baseColumnNames: quest_node_db_id
+        baseTableName: options
+        constraintName: fk_options_questnode
+        deferrable: false
+        initiallyDeferred: false
+        onDelete: CASCADE
+        onUpdate: NO ACTION
+        referencedColumnNames: db_quest_node_id
+        referencedTableName: quest_nodes
+        validate: true
+- changeSet:
+    id: 1762345732971-39
+    author: misha (generated)
+    changes:
+    - addForeignKeyConstraint:
+        baseColumnNames: quest_id
+        baseTableName: quest_nodes
+        constraintName: fk_questnodes_quest
+        deferrable: false
+        initiallyDeferred: false
+        onDelete: CASCADE
+        onUpdate: NO ACTION
+        referencedColumnNames: quest_id
+        referencedTableName: custom_quests
+        validate: true
+- changeSet:
+    id: 1762345732971-40
+    author: misha (generated)
+    changes:
+    - addForeignKeyConstraint:
+        baseColumnNames: user_id
+        baseTableName: save_states
+        constraintName: fk_save_states_user
+        deferrable: false
+        initiallyDeferred: false
+        onDelete: CASCADE
+        onUpdate: NO ACTION
+        referencedColumnNames: user_id
+        referencedTableName: users
+        validate: true
+- changeSet:
+    id: 1762345732971-41
+    author: misha (generated)
+    changes:
+    - addForeignKeyConstraint:
+        baseColumnNames: friend_id
+        baseTableName: user_friends
+        constraintName: fk_user_friends_friend
+        deferrable: false
+        initiallyDeferred: false
+        onDelete: CASCADE
+        onUpdate: NO ACTION
+        referencedColumnNames: user_id
+        referencedTableName: users
+        validate: true
+- changeSet:
+    id: 1762345732971-42
+    author: misha (generated)
+    changes:
+    - addForeignKeyConstraint:
+        baseColumnNames: user_id
+        baseTableName: user_friends
+        constraintName: fk_user_friends_user
+        deferrable: false
+        initiallyDeferred: false
+        onDelete: CASCADE
+        onUpdate: NO ACTION
+        referencedColumnNames: user_id
+        referencedTableName: users
+        validate: true
+- changeSet:
+    id: 1762345732971-43
+    author: misha (generated)
+    changes:
+    - addForeignKeyConstraint:
+        baseColumnNames: user_id
+        baseTableName: user_stats
+        constraintName: fk_user_stats_user
+        deferrable: false
+        initiallyDeferred: false
+        onDelete: CASCADE
+        onUpdate: NO ACTION
+        referencedColumnNames: user_id
+        referencedTableName: users
+        validate: true
+- changeSet:
+    id: 1762345732971-44
+    author: misha (generated)
+    changes:
+    - addForeignKeyConstraint:
+        baseColumnNames: user_id
+        baseTableName: user_main_endings
+        constraintName: user_main_endings_user_id_fkey
+        deferrable: false
+        initiallyDeferred: false
+        onDelete: CASCADE
+        onUpdate: NO ACTION
+        referencedColumnNames: user_id
+        referencedTableName: users
+        validate: true
+

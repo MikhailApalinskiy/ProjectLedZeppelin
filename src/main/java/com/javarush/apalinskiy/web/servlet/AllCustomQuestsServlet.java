@@ -15,55 +15,30 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.List;
 
 /**
  * Servlet responsible for displaying the list of all published custom quests.
- * <p>
- * This servlet provides a read-only view of the catalog for end-users:
- * it lists all quests stored in the catalog repository, attaches owner names,
- * and forwards the data to a JSP view for rendering.
- * <p>
- * <b>Initialization:</b><br>
- * On startup, retrieves {@link QuestAuthoringService} and {@link UserService}
- * from the servlet context. If either service is missing, the servlet fails
- * with {@link UnavailableException}.
- * <p>
- * <b>GET:</b><br>
- * Renders a page with the list of all available custom quests.
- * Flash messages and errors (if any) are pulled from the request/session.
- * Quests are enriched with owner display names and filtered/attached
- * using helper methods in {@link Web}.
- * <p>
- * <b>Security:</b> This servlet is public and does not perform authorization;
- * visibility of actions in the view (e.g. owner actions) is controlled via request attributes.
  *
- * @author Your Name
- * @since 1.0
+ * <p>This servlet provides a paginated view of all quests available in the global catalog.
+ * It is typically used on the public “All Quests” page, accessible to both logged-in and
+ * anonymous users.</p>
+ *
+ * <p>The servlet supports search and pagination through query parameters parsed by
+ * {@link Web.Params}. It also attaches quest owner names to the list using
+ * {@link UserService} for display in JSP.</p>
  */
 public class AllCustomQuestsServlet extends HttpServlet {
 
     private static final Logger log = LoggerFactory.getLogger(AllCustomQuestsServlet.class);
 
-    /**
-     * Provides access to quest catalog and draft editor operations.
-     */
     private QuestAuthoringService authoring;
-    /**
-     * Provides access to user information, used to resolve quest owners.
-     */
     private UserService userService;
 
     /**
-     * Initializes servlet dependencies by looking up context beans for
-     * {@link QuestAuthoringService} and {@link UserService}.
-     * <p>
-     * If either service is not available in the servlet context,
-     * the servlet cannot function and is marked unavailable.
+     * Initializes the servlet and retrieves required beans from the application context.
      *
      * @param c servlet configuration
-     * @throws ServletException     if superclass initialization fails
-     * @throws UnavailableException if required services are not found
+     * @throws ServletException if service beans are missing from the context
      */
     @Override
     public void init(ServletConfig c) throws ServletException {
@@ -79,37 +54,37 @@ public class AllCustomQuestsServlet extends HttpServlet {
     }
 
     /**
-     * Handles GET requests by rendering the list of all custom quests.
-     * <p>
-     * Behavior:
+     * Handles GET requests and renders a paginated list of all published quests.
+     *
+     * <p>The method extracts pagination and search parameters using {@link Web#extract(HttpServletRequest)},
+     * retrieves paged results from the {@link QuestAuthoringService}, and forwards them to the
+     * JSP page defined by {@link WebConst.Jsp#QUESTS_LIST}.</p>
+     *
+     * <p>Attributes added to the request scope:</p>
      * <ul>
-     *   <li>Pulls flash and error messages from the request/session.</li>
-     *   <li>Retrieves all quests from the catalog via {@code authoring}.</li>
-     *   <li>Attaches owner display names using {@code userService}.</li>
-     *   <li>Logs how many items were found.</li>
-     *   <li>Applies additional filtering and attaches quests using
-     *       {@link Web#filterAndAttachQuests(HttpServletRequest, List)}.</li>
-     *   <li>Sets common view attributes: {@code pageTitleKey}, {@code showOwnerActions}, {@code selfUrl}.</li>
-     *   <li>Forwards the request to {@link WebConst.Jsp#QUESTS_LIST} for rendering.</li>
+     *     <li>{@code pageTitleKey} — localization key for the page title</li>
+     *     <li>{@code showOwnerActions} — flag indicating no owner-specific actions</li>
+     *     <li>{@code selfUrl} — the current servlet path for UI links</li>
      * </ul>
      *
-     * @param req  current HTTP request
-     * @param resp current HTTP response
-     * @throws ServletException if forwarding fails
-     * @throws IOException      if forwarding the request/response fails
+     * @param req  HTTP request containing search and pagination parameters
+     * @param resp HTTP response used to render the JSP
+     * @throws ServletException if JSP forwarding fails
+     * @throws IOException      if an I/O error occurs
      */
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp)
             throws ServletException, IOException {
         Web.pullFlash(req, WebConst.Attr.FLASH);
         Web.pullFlash(req, WebConst.Attr.ERROR);
-        List<CustomQuest> items = authoring.listAllFromCatalog();
-        Web.attachOwnerNamesById(req, items, userService);
-        log.info("All custom quests page opened, items={}", items.size());
-        Web.filterAndAttachQuests(req, items);
+        Web.Params params = Web.extract(req);
+        QuestAuthoringService.Paged<CustomQuest> paged =
+                authoring.listAllFromCatalogPaged(params.q, params.page, params.size);
+        Web.applyPagedList(req, paged, userService, params.q);
         req.setAttribute("pageTitleKey", "all.quests");
         req.setAttribute("showOwnerActions", Boolean.FALSE);
         req.setAttribute("selfUrl", req.getContextPath() + req.getServletPath());
+        log.info("All custom quests paged: q='{}' page={}/{} total={}", params.q, paged.getPage(), paged.getPages(), paged.getTotal());
         Web.forward(req, resp, WebConst.Jsp.QUESTS_LIST);
     }
 }

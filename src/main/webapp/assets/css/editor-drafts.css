@@ -1,0 +1,204 @@
+
+.page-drafts .header-inline-space {
+    padding-bottom: 0;
+}
+
+.input {
+    height: var(--btn-h);
+    padding: 0 12px;
+    border-radius: 12px;
+    border: 1px solid rgba(127, 127, 127, .22);
+    background: rgba(127, 127, 127, .06);
+    color: rgb(var(--fg));
+    outline: 2px solid transparent;
+    transition: outline-color .18s, box-shadow .18s, background .18s, border-color .18s;
+}
+
+.input:focus-visible {
+    outline-color: rgba(var(--ring), .6);
+    box-shadow: 0 6px 14px rgba(var(--primary), .18);
+}
+
+.input-name {
+    width: 260px !important;
+    max-width: 260px !important;
+    flex: 0 0 260px;
+}
+
+.input-rename {
+    flex: 1 1 0;
+    min-width: 180px;
+}
+
+.list {
+    margin: 0;
+}
+
+.stack {
+    display: grid;
+    gap: 14px;
+}
+
+.stack-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+}
+
+.stack-actions .inline-form {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 0 0 auto;
+    flex-wrap: nowrap;
+    padding-right: 12px;
+}
+
+.ql-card {
+    background: rgba(var(--card), 1);
+    border: 1px solid rgba(120, 120, 120, .12);
+    border-radius: 12px;
+    padding: 14px;
+    box-shadow: var(--shadow);
+}
+
+.ql-card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 6px;
+}
+
+.ql-name {
+    margin: 0;
+    font-size: clamp(16px, 2.1vw, 20px);
+    line-height: 1.25;
+    letter-spacing: .2px;
+}
+
+.ql-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(var(--primary), .35);
+    background: rgba(var(--primary), .10);
+    color: rgb(var(--fg));
+    font-size: 13px;
+    white-space: nowrap;
+}
+
+.ql-badge code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    font-size: 12px;
+    opacity: .9;
+}
+
+.ql-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 14px;
+    align-items: center;
+    margin: 0 0 10px 0;
+    color: rgb(var(--muted));
+    font-size: 14px;
+}
+
+.ql-meta-item strong {
+    color: rgb(var(--fg));
+}
+
+.ql-dot {
+    opacity: .6;
+}
+
+.page-drafts .btn-primary {
+    background: rgb(var(--primary)) !important;
+    color: #fff !important;
+    box-shadow: 0 6px 14px rgba(var(--primary), .28);
+}
+
+.page-drafts .btn-primary:hover,
+.page-drafts .btn-primary:focus-visible {
+    background: rgb(var(--primary-hover)) !important;
+}
+
+.page-drafts .btn-danger {
+    background: rgb(var(--danger)) !important;
+    color: #fff !important;
+    box-shadow: 0 6px 14px rgba(var(--danger), .28);
+}
+
+.page-drafts .btn-danger:hover,
+.page-drafts .btn-danger:focus-visible {
+    background: rgb(var(--danger-hover)) !important;
+}
+
+.page-drafts .btn-ghost {
+    background: transparent !important;
+    border: 1px solid rgba(127, 127, 127, .3) !important;
+    color: inherit !important;
+}
+
+.sr-only {
+    position: absolute !important;
+    width: 1px !important;
+    height: 1px !important;
+    padding: 0 !important;
+    margin: -1px !important;
+    overflow: hidden !important;
+    clip: rect(0, 0, 0, 0) !important;
+    white-space: nowrap !important;
+    border: 0 !important;
+}
+
+@media (max-width: 720px) {
+    .stack-actions {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .actions {
+        justify-content: flex-start;
+        padding-right: 0;
+    }
+}
+
+@media (max-width: 640px) {
+    .ql-card {
+        padding: 12px;
+    }
+
+    .btn, .input {
+        height: calc(var(--btn-h) - 2px);
+    }
+}
+
+.page-drafts .header-actions .inline-form {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: nowrap;
+}
+
+@media (max-width: 520px) {
+    .page-drafts .header-actions .inline-form {
+        flex-wrap: wrap;
+    }
+
+    .input-name {
+        flex: 1 1 220px;
+        max-width: 100% !important;
+    }
+}

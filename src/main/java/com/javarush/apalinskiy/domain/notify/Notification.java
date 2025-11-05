@@ -1,112 +1,91 @@
 package com.javarush.apalinskiy.domain.notify;
 
+import com.javarush.apalinskiy.domain.user.User;
+import jakarta.persistence.*;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import java.time.Instant;
 import java.util.Date;
 import java.util.UUID;
 
 /**
- * Represents a user notification within the system.
- * <p>
- * Each notification is immutable and contains:
- * <ul>
- *   <li>A unique identifier {@link #id}.</li>
- *   <li>The target user ID {@link #userId}.</li>
- *   <li>A {@link NotificationType} indicating the notification category.</li>
- *   <li>A short title and optional body message.</li>
- *   <li>The creation timestamp {@link #createdAt}.</li>
- *   <li>A {@code read} flag indicating if the notification was acknowledged.</li>
- * </ul>
- * <p>
- * Instances are created via the static factory method {@link #of(String, NotificationType, String, String)}
- * or as a new copy through {@link #markRead()}.
+ * Represents a user notification entity in the system.
  *
- * <p>This class is annotated with Lombok {@code @Getter}, so all fields have getters generated automatically.</p>
+ * <p>Each {@code Notification} is stored in the {@code notifications} table and
+ * belongs to a specific {@link User}. Notifications contain information such as
+ * title, body, creation time, type, and read status.</p>
+ *
+ * <p>Instances are typically created using the factory method
+ * {@link #of(User, NotificationType, String, String)}.</p>
  */
 @Getter
+@Setter
+@NoArgsConstructor
+@Entity
+@Table(name = "notifications")
 public class Notification {
 
-    /**
-     * Unique identifier of the notification.
-     */
-    private final String id;
-    /**
-     * ID of the user this notification belongs to.
-     */
-    private final String userId;
-    /**
-     * Type/category of the notification.
-     */
-    private final NotificationType type;
-    /**
-     * Short title of the notification.
-     */
-    private final String title;
-    /**
-     * Optional body message with more details.
-     */
-    private final String body;
-    /**
-     * Creation timestamp of the notification.
-     */
-    private final Instant createdAt;
-    /**
-     * Flag indicating whether this notification has been read.
-     */
-    private final boolean read;
+    /** Unique notification identifier (UUID as a string). */
+    @Id
+    @Column(name = "notification_id", nullable = false, length = 36)
+    private String id;
+
+    /** Type of the notification (e.g., FRIEND_REQUEST, SYSTEM, MESSAGE). */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "type", nullable = false, length = 50)
+    private NotificationType type;
+
+    /** Notification title shown in user interface. */
+    @Column(name = "title", nullable = false, length = 200)
+    private String title;
+
+    /** Optional detailed message body (may be {@code null}). */
+    @Column(name = "body", columnDefinition = "TEXT")
+    private String body;
+
+    /** Timestamp when the notification was created. */
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private Instant createdAt;
+
+    /** Indicates whether the notification has been read by the user. */
+    @Column(name = "is_read", nullable = false)
+    private Boolean read;
+
+    /** The user who owns this notification. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
 
     /**
-     * Constructs a new {@code Notification}.
+     * Creates and initializes a new {@code Notification} instance.
      *
-     * @param id        unique identifier
-     * @param userId    target user ID
-     * @param type      type of notification
-     * @param title     short title
-     * @param body      detailed message body (may be {@code null})
-     * @param createdAt creation timestamp (if {@code null}, defaults to {@link Instant#now()})
-     * @param read      whether the notification is marked as read
+     * <p>Automatically generates a unique UUID, sets {@code createdAt} to
+     * the current time, and marks the notification as unread.</p>
+     *
+     * @param user  the target user who will receive this notification
+     * @param type  the {@link NotificationType} describing the notification category
+     * @param title the short notification title
+     * @param body  the detailed message body (optional)
+     * @return a fully initialized {@code Notification} instance
      */
-    private Notification(String id, String userId, NotificationType type,
-                         String title, String body, Instant createdAt, boolean read) {
-        this.id = id;
-        this.userId = userId;
-        this.type = type;
-        this.title = title;
-        this.body = body;
-        this.createdAt = createdAt == null ? Instant.now() : createdAt;
-        this.read = read;
+    public static Notification of(User user, NotificationType type, String title, String body) {
+        Notification n = new Notification();
+        n.id = UUID.randomUUID().toString();
+        n.user = user;
+        n.type = type;
+        n.title = title;
+        n.body = body;
+        n.createdAt = Instant.now();
+        n.read = false;
+        return n;
     }
 
     /**
-     * Creates a new unread notification with a random unique ID and current timestamp.
+     * Returns the {@link Date} representation of the creation timestamp.
      *
-     * @param userId target user ID
-     * @param type   type of notification
-     * @param title  short title
-     * @param body   detailed message body
-     * @return newly created {@code Notification} instance
-     */
-    public static Notification of(String userId, NotificationType type, String title, String body) {
-        return new Notification(UUID.randomUUID().toString(), userId, type, title, body, Instant.now(), false);
-    }
-
-    /**
-     * Returns a copy of this notification marked as read.
-     *
-     * @return new {@code Notification} instance with {@code read=true}
-     */
-    public Notification markRead() {
-        return new Notification(id, userId, type, title, body, createdAt, true);
-    }
-
-    /**
-     * Returns the creation timestamp as a legacy {@link Date} instance.
-     * <p>
-     * Useful for JSP/EL bindings or APIs expecting {@code Date}.
-     * </p>
-     *
-     * @return creation time as {@link Date}
+     * @return creation date as a {@link java.util.Date} instance
      */
     @SuppressWarnings("unused")
     public Date getCreatedAtDate() {

@@ -13,31 +13,33 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 
 /**
- * Servlet filter that restricts access to admin-only resources.
- * <p>
- * This filter checks the authenticated user stored in the HTTP session and
- * ensures they have the {@link Role#ADMIN} role. If the user is missing
- * or not an admin, they are redirected to the home page with an
- * "Access denied" error message.
- * </p>
+ * Servlet filter that restricts access to administrative resources.
  *
- * <h3>Responsibilities</h3>
- * <ul>
- *   <li>Block anonymous users from accessing admin-only endpoints.</li>
- *   <li>Block authenticated non-admin users from accessing admin-only endpoints.</li>
- *   <li>Allow requests to proceed if the user is an admin.</li>
- * </ul>
+ * <p>This filter ensures that only authenticated users with the {@link Role#ADMIN}
+ * role can access the protected endpoints. All unauthorized or anonymous requests
+ * are redirected to the home page with an error message.</p>
  *
- * <h3>Logging</h3>
- * <ul>
- *   <li>Logs warnings when access is denied (anonymous or non-admin).</li>
- *   <li>Logs info messages when admin access is granted.</li>
- * </ul>
+ * <p>Typical usage: register this filter in {@code web.xml} or via annotation to
+ * protect administrative sections of the application such as moderation panels
+ * or system management pages.</p>
  */
 public class AdminOnlyFilter implements Filter {
 
     private static final Logger log = LoggerFactory.getLogger(AdminOnlyFilter.class);
 
+    /**
+     * Intercepts incoming requests and validates that the current user has administrative privileges.
+     *
+     * <p>If the session does not contain a user or the user’s role is not ADMIN,
+     * the request is denied and the client is redirected to the home page with an
+     * appropriate error message.</p>
+     *
+     * @param req incoming servlet request
+     * @param resp outgoing servlet response
+     * @param chain filter chain for passing control to the next filter or servlet
+     * @throws IOException if an I/O error occurs during processing
+     * @throws ServletException if the request cannot be processed further
+     */
     @Override
     public void doFilter(ServletRequest req, ServletResponse resp, FilterChain chain)
             throws IOException, ServletException {

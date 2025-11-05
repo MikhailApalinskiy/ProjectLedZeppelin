@@ -1,50 +1,56 @@
 package com.javarush.apalinskiy.domain.notify;
 
 /**
- * Enumeration of supported notification types in the system.
- * <p>
- * Each value represents a specific category of event that can generate a {@link Notification}.
- * These types are typically used in {@link NotificationEvent} and processed by
- * {@code NotificationService}.
- * </p>
+ * Defines all possible types of notifications that can be sent to users.
  *
+ * <p>Each {@link NotificationType} represents a distinct event or state change
+ * within the TextQuest platform that may trigger user-facing notifications.</p>
+ *
+ * <h2>Available types</h2>
  * <ul>
- *   <li>{@link #FRIEND_REQUEST} – a user has sent a friend request.</li>
- *   <li>{@link #FRIEND_ACCEPTED} – a friend request was accepted.</li>
- *   <li>{@link #FRIEND_PUBLISHED_QUEST} – a friend published a new quest.</li>
- *   <li>{@link #QUEST_MODERATED} – a quest has been moderated (approved or rejected).</li>
- *   <li>{@link #QUEST_ADMIN_CHANGED} – an admin has changed quest details.</li>
- *   <li>{@link #USER_ADMIN_CHANGED} – an admin has changed user details.</li>
- *   <li>{@link #FRIEND_REMOVED} – a friend has been removed from the list.</li>
+ *   <li>{@link #FRIEND_REQUEST} — a new friend request has been received</li>
+ *   <li>{@link #FRIEND_ACCEPTED} — a sent friend request has been accepted</li>
+ *   <li>{@link #FRIEND_PUBLISHED_QUEST} — a friend has published a new quest</li>
+ *   <li>{@link #QUEST_MODERATED} — a user’s quest has been moderated by an admin</li>
+ *   <li>{@link #QUEST_ADMIN_CHANGED} — administrative changes were made to a quest</li>
+ *   <li>{@link #USER_ADMIN_CHANGED} — the user’s account permissions were modified by an admin</li>
+ *   <li>{@link #FRIEND_REMOVED} — a friend has removed the user from their friend list</li>
  * </ul>
  */
 public enum NotificationType {
+
     /**
-     * A user has sent a friend request.
+     * A new friend request has been received.
      */
     FRIEND_REQUEST,
+
     /**
-     * A friend request was accepted.
+     * A friend request was accepted by the recipient.
      */
     FRIEND_ACCEPTED,
+
     /**
-     * A friend published a new quest.
+     * A friend has published a new quest.
      */
     FRIEND_PUBLISHED_QUEST,
+
     /**
-     * A quest has been moderated (approved or rejected).
+     * A quest has been reviewed or moderated by an administrator.
      */
     QUEST_MODERATED,
+
     /**
-     * An admin has changed quest details.
+     * Administrative changes were made to a quest (e.g. forced update or unpublish).
      */
     QUEST_ADMIN_CHANGED,
+
     /**
-     * An admin has changed user details.
+     * Administrative changes were made to a user account (e.g. role update or ban).
      */
     USER_ADMIN_CHANGED,
+
     /**
-     * A friend has been removed from the list.
+     * A friend relationship has been removed.
      */
     FRIEND_REMOVED
 }

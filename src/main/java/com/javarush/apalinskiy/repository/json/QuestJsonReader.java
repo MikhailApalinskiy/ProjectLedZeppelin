@@ -9,41 +9,25 @@ import java.io.Reader;
 import java.util.List;
 
 /**
- * Utility class for reading quest definitions from JSON.
- * <p>
- * Wraps a configured Jackson {@link ObjectMapper} that
- * deserializes JSON arrays of {@link QuestNode} objects.
- * Unknown JSON properties are ignored to allow forward compatibility.
- * </p>
+ * Utility class for reading quest data from JSON sources.
  *
- * <h3>Usage example</h3>
- * <pre>{@code
- * QuestJsonReader reader = new QuestJsonReader();
- * try (Reader r = Files.newBufferedReader(Path.of("quest.json"))) {
- *     List<QuestNode> nodes = reader.read(r);
- * }
- * }</pre>
+ * <p>Uses a preconfigured Jackson {@link ObjectMapper} to deserialize JSON arrays
+ * into lists of {@link QuestNode} objects. Unknown JSON fields are ignored
+ * for forward compatibility.</p>
  *
- * <h3>Configuration</h3>
- * <ul>
- *   <li>{@link DeserializationFeature#FAIL_ON_UNKNOWN_PROPERTIES} is disabled –
- *       extra fields in JSON will not cause errors.</li>
- * </ul>
+ * <p>This class is thread-safe due to the static, immutable {@code ObjectMapper} configuration.</p>
  */
 public class QuestJsonReader {
 
-    /**
-     * Shared Jackson {@link ObjectMapper} configured for quest JSON parsing.
-     */
     private static final ObjectMapper MAPPER = new ObjectMapper()
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
     /**
-     * Reads quest nodes from a JSON array using the provided {@link Reader}.
+     * Reads and deserializes a list of {@link QuestNode} objects from a character stream.
      *
-     * @param reader the character stream containing quest JSON
-     * @return list of parsed {@link QuestNode} objects
-     * @throws IOException if reading or parsing fails
+     * @param reader a JSON reader providing quest data
+     * @return list of quest nodes parsed from JSON
+     * @throws IOException if an I/O or parsing error occurs
      */
     public List<QuestNode> read(Reader reader) throws IOException {
         return MAPPER.readerForListOf(QuestNode.class).readValue(reader);

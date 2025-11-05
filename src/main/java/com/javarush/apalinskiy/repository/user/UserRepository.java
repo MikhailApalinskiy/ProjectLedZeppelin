@@ -1,84 +1,82 @@
 package com.javarush.apalinskiy.repository.user;
 
 import com.javarush.apalinskiy.domain.user.User;
-import com.javarush.apalinskiy.exceptions.DuplicateIdException;
-import com.javarush.apalinskiy.exceptions.DuplicateLoginException;
 
 import java.util.List;
-import java.util.NoSuchElementException;
 import java.util.Optional;
 
 /**
  * Repository interface for managing {@link User} entities.
- * <p>
- * Provides persistence operations for storing, retrieving,
- * and updating user accounts.
- * </p>
  *
- * <h3>Contract</h3>
- * <ul>
- *   <li>Each user must have a unique {@code userId} and {@code userLogin}.</li>
- *   <li>Logins are treated case-insensitively and should be normalized to lowercase.</li>
- *   <li>{@link #save(User)} is used only for new users, and must fail if
- *       the ID or login already exists.</li>
- *   <li>{@link #update(User)} must fail if the user does not already exist,
- *       and must preserve uniqueness of login across users.</li>
- *   <li>{@link #findAll()} should return users in a deterministic order,
- *       typically sorted by creation time and then by login.</li>
- *   <li>Implementations must be thread-safe if accessed concurrently.</li>
- * </ul>
+ * <p>This interface defines persistence operations related to user accounts,
+ * including creation, update, lookup, and pagination. It is implemented by
+ * Hibernate-based classes such as {@code HUserRepository} that handle entity
+ * management and constraint enforcement (e.g. duplicate login or ID).</p>
+ *
+ * <p>Each {@link User} entity represents an application account with a unique
+ * login and a generated identifier. Uniqueness constraints are typically enforced
+ * at both the database and application level through exceptions like
+ * {@code DuplicateLoginException} and {@code DuplicateIdException}.</p>
  */
 public interface UserRepository {
 
     /**
-     * Finds a user by login.
-     * <p>
-     * Implementations should normalize the login (trim and lowercase)
-     * before lookup.
-     * </p>
+     * Returns a paginated list of users ordered by creation date (descending)
+     * and login (ascending).
      *
-     * @param userLogin login to search
-     * @return optional containing the user if found
+     * @param page page number (1-based)
+     * @param size number of records per page
+     * @return immutable list of users for the requested page
+     */
+    List<User> findPage(int page, int size);
+
+    /**
+     * Retrieves a user by their unique login name.
+     *
+     * @param userLogin login string (case-insensitive)
+     * @return optional containing the found user, or empty if not found
      */
     Optional<User> findByLogin(String userLogin);
 
     /**
-     * Finds a user by ID.
+     * Retrieves a user by their unique identifier.
      *
-     * @param id user ID
-     * @return optional containing the user if found
+     * @param id user ID (UUID string)
+     * @return optional containing the found user, or empty if not found
      */
     Optional<User> findById(String id);
 
     /**
-     * Saves a new user.
-     * <p>
-     * Must enforce uniqueness of {@code userId} and {@code userLogin}.
+     * Persists a new user to the database.
+     *
+     * <p>If a user with the same login or ID already exists, an exception is thrown:
+     * <ul>
+     *   <li>{@code DuplicateLoginException} — when the login already exists</li>
+     *   <li>{@code DuplicateIdException} — when the user ID already exists</li>
+     * </ul>
      * </p>
      *
-     * @param user user to persist
-     * @throws DuplicateLoginException if login already exists
-     * @throws DuplicateIdException    if userId already exists
+     * @param user new {@link User} entity to persist
+     * @throws com.javarush.apalinskiy.exceptions.DuplicateLoginException if login is not unique
+     * @throws com.javarush.apalinskiy.exceptions.DuplicateIdException    if user ID is not unique
      */
     void save(User user);
 
     /**
-     * Updates an existing user.
-     * <p>
-     * Must throw an exception if the user does not exist.
-     * If login changes, must enforce uniqueness.
-     * </p>
+     * Updates an existing user in the database.
      *
-     * @param user user with updated fields
-     * @throws NoSuchElementException  if user not found
-     * @throws DuplicateLoginException if new login already exists
+     * <p>Attempts to merge the entity state with the current persistence context.
+     * If a login conflict occurs, a {@code DuplicateLoginException} is thrown.</p>
+     *
+     * @param user {@link User} entity with updated fields
+     * @throws com.javarush.apalinskiy.exceptions.DuplicateLoginException if new login conflicts with another user
      */
     void update(User user);
 
     /**
-     * Returns all users in deterministic order.
+     * Counts the total number of registered users.
      *
-     * @return list of users (never {@code null}, may be empty)
+     * @return total user count in the system
      */
-    List<User> findAll();
+    long countAll();
 }

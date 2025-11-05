@@ -20,54 +20,25 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * Admin-only preview servlet that renders a temporary SVG graph for quests
- * undergoing moderation (either a newly submitted quest or a pending edit).
- * <p>
- * The servlet reads pending items from {@link QuestAuthoringService} and
- * builds a view model for the SVG graph using {@link Web#buildQuestSvgModel}.
- * It does not mutate state and is safe to refresh.
- * </p>
+ * Servlet for displaying quest graphs during the moderation process.
  *
- * <h3>Access</h3>
- * <p>
- * Intended to be protected by admin auth (e.g., a security filter).
- * This class assumes authentication/authorization is enforced upstream.
- * </p>
+ * <p>This servlet allows administrators to preview quests submitted for moderation
+ * — either new quest submissions or edits to existing quests. It visualizes
+ * the quest structure (nodes and options) as an SVG graph for manual review.</p>
  *
- * <h3>Query parameters (GET)</h3>
+ * <p>Supported request parameters:</p>
  * <ul>
- *   <li><b>kind</b> — {@code "new"} or {@code "edit"}. Determines which pending list to search.</li>
- *   <li><b>id</b> — identifier of the pending item:
- *     <ul>
- *       <li>for {@code kind=new}: {@code pendingId}</li>
- *       <li>for {@code kind=edit}: {@code questId}</li>
- *     </ul>
- *   </li>
+ *     <li>{@code kind} — defines the type of moderation item:
+ *         <ul>
+ *             <li>{@code new} — for newly submitted quests</li>
+ *             <li>{@code edit} — for quest edit submissions</li>
+ *         </ul>
+ *     </li>
+ *     <li>{@code id} — the identifier of the pending quest item</li>
  * </ul>
  *
- * <h3>Response</h3>
- * <ul>
- *   <li><b>200</b> — forwards to {@code WebConst.Jsp.QUESTS_MOD_PREVIEW} with attributes:</li>
- *   <ul>
- *     <li>{@code previewTitle} — human-friendly header for the preview page.</li>
- *     <li>{@code backUrl} — URL back to moderation list ({@code WebConst.Path.QUESTS_MOD}).</li>
- *     <li>SVG graph model attributes populated by {@link Web#buildQuestSvgModel}.</li>
- *   </ul>
- *   <li><b>400</b> — missing/unknown parameters.</li>
- *   <li><b>404</b> — pending item not found.</li>
- * </ul>
- *
- * <h3>Notes</h3>
- * <ul>
- *   <li>Only non-null nodes are passed to the renderer (see {@link #sanitize(List)}).</li>
- *   <li>Start node is taken from the pending item and passed to the SVG builder.</li>
- * </ul>
- *
- * @see QuestAuthoringService
- * @see CustomQuestRepository.PendingNew
- * @see CustomQuestRepository.PendingEdit
- * @see Web#buildQuestSvgModel(HttpServletRequest, List, int, boolean)
- * @see WebConst
+ * <p>The servlet delegates SVG graph rendering to {@link Web#buildQuestSvgModel(HttpServletRequest, List, int, boolean)}
+ * and forwards the result to the JSP defined by {@link WebConst.Jsp#QUESTS_MOD_PREVIEW}.</p>
  */
 public class AdminModerationGraphServlet extends HttpServlet {
 
@@ -76,9 +47,10 @@ public class AdminModerationGraphServlet extends HttpServlet {
     private QuestAuthoringService authoring;
 
     /**
-     * Initializes the servlet by resolving {@link QuestAuthoringService} from the servlet context.
+     * Initializes the servlet by obtaining the {@link QuestAuthoringService} bean from the application context.
      *
-     * @throws UnavailableException if the service is not present in the context
+     * @param config servlet configuration provided by the container
+     * @throws ServletException if the service cannot be initialized
      */
     @Override
     public void init(ServletConfig config) throws ServletException {
@@ -94,15 +66,15 @@ public class AdminModerationGraphServlet extends HttpServlet {
     }
 
     /**
-     * Renders a read-only preview of a pending quest graph for moderation.
-     * <p>
-     * Required params: {@code kind} (new|edit), {@code id}.
-     * </p>
-     * <ul>
-     *   <li>When {@code kind=new}: searches {@link QuestAuthoringService#listPendingNew()} by {@code pendingId}.</li>
-     *   <li>When {@code kind=edit}: searches {@link QuestAuthoringService#listPendingEdits()} by {@code questId}.</li>
-     * </ul>
-     * On success, builds the SVG model and forwards to {@code WebConst.Jsp.QUESTS_MOD_PREVIEW}.
+     * Handles GET requests for quest moderation previews.
+     *
+     * <p>Based on the {@code kind} parameter, this method fetches either a pending new quest
+     * or a pending quest edit from the moderation queue and builds its graphical representation.</p>
+     *
+     * @param req  current HTTP request
+     * @param resp current HTTP response
+     * @throws ServletException if request forwarding fails
+     * @throws IOException      if an I/O error occurs
      */
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp)
@@ -157,10 +129,10 @@ public class AdminModerationGraphServlet extends HttpServlet {
     }
 
     /**
-     * Ensures the node list has no {@code null} entries and replaces {@code null} with an empty list.
+     * Removes null values from the provided quest node list for safe rendering.
      *
-     * @param src original list (may be {@code null})
-     * @return non-null list containing only non-null nodes
+     * @param src list of quest nodes
+     * @return sanitized list without null elements
      */
     private static List<QuestNode> sanitize(List<QuestNode> src) {
         return (src == null) ? List.of() : src.stream().filter(Objects::nonNull).collect(Collectors.toList());

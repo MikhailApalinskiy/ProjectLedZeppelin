@@ -109,7 +109,7 @@
                                type="text" minlength="2" maxlength="60" required
                                placeholder="Например: Михаил" autocomplete="name"/>
                     </div>
-                    <div class="help">От 2 до 60 символов. Видно другим пользователям.</div>
+                    <div class="help">До 20 символов. Видно другим пользователям.</div>
                 </div>
 
                 <div class="actions">

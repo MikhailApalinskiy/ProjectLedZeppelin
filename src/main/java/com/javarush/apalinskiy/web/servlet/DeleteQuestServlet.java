@@ -22,68 +22,32 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Servlet responsible for deleting quests from the catalog.
- * <p>
- * Supports only <b>POST</b> requests. A quest may be deleted either by its owner
- * or by an administrator:
- * <ul>
- *   <li>Owners can delete only their own quests.</li>
- *   <li>Administrators can delete any quest, and the quest owner will be notified if present.</li>
- * </ul>
- * <p>
- * <b>GET</b> requests are explicitly disallowed and result in HTTP 405 (Method Not Allowed).
- * <p>
- * Side effects include:
- * <ul>
- *   <li>Removing a quest from the catalog repository.</li>
- *   <li>Setting flash or error messages in the session.</li>
- *   <li>Redirecting to a "next" page or default path.</li>
- *   <li>Sending notifications to quest owners when an administrator deletes their quest.</li>
- * </ul>
+ * Servlet handling deletion of quests from the catalog.
  *
- * <b>Security:</b> Assumes that user authentication is handled outside. An anonymous user
- * is redirected to the login page.
+ * <p>Supports both user-driven deletion (if the actor is the owner)
+ * and administrative deletion (if the actor has {@code ADMIN} role).</p>
  *
- * @author Your Name
- * @since 1.0
+ * <p>Responsibilities:</p>
+ * <ul>
+ *   <li>Verify authentication and permissions</li>
+ *   <li>Delete quest from catalog via {@link QuestAuthoringService}</li>
+ *   <li>Notify quest owners if deleted by admin</li>
+ *   <li>Redirect back with flash or error message</li>
+ * </ul>
  */
 public class DeleteQuestServlet extends HttpServlet {
 
     private static final Logger log = LoggerFactory.getLogger(DeleteQuestServlet.class);
 
-    /**
-     * Service providing quest catalog access and deletion operations.
-     */
     private transient QuestAuthoringService authoring;
-
-    /**
-     * Notification service for informing users when an admin deletes their quest.
-     * Optional — may be {@code null}.
-     */
     private transient NotificationService notifications;
-
-    /**
-     * User service for resolving user details (optional).
-     */
     private transient UserService users;
 
     /**
-     * Initializes required and optional backend services from the servlet context.
-     * <p>
-     * Required:
-     * <ul>
-     *   <li>{@link QuestAuthoringService}</li>
-     * </ul>
-     * Optional:
-     * <ul>
-     *   <li>{@link NotificationService}</li>
-     *   <li>{@link UserService}</li>
-     * </ul>
-     * If {@link QuestAuthoringService} is not found, the servlet is marked unavailable.
+     * Initializes required services from {@link jakarta.servlet.ServletContext}.
      *
      * @param config servlet configuration
-     * @throws ServletException     if superclass initialization fails
-     * @throws UnavailableException if required services are missing
+     * @throws ServletException if the authoring service is missing
      */
     @Override
     public void init(ServletConfig config) throws ServletException {
@@ -121,34 +85,19 @@ public class DeleteQuestServlet extends HttpServlet {
     }
 
     /**
-     * Handles POST requests for deleting a quest.
-     * <p>
-     * Behavior:
-     * <ul>
-     *   <li>Requires an authenticated {@link User} stored in the session.
-     *       Anonymous users are redirected to the login page.</li>
-     *   <li>Retrieves quest id from {@link WebConst.Param#ID} and an optional next URL
-     *       from {@link WebConst.Param#NEXT}. Defaults to {@link WebConst.Path#MY_QUESTS}.</li>
-     *   <li>Loads quest details to resolve quest name and owner id.</li>
-     *   <li>Deletion rules:
-     *     <ul>
-     *       <li>If the user is an admin, deletes the quest unconditionally.</li>
-     *       <li>If the user is not an admin, deletes the quest only if they are the owner.</li>
-     *     </ul>
-     *   </li>
-     *   <li>On successful deletion:
-     *     <ul>
-     *       <li>Stores a flash success message.</li>
-     *       <li>If deleted by admin, notifies the quest owner (when different from the actor).</li>
-     *     </ul>
-     *   </li>
-     *   <li>On failure: stores an error message describing the reason.</li>
-     *   <li>Always redirects back to the "next" URL.</li>
-     * </ul>
+     * Handles POST requests for quest deletion.
      *
-     * @param req  current HTTP request
-     * @param resp current HTTP response
-     * @throws IOException if sending a redirect or error response fails
+     * <p>Determines whether the current user is the owner or an admin,
+     * attempts deletion via {@link QuestAuthoringService}, and sets
+     * a corresponding flash or error message in session scope.</p>
+     *
+     * <p>If the deletion was performed by an admin and the quest had
+     * a different owner, the owner is notified via
+     * {@link NotificationType#QUEST_ADMIN_CHANGED}.</p>
+     *
+     * @param req  HTTP request
+     * @param resp HTTP response
+     * @throws IOException if redirect or I/O fails
      */
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws IOException {
@@ -206,12 +155,11 @@ public class DeleteQuestServlet extends HttpServlet {
     }
 
     /**
-     * Explicitly disallows GET requests.
-     * Always responds with {@link HttpServletResponse#SC_METHOD_NOT_ALLOWED} (405).
+     * Disallows GET method for safety.
      *
-     * @param req  current HTTP request
-     * @param resp current HTTP response
-     * @throws IOException if sending the error fails
+     * @param req  HTTP request
+     * @param resp HTTP response
+     * @throws IOException if sending error fails
      */
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {

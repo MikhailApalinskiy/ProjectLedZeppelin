@@ -1,4 +1,4 @@
-package com.javarush.apalinskiy.repository.inmemory.quest;
+package com.javarush.apalinskiy.repository.hibernate.quest;
 
 import com.javarush.apalinskiy.repository.quest.QuestDraftStore;
 import com.javarush.apalinskiy.domain.quest.index.QuestNavigator;
@@ -15,38 +15,18 @@ import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * In-memory implementation of {@link QuestDraftStore}.
- * <p>
- * Maintains a quest graph in memory and provides operations for reading,
- * modifying, and resetting quest nodes. Designed for both "editing mode"
- * (drafts) and "live mode" (published quests).
- * </p>
+ * In-memory implementation of {@link QuestDraftStore} that maintains a loaded quest graph
+ * (nodes and navigation) entirely in RAM.
  *
- * <h3>Characteristics</h3>
- * <ul>
- *   <li>Thread-safe: modifications are synchronized; current state is held
- *       in an {@link AtomicReference} to an immutable {@link Snapshot}.</li>
- *   <li>Supports loading quest data from classpath resources or raw JSON bytes.</li>
- *   <li>Keeps track of the current {@code startId} (entry node).</li>
- *   <li>Provides versioning: either a hash of the loaded data
- *       (live mode) or a timestamp/draft marker (editing mode).</li>
- * </ul>
+ * <p>Supports both “editing” and “live” modes: in editing mode, graph integrity checks are
+ * more permissive to allow intermediate edits. The class holds an atomic {@link Snapshot}
+ * containing the current {@link QuestNavigator} and its version identifier.</p>
  *
- * <h3>Modes</h3>
- * <ul>
- *   <li><b>Editing mode</b>: created via {@link #empty(int)}, allows
- *       incremental modifications, tolerates invalid start IDs.</li>
- *   <li><b>Live mode</b>: created via {@link #fromClasspath(String, int)},
- *       requires consistent data, validates links strictly.</li>
- * </ul>
+ * <p>This store is typically used for quest authoring, draft editing, or fast read-only
+ * playback without database access.</p>
  *
- * <h3>Operations</h3>
- * <ul>
- *   <li>{@link #start()}, {@link #get(int)}, {@link #choose(int, String)} – navigation API.</li>
- *   <li>{@link #deleteNode(int)}, {@link #replaceNode(QuestNode)}, {@link #reload(List, int, boolean)} – mutation API.</li>
- *   <li>{@link #clearDraft(int)}, {@link #setStartId(int)} – reset and configuration.</li>
- *   <li>{@link #nodes()} – snapshot of all nodes sorted by ID.</li>
- * </ul>
+ * <p>All mutating methods are synchronized to preserve consistency across threads.
+ * Lightweight getters use atomic and volatile fields for concurrent reads.</p>
  */
 @Getter
 public class InMemoryQuestStore implements QuestDraftStore {
@@ -54,8 +34,8 @@ public class InMemoryQuestStore implements QuestDraftStore {
     private static final Logger log = LoggerFactory.getLogger(InMemoryQuestStore.class);
 
     /**
-     * Immutable snapshot of the quest store state.
-     * Holds the {@link QuestNavigator} and version string.
+     * Immutable snapshot of the quest state consisting of the {@link QuestNavigator}
+     * and its version label.
      */
     @Getter
     private static final class Snapshot {
@@ -68,26 +48,16 @@ public class InMemoryQuestStore implements QuestDraftStore {
         }
     }
 
-    /**
-     * Current snapshot reference.
-     */
+    /** Holds the current snapshot atomically for thread-safe reads. */
     private final AtomicReference<Snapshot> ref = new AtomicReference<>();
-    /**
-     * Current start node ID.
-     */
+
+    /** Identifier of the quest's start node. */
     private volatile int startId;
-    /**
-     * Whether this store is in editing (draft) mode.
-     */
+
+    /** Indicates whether the store is operating in editing mode. */
     private final boolean editingMode;
 
-    /**
-     * Creates a new quest store.
-     *
-     * @param startId     start node ID
-     * @param snapshot    initial snapshot
-     * @param editingMode true for editing mode, false for live mode
-     */
+
     private InMemoryQuestStore(int startId, Snapshot snapshot, boolean editingMode) {
         this.startId = startId;
         this.editingMode = editingMode;
@@ -97,27 +67,29 @@ public class InMemoryQuestStore implements QuestDraftStore {
     }
 
     /**
-     * Creates an empty store in editing mode with no nodes.
+     * Creates an empty, editable quest store with no nodes and version {@code draft:empty}.
      *
-     * @param startId initial start ID
-     * @return new empty quest store
+     * @param startId starting node ID for future graph initialization
+     * @return a new editable quest store
      */
     public static InMemoryQuestStore empty(int startId) {
+        log.info("Creating empty QuestStore startId={}", startId);
         return new InMemoryQuestStore(startId, new Snapshot(null, "draft:empty"), true);
     }
 
     /**
-     * Loads quest data from a classpath resource and creates a store in live mode.
+     * Loads a quest graph from a JSON resource on the classpath.
      *
-     * @param resourceName resource name (e.g. {@code quest.json})
+     * @param resourceName resource path (relative to classpath root)
      * @param startId      start node ID
-     * @return populated quest store
-     * @throws IOException if resource not found or cannot be parsed
+     * @return an initialized quest store in read-only mode
+     * @throws IOException if the resource cannot be found or parsed
      */
     public static InMemoryQuestStore fromClasspath(String resourceName, int startId) throws IOException {
         ClassLoader cl = Thread.currentThread().getContextClassLoader();
         try (InputStream in = cl.getResourceAsStream(resourceName)) {
             if (in == null) {
+                log.error("Resource not found on classpath: {}", resourceName);
                 throw new IOException("Resource not found on classpath: " + resourceName);
             }
             byte[] bytes = in.readAllBytes();
@@ -129,6 +101,14 @@ public class InMemoryQuestStore implements QuestDraftStore {
         }
     }
 
+    /**
+     * Builds a quest store from raw JSON bytes, parsing nodes and computing a SHA-256 version hash.
+     *
+     * @param bytes   UTF-8 encoded JSON bytes
+     * @param startId start node ID
+     * @return a new non-editing quest store
+     * @throws IOException if parsing fails
+     */
     private static InMemoryQuestStore fromBytes(byte[] bytes, int startId) throws IOException {
         long t0 = System.nanoTime();
         QuestJsonReader reader = new QuestJsonReader();
@@ -141,19 +121,17 @@ public class InMemoryQuestStore implements QuestDraftStore {
     }
 
     /**
-     * Returns current version string of the store.
-     * <p>
-     * In live mode this is a SHA-256 hash of the resource contents;
-     * in editing mode it is a draft marker with a timestamp.
-     * </p>
+     * Returns the current quest version string (e.g., {@code live:timestamp} or {@code draft:empty}).
      */
     @Override
     public String version() {
-        return ref.get().version;
+        String v = ref.get().version;
+        log.debug("version() -> {}", v);
+        return v;
     }
 
     /**
-     * Returns the start node, or {@code null} if store is empty.
+     * Returns the start node of the quest or {@code null} if the store is empty.
      */
     @Override
     public QuestNode start() {
@@ -166,7 +144,9 @@ public class InMemoryQuestStore implements QuestDraftStore {
     }
 
     /**
-     * Returns a node by ID, or {@code null} if not found.
+     * Retrieves a quest node by ID, or {@code null} if missing.
+     *
+     * @param id logical node ID
      */
     @Override
     public QuestNode get(int id) {
@@ -179,11 +159,11 @@ public class InMemoryQuestStore implements QuestDraftStore {
     }
 
     /**
-     * Resolves a choice made by a player into the next node.
+     * Performs a transition by evaluating a user answer from a given node.
      *
-     * @param fromId current node ID
-     * @param answer user answer text
-     * @return optional containing next node if found
+     * @param fromId starting node ID
+     * @param answer player's textual choice
+     * @return optional next node if valid
      */
     @Override
     public Optional<QuestNode> choose(int fromId, String answer) {
@@ -200,14 +180,18 @@ public class InMemoryQuestStore implements QuestDraftStore {
      */
     @Override
     public int startId() {
-        return startId;
+        int id = startId;
+        log.debug("startId() -> {}", id);
+        return id;
     }
 
     /**
-     * Deletes a node by ID and rebuilds the store.
+     * Deletes a node by ID and rebuilds the internal navigator.
+     *
+     * <p>Returns {@code false} if the node ID does not exist or the navigator is empty.</p>
      *
      * @param id node ID to delete
-     * @return true if deleted, false if not found
+     * @return {@code true} if deleted successfully
      */
     @Override
     public synchronized boolean deleteNode(int id) {
@@ -238,12 +222,13 @@ public class InMemoryQuestStore implements QuestDraftStore {
     }
 
     /**
-     * Returns a sorted unmodifiable list of all nodes.
+     * Returns an immutable, sorted list of all quest nodes by ID.
      */
     @Override
     public List<QuestNode> nodes() {
         QuestNavigator n = ref.get().getNav();
         if (n == null) {
+            log.debug("nodes() -> empty (navigator is null)");
             return Collections.emptyList();
         }
         List<QuestNode> res = new ArrayList<>(n.allIds().size());
@@ -258,9 +243,9 @@ public class InMemoryQuestStore implements QuestDraftStore {
     }
 
     /**
-     * Replaces or inserts a node, rebuilding the store.
+     * Replaces or inserts a node into the graph, rebuilding navigation afterward.
      *
-     * @param node node to replace
+     * @param node node to insert or replace
      */
     @Override
     public synchronized void replaceNode(QuestNode node) {
@@ -270,7 +255,7 @@ public class InMemoryQuestStore implements QuestDraftStore {
         if (cur != null) {
             for (Integer id : cur.allIds()) {
                 QuestNode ex = cur.get(id);
-                if (ex != null && ex.getId() != node.getId()) newNodes.add(ex);
+                if (ex != null && !Objects.equals(ex.getId(), node.getId())) newNodes.add(ex);
             }
         }
         newNodes.add(node);
@@ -280,9 +265,9 @@ public class InMemoryQuestStore implements QuestDraftStore {
     }
 
     /**
-     * Clears all draft data and resets to an empty state.
+     * Clears the current draft, resets the start node ID, and marks version as {@code draft:empty}.
      *
-     * @param newStartId new start node ID
+     * @param newStartId new start ID to set
      */
     @Override
     public synchronized void clearDraft(int newStartId) {
@@ -292,7 +277,9 @@ public class InMemoryQuestStore implements QuestDraftStore {
     }
 
     /**
-     * Sets the start node ID. If navigator is available, rebuilds with the new start.
+     * Updates the start node ID and rebuilds the navigator if available.
+     *
+     * @param newStartId new start node ID
      */
     @Override
     public synchronized void setStartId(int newStartId) {
@@ -306,11 +293,11 @@ public class InMemoryQuestStore implements QuestDraftStore {
     }
 
     /**
-     * Reloads the store with new nodes and start ID.
+     * Reloads the quest with a new list of nodes and start node ID.
      *
-     * @param nodes      new nodes
+     * @param nodes      new quest nodes
      * @param newStartId new start node ID
-     * @param markEdited whether to mark this reload as an edit
+     * @param markEdited whether to mark the version as edited
      */
     @Override
     public synchronized void reload(List<QuestNode> nodes, int newStartId, boolean markEdited) {
@@ -319,22 +306,31 @@ public class InMemoryQuestStore implements QuestDraftStore {
         log.debug("reload() nodes={} startId={} markEdited={}", (nodes == null ? 0 : nodes.size()), newStartId, markEdited);
     }
 
+    /**
+     * Rebuilds the internal {@link QuestNavigator} and updates the snapshot version.
+     *
+     * <p>Handles cases where the start ID is invalid by falling back to node #1 or the smallest ID.</p>
+     *
+     * @param nodes list of quest nodes
+     * @param start desired start node ID
+     */
     private void rebuild(List<QuestNode> nodes, int start) {
         List<QuestNode> safe = (nodes == null ? List.of() : nodes);
         final QuestNavigator nav;
         if (safe.isEmpty()) {
             nav = null;
         } else {
-            boolean invalidStart = (start <= 0) || safe.stream().noneMatch(n -> n.getId() == start);
-            int effectiveStart = (editingMode && invalidStart)
-                    ? safe.stream().mapToInt(QuestNode::getId).min().orElseThrow()
-                    : start;
-            if (editingMode && invalidStart) {
-                log.warn("rebuild() invalid startId={}, using effectiveStart={} (editingMode)", start, effectiveStart);
+            boolean has1 = safe.stream().anyMatch(n -> n.getId() == 1);
+            int tmpStart = has1 ? 1 : start;
+            int finalTmpStart = tmpStart;
+            boolean invalidStart = (tmpStart <= 0) || safe.stream().noneMatch(n -> n.getId() == finalTmpStart);
+            if (invalidStart) {
+                tmpStart = safe.stream().mapToInt(QuestNode::getId).min().orElseThrow();
             }
             nav = editingMode
-                    ? QuestNavigator.editingFrom(safe, effectiveStart)
-                    : QuestNavigator.from(safe, start);
+                    ? QuestNavigator.editingFrom(safe, tmpStart)
+                    : QuestNavigator.from(safe, tmpStart);
+            start = tmpStart; // 👈 после всех стримов
         }
         String version = (editingMode ? "draft:" : "live:") + System.currentTimeMillis();
         ref.set(new Snapshot(nav, version));
@@ -344,10 +340,10 @@ public class InMemoryQuestStore implements QuestDraftStore {
     }
 
     /**
-     * Computes a SHA-256 hash of quest bytes.
+     * Computes the SHA-256 hash of quest JSON bytes and returns it in hex format.
      *
-     * @param data quest data
-     * @return hash string, or "unknown" if calculation fails
+     * @param data input data
+     * @return lowercase hex string or {@code "unknown"} if hashing fails
      */
     private static String sha256(byte[] data) {
         try {

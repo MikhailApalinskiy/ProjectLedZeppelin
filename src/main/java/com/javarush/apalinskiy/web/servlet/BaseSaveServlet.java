@@ -25,52 +25,34 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 /**
- * Base servlet for features related to quest playing and save slots.
- * <p>
- * Resolves core services from the {@link ServletContext} and provides helpers for:
- * authentication guard with redirect, human-readable titles, date formatting,
- * and building a list of {@link SlotView} for the UI.
- * </p>
+ * Abstract base servlet providing shared logic for save-slot related operations.
  *
- * <h3>Injected services (from context)</h3>
+ * <p>This class offers utility methods for managing save states, displaying quest
+ * information in slots, formatting timestamps, and verifying user authentication.</p>
+ *
+ * <p>It initializes core services used across save/load servlet hierarchy:</p>
  * <ul>
- *   <li>{@code QUEST_SERVICE} → {@link QuestService} (required)</li>
- *   <li>{@code SAVE_STATE_SERVICE} → {@link SaveStateService} (required)</li>
- *   <li>{@code AUTHORING_SERVICE} → {@link QuestAuthoringService} (optional; detected if present)</li>
+ *     <li>{@link SaveStateService} — access to player save slots and global states</li>
+ *     <li>{@link QuestService} — retrieval of main quest nodes and text</li>
+ *     <li>{@link QuestAuthoringService} — optional access to custom quest metadata</li>
  * </ul>
  *
- * <p>All service fields are marked {@code transient} to avoid accidental session serialization.</p>
- *
- * @see SlotView
- * @see SaveStateService
- * @see QuestService
- * @see QuestAuthoringService
- * @see WebConst
- * @see Web
+ * <p>Child servlets such as save and load controllers extend this class to reuse its
+ * helper utilities and enforce consistent authentication and slot rendering logic.</p>
  */
 public class BaseSaveServlet extends HttpServlet {
 
     private static final Logger log = LoggerFactory.getLogger(BaseSaveServlet.class);
 
-    /**
-     * Global save-state persistence.
-     */
     protected transient SaveStateService saveState;
-    /**
-     * Service to retrieve main-quest nodes.
-     */
     protected transient QuestService questService;
-    /**
-     * Optional authoring/catalog service for custom quests.
-     */
     protected transient QuestAuthoringService authoring;
 
     /**
-     * Resolves required services from the application context.
-     * <p>
-     * Required: {@link QuestService}, {@link SaveStateService}. Optional: {@link QuestAuthoringService}.
-     * Fails fast with {@link UnavailableException} if required beans are missing.
-     * </p>
+     * Initializes all core services required for save-slot operations.
+     *
+     * @param config servlet configuration provided by the container
+     * @throws ServletException if mandatory services are not found
      */
     @Override
     public void init(ServletConfig config) throws ServletException {
@@ -94,15 +76,15 @@ public class BaseSaveServlet extends HttpServlet {
     }
 
     /**
-     * Requires an authenticated {@link User} in the session; otherwise redirects to the login page.
-     * <p>
-     * Looks up the user under {@code WebConst.Attr.USER}. If absent, constructs a login URL with a
-     * {@code next} parameter pointing back to {@code returnPath} (normalized to start with {@code /}),
-     * redirects, and returns {@code null}. If present, returns the {@link User}.
-     * </p>
+     * Ensures that a user is authenticated. If not, redirects them to the login page.
      *
-     * @param returnPath relative path to return to after login (e.g., {@code "/slots"})
-     * @return the authenticated user or {@code null} if a redirect happened
+     * <p>Includes a “next” parameter to return to the originally requested page after login.</p>
+     *
+     * @param req        HTTP request
+     * @param resp       HTTP response
+     * @param returnPath path to return to after successful login
+     * @return the authenticated {@link User}, or {@code null} if redirected
+     * @throws IOException if redirect fails
      */
     protected User requireAuthOrRedirect(HttpServletRequest req, HttpServletResponse resp, String returnPath)
             throws IOException {
@@ -118,14 +100,12 @@ public class BaseSaveServlet extends HttpServlet {
     }
 
     /**
-     * Resolves a human-friendly quest name for display purposes.
-     * <p>
-     * Delegates to {@link Web#displayName(String, QuestAuthoringService)} which uses the authoring
-     * service when available and falls back to sensible defaults.
-     * </p>
+     * Resolves the display name of a quest based on its ID.
      *
-     * @param questIdOrNull {@code null}, {@code "main"}, or custom quest id
-     * @return non-null display name (e.g., {@code "Main quest"} or a catalog name)
+     * <p>Delegates to {@link Web#displayName(String, QuestAuthoringService)} for proper formatting.</p>
+     *
+     * @param questIdOrNull quest identifier or {@code null}
+     * @return resolved display name
      */
     protected String resolveQuestName(String questIdOrNull) {
         String name = Web.displayName(questIdOrNull, authoring);
@@ -134,15 +114,11 @@ public class BaseSaveServlet extends HttpServlet {
     }
 
     /**
-     * Computes a short title for a node, depending on whether it belongs to the main quest or a custom quest.
-     * <ul>
-     *   <li>Main quest: fetches node via {@link QuestService#getById(int)} and shortens text with {@link Web#shortTitle(String)}.</li>
-     *   <li>Custom quest: finds the node inside the catalog entry and shortens its text; falls back to {@code "Node #<id>"}.</li>
-     * </ul>
+     * Produces a short, user-friendly title for a given quest node.
      *
      * @param nodeId        node identifier
-     * @param questIdOrNull {@code null}, {@code "main"}, or custom quest id
-     * @return a concise, human-readable title
+     * @param questIdOrNull quest ID or {@code null} for the main quest
+     * @return concise title (e.g., truncated node text or “Node #X”)
      */
     protected String titleFor(int nodeId, String questIdOrNull) {
         String qid = (questIdOrNull == null || questIdOrNull.isBlank()) ? "main" : questIdOrNull;
@@ -172,10 +148,10 @@ public class BaseSaveServlet extends HttpServlet {
     }
 
     /**
-     * Formats an {@link Instant} as {@code dd.MM.yyyy HH:mm} in the system default zone.
+     * Formats a timestamp for human-readable display (e.g., “25.04.2025 13:45”).
      *
-     * @param ts timestamp (may be {@code null})
-     * @return formatted string or {@code null} if {@code ts} is {@code null}
+     * @param ts timestamp to format
+     * @return formatted string, or {@code null} if timestamp is {@code null}
      */
     protected String formatUpdated(Instant ts) {
         if (ts == null) {
@@ -187,19 +163,14 @@ public class BaseSaveServlet extends HttpServlet {
     }
 
     /**
-     * Builds a fixed-size list of {@link SlotView} representing all global save slots for a user.
-     * <p>
-     * For each index in {@code [0, WebConst.SLOT_COUNT)}:
-     * <ul>
-     *   <li>If a {@link SaveStateService.GlobalSlot} exists, normalizes its data (quest id/name, title, updatedAt)
-     *       and creates a {@link SlotView#filled(int, int, String, String, String, String)}.</li>
-     *   <li>Otherwise, creates a default {@link SlotView#empty(int, String, String)} with {@code "main"}.</li>
-     * </ul>
-     * Titles default to {@code "Node #<id>"}; quest name defaults to {@code "Main quest"} or {@code "Custom quest"}.
-     * </p>
+     * Builds a complete list of all save slots for a given user.
      *
-     * @param userId owner of the global slots
-     * @return immutable-size list (but not unmodifiable) of slot view models
+     * <p>Combines filled and empty slots using {@link SlotView} wrappers for rendering
+     * in the save/load JSP pages. Each filled slot contains quest metadata, node title,
+     * and last update timestamp.</p>
+     *
+     * @param userId identifier of the user whose slots should be built
+     * @return list of {@link SlotView} objects representing all slots
      */
     protected List<SlotView> buildSlotsAll(String userId) {
         List<SlotView> list = new ArrayList<>(WebConst.SLOT_COUNT);

@@ -9,6 +9,7 @@ import com.javarush.apalinskiy.service.user.UserService;
 import com.javarush.apalinskiy.web.util.Web;
 import jakarta.servlet.ServletConfig;
 import jakarta.servlet.ServletContext;
+import jakarta.servlet.ServletException;
 import jakarta.servlet.UnavailableException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -18,256 +19,237 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.lang.reflect.Field;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+@DisplayName("UserPublishedQuestsServlet (unit)")
 @ExtendWith(MockitoExtension.class)
-@DisplayName("UserPublishedQuestsServlet")
 class UserPublishedQuestsServletTest {
 
     @Mock
     ServletConfig config;
     @Mock
+    ServletContext ctx;
+    @Mock
     HttpServletRequest req;
     @Mock
     HttpServletResponse resp;
     @Mock
+    HttpSession session;
+    @Mock
     UserService userService;
     @Mock
     QuestAuthoringService authoring;
-    @Mock
-    User viewUser;
-    @Mock
-    User me;
-    @Mock
-    CustomQuest q1;
-    @Mock
-    CustomQuest q2;
 
-    UserPublishedQuestsServlet subject;
+    private UserPublishedQuestsServlet sut;
 
-    private void ensureSubject() {
-        if (subject == null) subject = new UserPublishedQuestsServlet();
+    private static User user(String id, String name, Role role) {
+        User u = new User();
+        u.setUserId(id);
+        u.setUserName(name);
+        u.setRole(role);
+        return u;
     }
 
-    private void setField(String name, Object value) {
-        try {
-            Field f = UserPublishedQuestsServlet.class.getDeclaredField(name);
-            f.setAccessible(true);
-            f.set(subject, value);
-        } catch (Exception e) {
-            throw new AssertionError(e);
-        }
+    private static CustomQuest cq(String id, String ownerId, String name) {
+        CustomQuest q = new CustomQuest();
+        q.setId(id);
+        q.setOwnerId(ownerId);
+        q.setName(name);
+        return q;
+    }
+
+    private static QuestAuthoringService.Paged<CustomQuest> paged(List<CustomQuest> items, int total, int size) {
+        return new QuestAuthoringService.Paged<>(items, total, 1, size);
     }
 
     @Nested
-    @DisplayName("init")
-    class InitBlock {
-
-        @BeforeEach
-        void before() {
-            ensureSubject();
-        }
+    @DisplayName("init(config)")
+    class InitPhase {
 
         @Test
-        @DisplayName("given both beans in ctx when init then fields set")
-        void should_Init_When_BeansPresent() throws Exception {
-            try (MockedStatic<Web> web = mockStatic(Web.class, CALLS_REAL_METHODS)) {
-                // given
-                ServletContext sc = mock(ServletContext.class);
-                when(config.getServletContext()).thenReturn(sc);
-                web.when(() -> Web.ctxBean(eq(sc), eq(WebConst.Ctx.USER_SERVICE), eq(UserService.class)))
+        @DisplayName("Given both beans present — When init — Then OK")
+        void initOk() {
+            // Given
+            sut = new UserPublishedQuestsServlet();
+            when(config.getServletContext()).thenReturn(ctx);
+            try (MockedStatic<Web> web = mockStatic(Web.class)) {
+                web.when(() -> Web.ctxBean(ctx, WebConst.Ctx.USER_SERVICE, UserService.class))
                         .thenReturn(userService);
-                web.when(() -> Web.ctxBean(eq(sc), eq(WebConst.Ctx.AUTHORING_SERVICE), eq(QuestAuthoringService.class)))
+                web.when(() -> Web.ctxBean(ctx, WebConst.Ctx.AUTHORING_SERVICE, QuestAuthoringService.class))
                         .thenReturn(authoring);
-                // when
-                subject.init(config);
-                // then
-                web.verify(() -> Web.ctxBean(sc, WebConst.Ctx.USER_SERVICE, UserService.class));
-                web.verify(() -> Web.ctxBean(sc, WebConst.Ctx.AUTHORING_SERVICE, QuestAuthoringService.class));
+                // When / Then
+                assertDoesNotThrow(() -> sut.init(config));
             }
         }
 
         @Test
-        @DisplayName("edge: one of beans missing -> UnavailableException with message prefix")
-        void should_Throw_When_BeansMissing() {
+        @DisplayName("Given beans missing — When init — Then UnavailableException")
+        void initFails() {
+            // Given
+            sut = new UserPublishedQuestsServlet();
+            when(config.getServletContext()).thenReturn(ctx);
             try (MockedStatic<Web> web = mockStatic(Web.class)) {
-                // given
-                ServletContext sc = mock(ServletContext.class);
-                when(config.getServletContext()).thenReturn(sc);
-                web.when(() -> Web.ctxBean(eq(sc), eq(WebConst.Ctx.USER_SERVICE), eq(UserService.class)))
-                        .thenThrow(new IllegalStateException("no user service"));
-                // when / then
-                UnavailableException ex = assertThrows(UnavailableException.class, () -> subject.init(config));
-                assertTrue(ex.getMessage().startsWith("Required services not found: "));
+                web.when(() -> Web.ctxBean(ctx, WebConst.Ctx.USER_SERVICE, UserService.class))
+                        .thenThrow(new IllegalStateException("no bean"));
+                // When
+                UnavailableException ex = assertThrows(UnavailableException.class, () -> sut.init(config));
+                // Then
+                assertTrue(ex.getMessage().contains("Required services not found"));
             }
         }
     }
 
-    @SuppressWarnings("unchecked")
     @Nested
-    @DisplayName("doGet")
-    class DoGetBlock {
+    @DisplayName("doGet(req, resp)")
+    class DoGet {
 
         @BeforeEach
-        void wire() {
-            ensureSubject();
-            setField("userService", userService);
-            setField("authoring", authoring);
+        void setup() throws ServletException {
+            sut = new UserPublishedQuestsServlet();
+            when(config.getServletContext()).thenReturn(ctx);
+            try (MockedStatic<Web> web = mockStatic(Web.class)) {
+                web.when(() -> Web.ctxBean(ctx, WebConst.Ctx.USER_SERVICE, UserService.class))
+                        .thenReturn(userService);
+                web.when(() -> Web.ctxBean(ctx, WebConst.Ctx.AUTHORING_SERVICE, QuestAuthoringService.class))
+                        .thenReturn(authoring);
+                sut.init(config);
+            }
         }
 
         @Test
-        @DisplayName("edge: id==null -> viewUser=null, items=[], selfUrl without query, forward")
-        void should_Forward_With_Empty_When_IdNull() throws Exception {
+        @DisplayName("Given missing id — When doGet — Then redirectErr HOME 'User id is required'")
+        void missingId() throws Exception {
+            // Given
+            when(req.getParameter("id")).thenReturn(null);
             try (MockedStatic<Web> web = mockStatic(Web.class)) {
-                // given
-                when(req.getParameter("id")).thenReturn(null);
-                web.when(() -> Web.trimOrNull(null)).thenReturn(null);
                 web.when(() -> Web.pullFlash(eq(req), anyString())).thenAnswer(inv -> null);
-                when(req.getContextPath()).thenReturn("/app");
-                when(req.getServletPath()).thenReturn("/u/quests");
-                web.when(() -> Web.attachQuestLists(eq(req), any())).thenAnswer(inv -> null);
-                web.when(() -> Web.forward(eq(req), eq(resp), eq(WebConst.Jsp.USER_QUESTS))).thenAnswer(inv -> null);
-                // when
-                subject.doGet(req, resp);
-                // then
-                verify(req).setAttribute("viewUser", null);
-                verify(req).setAttribute("selfUrl", "/app/u/quests");
-                web.verify(() -> Web.attachQuestLists(eq(req), argThat(List::isEmpty)));
-                web.verify(() -> Web.forward(req, resp, WebConst.Jsp.USER_QUESTS));
+                web.when(() -> Web.trimOrNull(null)).thenReturn(null);
+                // When
+                sut.doGet(req, resp);
+                // Then
+                web.verify(() -> Web.redirectErr(eq(req), eq(resp),
+                        eq(WebConst.Path.HOME), eq("User id is required")));
                 verifyNoInteractions(userService, authoring);
             }
         }
 
         @Test
-        @DisplayName("given id but user not found -> items=[], selfUrl with encoded id, forward")
-        void should_Forward_Empty_When_UserNotFound() throws Exception {
+        @DisplayName("Given user not found — When doGet — Then redirectErr HOME 'User not found'")
+        void userNotFound() throws Exception {
+            // Given
+            when(req.getParameter("id")).thenReturn("  u3  ");
             try (MockedStatic<Web> web = mockStatic(Web.class)) {
-                // given
-                when(req.getParameter("id")).thenReturn("u1");
-                web.when(() -> Web.trimOrNull("u1")).thenReturn("u1");
-                when(userService.findById("u1")).thenReturn(Optional.empty());
                 web.when(() -> Web.pullFlash(eq(req), anyString())).thenAnswer(inv -> null);
-                when(req.getContextPath()).thenReturn("/app");
-                when(req.getServletPath()).thenReturn("/u/quests");
-                web.when(() -> Web.urlEncode("u1")).thenReturn("u1");
-                web.when(() -> Web.attachQuestLists(eq(req), any())).thenAnswer(inv -> null);
-                web.when(() -> Web.forward(eq(req), eq(resp), eq(WebConst.Jsp.USER_QUESTS))).thenAnswer(inv -> null);
-                // when
-                subject.doGet(req, resp);
-                // then
-                verify(userService).findById("u1");
-                verify(req).setAttribute("viewUser", null);
-                verify(req).setAttribute("selfUrl", "/app/u/quests?id=u1");
-                web.verify(() -> Web.attachQuestLists(eq(req), argThat(List::isEmpty)));
-                web.verify(() -> Web.forward(req, resp, WebConst.Jsp.USER_QUESTS));
+                web.when(() -> Web.trimOrNull("  u3  ")).thenReturn("u3");
+                when(userService.findById("u3")).thenReturn(Optional.empty());
+                // When
+                sut.doGet(req, resp);
+                // Then
+                web.verify(() -> Web.redirectErr(eq(req), eq(resp),
+                        eq(WebConst.Path.HOME), eq("User not found")));
+                verify(userService).findById("u3");
                 verifyNoInteractions(authoring);
             }
         }
 
         @Test
-        @DisplayName("given owner viewing own page -> items not filtered (all returned)")
-        void should_Return_All_For_Owner() throws Exception {
+        @DisplayName("Given viewer is anon — When doGet — Then listOwnerFromCatalogPaged(..., onlyLive=true) and forward USER_QUESTS")
+        void anonViewer() throws Exception {
+            // Given
+            when(req.getParameter("id")).thenReturn("u42");
+            when(req.getContextPath()).thenReturn("/app");
+            when(req.getServletPath()).thenReturn("/users/quests");
+            User viewed = user("u42", "Alice", Role.USER);
             try (MockedStatic<Web> web = mockStatic(Web.class)) {
-                // given
-                when(req.getParameter("id")).thenReturn("U");
-                web.when(() -> Web.trimOrNull("U")).thenReturn("U");
-                when(userService.findById("U")).thenReturn(Optional.of(viewUser));
-                when(viewUser.getUserId()).thenReturn("U");
-                when(viewUser.getUserLogin()).thenReturn("loginU");
-                List<CustomQuest> all = List.of(q1, q2);
-                when(authoring.listOwnerFromCatalog("U")).thenReturn(all);
-                HttpSession session = mock(HttpSession.class);
-                when(req.getSession()).thenReturn(session);
-                when(session.getAttribute(WebConst.Attr.USER)).thenReturn(me);
-                when(me.getUserId()).thenReturn("U");
                 web.when(() -> Web.pullFlash(eq(req), anyString())).thenAnswer(inv -> null);
-                when(req.getContextPath()).thenReturn("/app");
-                when(req.getServletPath()).thenReturn("/u/quests");
-                web.when(() -> Web.urlEncode("U")).thenReturn("U");
-                ArgumentCaptor<List<CustomQuest>> cap = ArgumentCaptor.forClass(List.class);
-                web.when(() -> Web.attachQuestLists(eq(req), any())).thenAnswer(inv -> null);
-                web.when(() -> Web.forward(eq(req), eq(resp), eq(WebConst.Jsp.USER_QUESTS))).thenAnswer(inv -> null);
-                // when
-                subject.doGet(req, resp);
-                // then
-                verify(authoring).listOwnerFromCatalog("U");
-                verify(req).setAttribute("viewUser", viewUser);
-                verify(req).setAttribute("selfUrl", "/app/u/quests?id=U");
-                web.verify(() -> Web.attachQuestLists(eq(req), cap.capture()));
-                assertEquals(2, cap.getValue().size(), "для владельца список не фильтруется");
-                web.verify(() -> Web.forward(req, resp, WebConst.Jsp.USER_QUESTS));
+                web.when(() -> Web.trimOrNull("u42")).thenReturn("u42");
+                when(req.getAttribute(WebConst.Attr.USER)).thenReturn(null);
+                when(req.getSession()).thenReturn(session);
+                when(session.getAttribute(WebConst.Attr.USER)).thenReturn(null);
+                when(userService.findById("u42")).thenReturn(Optional.of(viewed));
+                var params = new Web.Params("Mike", 2, 5);
+                web.when(() -> Web.extract(req)).thenReturn(params);
+                var items = List.of(cq("q1", "u42", "First"));
+                when(authoring.listOwnerFromCatalogPaged("u42", "Mike", 2, 5, false))
+                        .thenReturn(paged(items, 1, 5));
+                // When
+                sut.doGet(req, resp);
+                // Then
+                verify(req).setAttribute("ownerNameById", Map.of("u42", "Alice"));
+                verify(req).setAttribute("viewUser", viewed);
+                verify(req).setAttribute("items", items);
+                verify(req).setAttribute("total", 1);
+                verify(req).setAttribute("pages", 1);
+                verify(req).setAttribute("page", 1);
+                verify(req).setAttribute("q", "Mike");
+                verify(req).setAttribute("selfPathOnly", "/app/users/quests");
+                verify(req).setAttribute("viewUserId", "u42");
+                web.verify(() -> Web.forward(eq(req), eq(resp), eq(WebConst.Jsp.USER_QUESTS)));
             }
         }
 
         @Test
-        @DisplayName("given admin viewing -> items not filtered")
-        void should_Return_All_For_Admin() throws Exception {
+        @DisplayName("Given viewer is the owner — When doGet — Then onlyLive=false")
+        void viewerIsOwner() throws Exception {
+            // Given
+            when(req.getParameter("id")).thenReturn("u1");
+            when(req.getContextPath()).thenReturn("");
+            when(req.getServletPath()).thenReturn("/users/quests");
+            User viewed = user("u1", "Mike", Role.USER);
+            User me = user("u1", "Mike", Role.USER);
             try (MockedStatic<Web> web = mockStatic(Web.class)) {
-                // given
-                when(req.getParameter("id")).thenReturn("X");
-                web.when(() -> Web.trimOrNull("X")).thenReturn("X");
                 web.when(() -> Web.pullFlash(eq(req), anyString())).thenAnswer(inv -> null);
-                when(userService.findById("X")).thenReturn(Optional.of(viewUser));
-                when(viewUser.getUserId()).thenReturn("X");
-                when(viewUser.getUserLogin()).thenReturn("loginX");
-                when(authoring.listOwnerFromCatalog("X"))
-                        .thenReturn(List.of(q1, q2));
-                HttpSession session = mock(HttpSession.class);
+                web.when(() -> Web.trimOrNull("u1")).thenReturn("u1");
+                when(userService.findById("u1")).thenReturn(Optional.of(viewed));
+                when(req.getAttribute(WebConst.Attr.USER)).thenReturn(null);
                 when(req.getSession()).thenReturn(session);
                 when(session.getAttribute(WebConst.Attr.USER)).thenReturn(me);
-                when(me.getRole()).thenReturn(Role.ADMIN);
-                web.when(() -> Web.attachQuestLists(eq(req), any())).thenAnswer(inv -> null);
-                ArgumentCaptor<List<CustomQuest>> cap = ArgumentCaptor.forClass(List.class);
-                // when
-                subject.doGet(req, resp);
-                // then
-                web.verify(() -> Web.attachQuestLists(eq(req), cap.capture()));
-                assertEquals(2, cap.getValue().size());
+                var params = new Web.Params(null, 1, 10);
+                web.when(() -> Web.extract(req)).thenReturn(params);
+                when(authoring.listOwnerFromCatalogPaged("u1", null, 1, 10, true))
+                        .thenReturn(paged(Collections.emptyList(), 0, 10));
+                // When
+                sut.doGet(req, resp);
+                // Then
+                verify(authoring).listOwnerFromCatalogPaged("u1", null, 1, 10, true);
+                web.verify(() -> Web.forward(eq(req), eq(resp), eq(WebConst.Jsp.USER_QUESTS)));
             }
         }
 
         @Test
-        @DisplayName("given viewer not owner and not admin -> items filtered to published only")
-        void should_Filter_To_Published_For_Visitor() throws Exception {
+        @DisplayName("Given viewer is admin — When doGet — Then onlyLive=false")
+        void viewerIsAdmin() throws Exception {
+            // Given
+            when(req.getParameter("id")).thenReturn("u2");
+            when(req.getContextPath()).thenReturn("/ctx");
+            when(req.getServletPath()).thenReturn("/users/quests");
+            User viewed = user("u2", "Ann", Role.USER);
+            User admin = user("adm", "Root", Role.ADMIN);
             try (MockedStatic<Web> web = mockStatic(Web.class)) {
-                // given
-                when(req.getParameter("id")).thenReturn("A");
-                web.when(() -> Web.trimOrNull("A")).thenReturn("A");
-                when(userService.findById("A")).thenReturn(Optional.of(viewUser));
-                when(viewUser.getUserId()).thenReturn("A");
-                when(viewUser.getUserLogin()).thenReturn("loginA");
-                when(q1.isPublished()).thenReturn(true);
-                when(q2.isPublished()).thenReturn(false);
-                when(authoring.listOwnerFromCatalog("A")).thenReturn(List.of(q1, q2));
-                var session = mock(jakarta.servlet.http.HttpSession.class);
-                when(req.getSession()).thenReturn(session);
-                when(session.getAttribute(WebConst.Attr.USER)).thenReturn(me);
-                when(me.getUserId()).thenReturn("other");
-                when(me.getRole()).thenReturn(Role.USER);
                 web.when(() -> Web.pullFlash(eq(req), anyString())).thenAnswer(inv -> null);
-                when(req.getContextPath()).thenReturn("/app");
-                when(req.getServletPath()).thenReturn("/u/quests");
-                web.when(() -> Web.urlEncode("A")).thenReturn("A");
-                ArgumentCaptor<List<CustomQuest>> cap = ArgumentCaptor.forClass(List.class);
-                web.when(() -> Web.attachQuestLists(eq(req), any())).thenAnswer(inv -> null);
-                web.when(() -> Web.forward(eq(req), eq(resp), eq(WebConst.Jsp.USER_QUESTS))).thenAnswer(inv -> null);
-                // when
-                subject.doGet(req, resp);
-                // then
-                web.verify(() -> Web.attachQuestLists(eq(req), cap.capture()));
-                List<CustomQuest> filtered = cap.getValue();
-                assertEquals(1, filtered.size(), "для гостя должен остаться только опубликованный квест");
-                assertSame(q1, filtered.getFirst());
+                web.when(() -> Web.trimOrNull("u2")).thenReturn("u2");
+                when(userService.findById("u2")).thenReturn(Optional.of(viewed));
+                when(req.getAttribute(WebConst.Attr.USER)).thenReturn(admin);
+                var params = new Web.Params("x", 3, 7);
+                web.when(() -> Web.extract(req)).thenReturn(params);
+                when(authoring.listOwnerFromCatalogPaged("u2", "x", 3, 7, true))
+                        .thenReturn(paged(List.of(cq("q2", "u2", "Q")), 1, 7));
+                // When
+                sut.doGet(req, resp);
+                // Then
+                verify(authoring).listOwnerFromCatalogPaged("u2", "x", 3, 7, true);
+                verify(req).setAttribute("selfPathOnly", "/ctx/users/quests");
+                web.verify(() -> Web.forward(eq(req), eq(resp), eq(WebConst.Jsp.USER_QUESTS)));
             }
         }
     }

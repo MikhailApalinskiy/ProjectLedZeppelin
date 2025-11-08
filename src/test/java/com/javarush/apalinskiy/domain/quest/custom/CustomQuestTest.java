@@ -1,208 +1,324 @@
 package com.javarush.apalinskiy.domain.quest.custom;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
 import com.javarush.apalinskiy.domain.quest.QuestNode;
+import com.javarush.apalinskiy.domain.user.User;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.lang.reflect.Method;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.UUID;
 
-
-@DisplayName("CustomQuest")
+@ExtendWith(MockitoExtension.class)
+@DisplayName("CustomQuest entity")
 class CustomQuestTest {
 
-    private QuestNode n(int id) {
-        return QuestNode.of(id, "text-" + id, List.of(), false, null);
+    @Mock
+    User user;
+    @Mock
+    QuestNode nodeA;
+    @Mock
+    QuestNode nodeB;
+
+    @Captor
+    ArgumentCaptor<CustomQuest> questCaptor;
+
+    private static void invoke(Object target, String name) throws Exception {
+        Method m = CustomQuest.class.getDeclaredMethod(name);
+        m.setAccessible(true);
+        m.invoke(target);
     }
 
     @Nested
     @DisplayName("constructor")
-    class Ctor {
+    class Constructor {
 
         @Test
-        @DisplayName("sets fields when valid args then ok")
-        void setsFields() {
+        @DisplayName("should initialize required fields and defaults")
+        void initializesFieldsAndDefaults() {
             // Given
-            List<QuestNode> nodes = List.of(n(1), n(2));
-            Instant now = Instant.now();
+            String id = UUID.randomUUID().toString();
+            List<QuestNode> nodes = List.of();
             // When
-            CustomQuest q = new CustomQuest("id1", "owner", "name", 1, nodes, true, "v1", now, now);
+            CustomQuest q = new CustomQuest(id, user, "Quest", 1, nodes, null, null, null, null);
             // Then
-            assertEquals("id1", q.getId());
-            assertEquals("owner", q.getOwnerId());
-            assertEquals("name", q.getName());
+            assertEquals(id, q.getId());
+            assertSame(user, q.getUser());
+            assertEquals("Quest", q.getName());
             assertEquals(1, q.getStartId());
-            assertTrue(q.isPublished());
-            assertEquals("v1", q.getVersion());
-            assertEquals(nodes, q.getNodes());
-            assertEquals(now, q.getCreatedAt());
-            assertEquals(now, q.getUpdatedAt());
-        }
-
-        @Test
-        @DisplayName("throws NPE when id is null")
-        void throwsOnNullId() {
-            // Given
-            List<QuestNode> nodes = List.of(n(1));
-            Instant now = Instant.now();
-            // When / Then
-            assertThrows(NullPointerException.class,
-                    () -> new CustomQuest(null, "owner", "name", 1, nodes, false, "v", now, now));
-        }
-
-        @Test
-        @DisplayName("throws NPE when ownerId is null")
-        void throwsOnNullOwner() {
-            // Given
-            List<QuestNode> nodes = List.of(n(1));
-            Instant now = Instant.now();
-            // When / Then
-            assertThrows(NullPointerException.class,
-                    () -> new CustomQuest("id", null, "name", 1, nodes, false, "v", now, now));
-        }
-
-        @Test
-        @DisplayName("throws NPE when name is null")
-        void throwsOnNullName() {
-            // Given
-            List<QuestNode> nodes = List.of(n(1));
-            Instant now = Instant.now();
-            // When / Then
-            assertThrows(NullPointerException.class,
-                    () -> new CustomQuest("id", "owner", null, 1, nodes, false, "v", now, now));
-        }
-
-        @Test
-        @DisplayName("throws NPE when nodes is null")
-        void throwsOnNullNodes() {
-            // Given
-            Instant now = Instant.now();
-            // When / Then
-            assertThrows(NullPointerException.class,
-                    () -> new CustomQuest("id", "owner", "name", 1, null, false, "v", now, now));
-        }
-
-        @Test
-        @DisplayName("throws NPE when createdAt is null")
-        void throwsOnNullCreatedAt() {
-            // Given
-            List<QuestNode> nodes = List.of(n(1));
-            Instant now = Instant.now();
-            // When / Then
-            assertThrows(NullPointerException.class,
-                    () -> new CustomQuest("id", "owner", "name", 1, nodes, false, "v", null, now));
-        }
-
-        @Test
-        @DisplayName("throws NPE when updatedAt is null")
-        void throwsOnNullUpdatedAt() {
-            // Given
-            List<QuestNode> nodes = List.of(n(1));
-            Instant now = Instant.now();
-            // When / Then
-            assertThrows(NullPointerException.class,
-                    () -> new CustomQuest("id", "owner", "name", 1, nodes, false, "v", now, null));
-        }
-
-        @Test
-        @DisplayName("sets version='' when version is null")
-        void versionBecomesEmptyWhenNull() {
-            // Given
-            List<QuestNode> nodes = List.of(n(1));
-            Instant now = Instant.now();
-            // When
-            CustomQuest q = new CustomQuest("id", "owner", "name", 1, nodes, false, null, now, now);
-            // Then
+            assertEquals(CustomQuest.ModerationStatus.LIVE, q.getModerationStatus());
             assertEquals("", q.getVersion());
+            assertNotNull(q.getCreatedAt());
+            assertEquals(q.getCreatedAt(), q.getUpdatedAt());
         }
 
         @Test
-        @DisplayName("defensive copy of nodes when created then original changes don't affect")
-        void defensiveCopyOnCtor() {
+        @DisplayName("should trim name")
+        void trimsName() {
             // Given
-            List<QuestNode> original = new ArrayList<>(List.of(n(1)));
-            Instant now = Instant.now();
-            CustomQuest q = new CustomQuest("id", "owner", "name", 1, original, false, "v", now, now);
+            String raw = "   Trim  ";
             // When
-            original.add(n(2));
+            CustomQuest q = new CustomQuest(UUID.randomUUID().toString(), user, raw, 10, null, null, null, null, null);
             // Then
-            assertEquals(1, q.getNodes().size());
+            assertEquals("Trim", q.getName());
         }
 
         @Test
-        @DisplayName("nodes list is unmodifiable when accessed then UOE")
-        void nodesIsUnmodifiable() {
+        @DisplayName("should throw when name blank or too long")
+        void throwsOnInvalidName() {
             // Given
-            List<QuestNode> nodes = List.of(n(1));
-            Instant now = Instant.now();
-            CustomQuest q = new CustomQuest("id", "owner", "name", 1, nodes, false, "v", now, now);
+            String tooLong = "a".repeat(51);
             // When / Then
-            //noinspection DataFlowIssue
-            assertThrows(UnsupportedOperationException.class, () -> q.getNodes().add(n(2)));
+            assertThrows(IllegalArgumentException.class, () ->
+                    new CustomQuest(UUID.randomUUID().toString(), user, "   ", 1, null, null, null, null, null));
+            assertThrows(IllegalArgumentException.class, () ->
+                    new CustomQuest(UUID.randomUUID().toString(), user, tooLong, 1, null, null, null, null, null));
+        }
+
+        @Test
+        @DisplayName("should throw when id/user/startId is null")
+        void throwsOnNulls() {
+            // Given
+            String id = UUID.randomUUID().toString();
+            // When / Then
+            assertThrows(NullPointerException.class, () ->
+                    new CustomQuest(null, user, "N", 1, null, null, null, null, null));
+            assertThrows(NullPointerException.class, () ->
+                    new CustomQuest(id, null, "N", 1, null, null, null, null, null));
+            assertThrows(NullPointerException.class, () ->
+                    new CustomQuest(id, user, "N", null, null, null, null, null, null));
         }
     }
 
     @Nested
-    @DisplayName("withUpdate()")
-    class WithUpdate {
+    @DisplayName("factory method 'create'")
+    class FactoryMethod {
 
         @Test
-        @DisplayName("updates nodes/startId/published/version when called then changed")
-        void updatesFields() {
+        @DisplayName("should generate UUID and timestamps")
+        void generatesUuidAndTimestamps() {
             // Given
-            Instant t0 = Instant.now();
-            CustomQuest q0 = new CustomQuest("id", "owner", "name", 1, List.of(n(1)), false, "v1", t0, t0);
             // When
-            CustomQuest q1 = q0.withUpdate(List.of(n(2), n(3)), 2, true, "v2");
+            CustomQuest q = CustomQuest.create(user, "Q", 1, null, "v", true);
             // Then
-            assertEquals(2, q1.getStartId());
-            assertTrue(q1.isPublished());
-            assertEquals("v2", q1.getVersion());
-            assertEquals(2, q1.getNodes().size());
-            assertEquals(List.of(2, 3), q1.getNodes().stream().map(QuestNode::getId).toList());
+            assertDoesNotThrow(() -> UUID.fromString(q.getId()));
+            assertNotNull(q.getCreatedAt());
+            assertNotNull(q.getUpdatedAt());
         }
 
         @Test
-        @DisplayName("preserves id/owner/name/createdAt when updated then same")
-        void preservesIdentityFields() {
+        @DisplayName("should set LIVE when publishImmediately=true")
+        void setsLive() {
             // Given
-            Instant t0 = Instant.now();
-            CustomQuest q0 = new CustomQuest("ID", "OWN", "NAME", 1, List.of(n(1)), false, "v1", t0, t0);
             // When
-            CustomQuest q1 = q0.withUpdate(List.of(n(2)), 2, true, "v2");
+            CustomQuest q = CustomQuest.create(user, "Q", 1, null, "v", true);
             // Then
-            assertEquals("ID", q1.getId());
-            assertEquals("OWN", q1.getOwnerId());
-            assertEquals("NAME", q1.getName());
-            assertEquals(t0, q1.getCreatedAt());
+            assertEquals(CustomQuest.ModerationStatus.LIVE, q.getModerationStatus());
         }
 
         @Test
-        @DisplayName("bumps updatedAt to now when updated then > old")
+        @DisplayName("should set PENDING_NEW when publishImmediately=false")
+        void setsPendingNew() {
+            // Given
+            // When
+            CustomQuest q = CustomQuest.create(user, "Q", 1, null, "v", false);
+            // Then
+            assertEquals(CustomQuest.ModerationStatus.PENDING_NEW, q.getModerationStatus());
+        }
+
+        @Test
+        @DisplayName("should assign input fields correctly")
+        void assignsInputs() {
+            // Given
+            List<QuestNode> nodes = new ArrayList<>();
+            // When
+            CustomQuest q = CustomQuest.create(user, "N", 42, nodes, "v1", true);
+            // Then
+            assertSame(user, q.getUser());
+            assertEquals("N", q.getName());
+            assertEquals(42, q.getStartId());
+            assertEquals("v1", q.getVersion());
+        }
+    }
+
+    @Nested
+    @DisplayName("node handling")
+    class NodeHandling {
+
+        @Test
+        @DisplayName("constructor sets quest on each node")
+        void ctorSetsBackrefs() {
+            // Given
+            List<QuestNode> nodes = List.of(nodeA, nodeB);
+            // When
+            CustomQuest q = new CustomQuest(UUID.randomUUID().toString(), user, "N", 1, nodes, null, null, null, null);
+            // Then
+            verify(nodeA).setQuest(q);
+            verify(nodeB).setQuest(q);
+            assertEquals(2, q.getNodes().size());
+        }
+
+        @Test
+        @DisplayName("constructor ignores null nodes")
+        void ignoresNullNodes() {
+            // Given
+            List<QuestNode> nodes = new ArrayList<>(Arrays.asList(nodeA, null));
+            // When
+            CustomQuest q = new CustomQuest(UUID.randomUUID().toString(), user, "N", 1, nodes, null, null, null, null);
+            // Then
+            verify(nodeA).setQuest(q);
+            assertEquals(1, q.getNodes().size());
+        }
+
+        @Test
+        @DisplayName("applyUpdate replaces nodes and sets quest refs")
+        void applyUpdateSetsBackrefs() {
+            // Given
+            CustomQuest q = CustomQuest.create(user, "Q", 1, null, "v", true);
+            // When
+            q.applyUpdate(List.of(nodeA, nodeB), 7, null, null);
+            // Then
+            verify(nodeA).setQuest(q);
+            verify(nodeB).setQuest(q);
+            assertEquals(2, q.getNodes().size());
+            assertEquals(7, q.getStartId());
+        }
+    }
+
+    @Nested
+    @DisplayName("applyUpdate")
+    class ApplyUpdate {
+
+        @Test
+        @DisplayName("requires non-null startId")
+        void requiresStartId() {
+            // Given
+            CustomQuest q = CustomQuest.create(user, "N", 1, null, "v", true);
+            // When / Then
+            assertThrows(NullPointerException.class, () ->
+                    q.applyUpdate(List.of(), null, null, null));
+        }
+
+        @Test
+        @DisplayName("updates status and version when provided")
+        void updatesStatusAndVersion() {
+            // Given
+            CustomQuest q = CustomQuest.create(user, "N", 1, null, "v1", true);
+            // When
+            q.applyUpdate(List.of(), 2, CustomQuest.ModerationStatus.REJECTED, "v2");
+            // Then
+            assertEquals(CustomQuest.ModerationStatus.REJECTED, q.getModerationStatus());
+            assertEquals("v2", q.getVersion());
+        }
+
+        @Test
+        @DisplayName("preserves status and version when null")
+        void keepsStatusAndVersion() {
+            // Given
+            CustomQuest q = CustomQuest.create(user, "N", 1, null, "v1", true);
+            // When
+            q.applyUpdate(List.of(), 2, null, null);
+            // Then
+            assertEquals(CustomQuest.ModerationStatus.LIVE, q.getModerationStatus());
+            assertEquals("v1", q.getVersion());
+        }
+
+        @Test
+        @DisplayName("should bump updatedAt timestamp")
         void bumpsUpdatedAt() {
             // Given
-            Instant t0 = Instant.now();
-            CustomQuest q0 = new CustomQuest("id", "owner", "name", 1, List.of(n(1)), false, "v1", t0, t0);
+            CustomQuest q = CustomQuest.create(user, "N", 1, null, "v", true);
+            Instant before = q.getUpdatedAt();
             // When
-            CustomQuest q1 = q0.withUpdate(List.of(n(2)), 2, true, "v2");
+            q.applyUpdate(List.of(), 1, null, null);
             // Then
-            assertFalse(q1.getUpdatedAt().isBefore(t0));
+            assertFalse(q.getUpdatedAt().isBefore(before));
+        }
+    }
+
+    @Nested
+    @DisplayName("lifecycle callbacks")
+    class Lifecycle {
+
+        @Test
+        @DisplayName("@PrePersist fills defaults when null")
+        void prePersistFillsDefaults() throws Exception {
+            // Given
+            CustomQuest q = new CustomQuest(UUID.randomUUID().toString(), user, "N", 1, null, null, null, null, null);
+            // When
+            invoke(q, "onCreate");
+            // Then
+            assertNotNull(q.getCreatedAt());
+            assertEquals(q.getCreatedAt(), q.getUpdatedAt());
+            assertEquals(CustomQuest.ModerationStatus.LIVE, q.getModerationStatus());
+            assertEquals("", q.getVersion());
         }
 
         @Test
-        @DisplayName("defensive copy on new nodes when updated then unmodifiable")
-        void defensiveCopyOnUpdate() {
+        @DisplayName("@PreUpdate updates timestamp")
+        void preUpdateUpdatesTimestamp() throws Exception {
             // Given
-            Instant t0 = Instant.now();
-            CustomQuest q0 = new CustomQuest("id", "owner", "name", 1, List.of(n(1)), false, "v1", t0, t0);
+            CustomQuest q = CustomQuest.create(user, "N", 1, null, "v", true);
+            Instant before = q.getUpdatedAt();
             // When
-            CustomQuest q1 = q0.withUpdate(new ArrayList<>(List.of(n(2))), 2, true, "v2");
+            invoke(q, "onUpdate");
             // Then
-            assertThrows(UnsupportedOperationException.class, () -> q1.getNodes().add(n(99)));
+            assertFalse(q.getUpdatedAt().isBefore(before));
+        }
+
+        @Test
+        @DisplayName("@PostLoad syncs ownerId from user")
+        void postLoadSyncsOwnerId() throws Exception {
+            // Given
+            when(user.getUserId()).thenReturn("U-1");
+            CustomQuest q = CustomQuest.create(user, "N", 1, null, "v", true);
+            q.setOwnerId(null);
+            // When
+            invoke(q, "syncOwnerIdAfterLoad");
+            // Then
+            assertEquals("U-1", q.getOwnerId());
+        }
+
+        @Test
+        @DisplayName("@PostLoad sets ownerId=null when user is null")
+        void postLoadSetsNullWhenUserNull() throws Exception {
+            // Given
+            CustomQuest q = CustomQuest.create(user, "N", 1, null, "v", true);
+            q.setUser(null);
+            q.setOwnerId("x");
+            // When
+            invoke(q, "syncOwnerIdAfterLoad");
+            // Then
+            assertNull(q.getOwnerId());
+        }
+    }
+
+    @Nested
+    @DisplayName("misc")
+    class Misc {
+
+        @Test
+        @DisplayName("applyUpdate should call setQuest with same quest instance")
+        void applyUpdateBackrefIdentity() {
+            // Given
+            CustomQuest q = CustomQuest.create(user, "N", 1, null, "v", true);
+            // When
+            q.applyUpdate(List.of(nodeA), 2, null, null);
+            // Then
+            verify(nodeA).setQuest(questCaptor.capture());
+            assertSame(q, questCaptor.getValue());
         }
     }
 }

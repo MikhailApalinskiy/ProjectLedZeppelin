@@ -176,7 +176,7 @@
                     <driver>org.postgresql.Driver</driver>
                     <promptOnNonLocalDatabase>false</promptOnNonLocalDatabase>
                     <logLevel>info</logLevel>
-                    <propertyFile>liquibase-dev.properties</propertyFile>
+                    <propertyFile>liquibase.properties</propertyFile>
                 </configuration>
             </plugin>
         </plugins>

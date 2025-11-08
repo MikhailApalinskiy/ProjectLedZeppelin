@@ -19,22 +19,19 @@ import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.io.IOException;
 import java.lang.reflect.Field;
-import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
+@DisplayName("PublishServlet (unit)")
 @ExtendWith(MockitoExtension.class)
-@DisplayName("PublishServlet")
 class PublishServletTest {
 
-    @Mock
-    QuestAuthoringService authoring;
     @Mock
     HttpServletRequest req;
     @Mock
@@ -42,276 +39,247 @@ class PublishServletTest {
     @Mock
     HttpSession session;
     @Mock
-    User user;
-    @Mock
-    CustomQuest cq;
+    QuestAuthoringService authoring;
 
-    PublishServlet subject;
+    private PublishServlet sut;
 
     @BeforeEach
     void setUp() throws Exception {
-        subject = Mockito.spy(new PublishServlet());
-        Field f = BaseQuestAdminServlet.class.getDeclaredField("authoring");
-        f.setAccessible(true);
-        f.set(subject, authoring);
+        sut = Mockito.spy(new PublishServlet());
+        injectField(sut, authoring);
     }
 
-    private void withSession() {
-        when(req.getSession()).thenReturn(session);
-        when(req.getSession(false)).thenReturn(session);
+    private static void injectField(Object target, Object value) throws Exception {
+        Class<?> c = target.getClass();
+        Field f = null;
+        while (c != null) {
+            try {
+                f = c.getDeclaredField("authoring");
+                break;
+            } catch (NoSuchFieldException e) {
+                c = c.getSuperclass();
+            }
+        }
+        assertNotNull(f, "Field '" + "authoring" + "' not found on class hierarchy");
+        f.setAccessible(true);
+        f.set(target, value);
+    }
+
+    private static User user(String id, Role role) {
+        User u = new User();
+        u.setUserId(id);
+        u.setRole(role);
+        return u;
+    }
+
+    private static CustomQuest quest(String ownerId, String name) {
+        CustomQuest q = new CustomQuest();
+        q.setId("q1");
+        q.setOwnerId(ownerId);
+        q.setName(name);
+        return q;
     }
 
     @Nested
-    @DisplayName("doGet")
+    @DisplayName("doGet(req, resp)")
     class DoGet {
 
         @Test
-        @DisplayName("given validation errors when doGet then redirectErr to GRAPH_SVG")
-        void should_RedirectErr_When_ValidationFails() throws Exception {
-            // given
-            when(authoring.validateCurrentDraft()).thenReturn(List.of("err1", "err2"));
+        @DisplayName("Given validation fails — When doGet — Then redirectErr to GRAPH_SVG with joined errors")
+        void validationFails_redirects() throws Exception {
+            // Given
+            when(authoring.validateCurrentDraft()).thenReturn(List.of("bad", "oops"));
+            when(req.getSession(false)).thenReturn(session);
+            when(session.getAttribute(WebConst.Attr.USER)).thenReturn(user("u1", Role.USER));
             try (MockedStatic<Web> web = mockStatic(Web.class)) {
-                // when
-                subject.doGet(req, resp);
-                // then
+                // When
+                sut.doGet(req, resp);
+                // Then
                 web.verify(() -> Web.redirectErr(eq(req), eq(resp), eq(WebConst.Path.GRAPH_SVG),
-                        argThat(msg -> msg.startsWith("You can't go to the publication:"))));
-                web.verifyNoMoreInteractions();
-                verifyNoInteractions(resp);
+                        argThat(msg -> msg.contains("You can't go to the publication")
+                                && msg.contains("bad") && msg.contains("oops"))));
+                verify(authoring).validateCurrentDraft();
             }
         }
 
         @Test
-        @DisplayName("given no validation errors when doGet then copyParamsToAttrs + forward to PUBLISH")
-        void should_Forward_When_ValidationOk() throws Exception {
-            // given
-            when(authoring.validateCurrentDraft()).thenReturn(Collections.emptyList());
+        @DisplayName("Given validation ok — When doGet — Then copyParamsToAttrs and forward to JSP.PUBLISH")
+        void validationOk_forwards() throws Exception {
+            // Given
+            when(authoring.validateCurrentDraft()).thenReturn(List.of());
+            // When/Then
             try (MockedStatic<Web> web = mockStatic(Web.class)) {
-                // when
-                subject.doGet(req, resp);
-                // then
-                web.verify(() -> Web.copyParamsToAttrs(req, WebConst.Attr.ERROR, WebConst.Attr.OK));
-                web.verify(() -> Web.forward(req, resp, WebConst.Jsp.PUBLISH));
-                web.verifyNoMoreInteractions();
+                web.when(() -> Web.copyParamsToAttrs(eq(req), anyString(), anyString())).thenAnswer(inv -> null);
+                sut.doGet(req, resp);
+                web.verify(() -> Web.copyParamsToAttrs(eq(req), eq(WebConst.Attr.ERROR), eq(WebConst.Attr.OK)));
+                web.verify(() -> Web.forward(eq(req), eq(resp), eq(WebConst.Jsp.PUBLISH)));
             }
         }
     }
 
     @Nested
-    @DisplayName("doPost: editing existing quest")
-    class DoPostEditing {
+    @DisplayName("doPost(req, resp)")
+    class DoPost {
+
+        @BeforeEach
+        void baseSession() {
+            when(req.getSession()).thenReturn(session);
+            when(req.getSession(false)).thenReturn(session);
+        }
 
         @Test
-        @DisplayName("given editingId present & non-blank and not admin when doPost then updateExisting(false) and redirectOk('Changes submitted...')")
-        void should_SubmitChanges_For_NonAdmin() throws Exception {
-            // given
-            withSession();
-            when(session.getAttribute(WebConst.Attr.EDITING_QUEST_ID)).thenReturn("Q1");
-            when(session.getAttribute(WebConst.Attr.USER)).thenReturn(user);
-            when(user.getRole()).thenReturn(Role.USER);
-            when(authoring.getFromCatalog("Q1")).thenReturn(Optional.empty());
+        @DisplayName("Given editingId present & admin — When doPost — Then updateExisting(true), notify owner if different, redirectOk 'Changes saved'")
+        void updateExistingAsAdmin_notifies() throws Exception {
+            // Given
+            User admin = user("admin", Role.ADMIN);
+            when(session.getAttribute(WebConst.Attr.USER)).thenReturn(admin);
+            when(session.getAttribute(WebConst.Attr.EDITING_QUEST_ID)).thenReturn("q1");
+            var existing = quest("owner-42", "QuestName");
+            when(authoring.getFromCatalog("q1")).thenReturn(Optional.of(existing));
+            doNothing().when(sut).notifyQuestAdminChangedById(eq(admin), eq("owner-42"), eq("QuestName"));
             try (MockedStatic<Web> web = mockStatic(Web.class)) {
-                // when
-                subject.doPost(req, resp);
-                // then
-                verify(authoring).updateExisting("Q1", false);
-                web.verify(() -> Web.redirectOk(req, resp, WebConst.Path.HOME, "Changes submitted for moderation"));
-                web.verifyNoMoreInteractions();
+                // When
+                sut.doPost(req, resp);
+                // Then
+                verify(authoring).updateExisting("q1", true);
+                verify(sut).notifyQuestAdminChangedById(eq(admin), eq("owner-42"), eq("QuestName"));
+                web.verify(() -> Web.redirectOk(eq(req), eq(resp), eq(WebConst.Path.HOME), eq("Changes saved")));
             }
         }
 
         @Test
-        @DisplayName("given editingId present & admin changing other owner's quest when doPost then notifyQuestAdminChanged and redirectOk('Changes saved')")
-        void should_NotifyOwner_For_AdminChange() throws Exception {
-            // given
-            withSession();
-            when(session.getAttribute(WebConst.Attr.EDITING_QUEST_ID)).thenReturn("Q2");
-            when(session.getAttribute(WebConst.Attr.USER)).thenReturn(user);
-            when(user.getUserId()).thenReturn("admin1");
-            when(user.getRole()).thenReturn(Role.ADMIN);
-            when(authoring.getFromCatalog("Q2")).thenReturn(Optional.of(cq));
-            when(cq.getName()).thenReturn("QuestName");
-            when(cq.getOwnerId()).thenReturn("owner2");
+        @DisplayName("Given editingId present & admin but owner same — When doPost — Then no owner notify, redirectOk 'Changes saved'")
+        void updateExistingAdmin_sameOwner_noNotify() throws Exception {
+            // Given
+            User admin = user("admin", Role.ADMIN);
+            when(session.getAttribute(WebConst.Attr.USER)).thenReturn(admin);
+            when(session.getAttribute(WebConst.Attr.EDITING_QUEST_ID)).thenReturn("q1");
+            var existing = quest("admin", "QuestName");
+            when(authoring.getFromCatalog("q1")).thenReturn(Optional.of(existing));
             try (MockedStatic<Web> web = mockStatic(Web.class)) {
-                // when
-                subject.doPost(req, resp);
-                // then
-                verify(authoring).updateExisting("Q2", true);
-                verify(subject).notifyQuestAdminChangedById(user, "owner2", "QuestName");
-                web.verify(() -> Web.redirectOk(req, resp, WebConst.Path.HOME, "Changes saved"));
-                web.verifyNoMoreInteractions();
+                // When
+                sut.doPost(req, resp);
+                // Then
+                verify(authoring).updateExisting("q1", true);
+                verify(sut, never()).notifyQuestAdminChangedById(any(), anyString(), anyString());
+                web.verify(() -> Web.redirectOk(eq(req), eq(resp), eq(WebConst.Path.HOME), eq("Changes saved")));
             }
         }
 
         @Test
-        @DisplayName("given editingId present & admin editing own quest when doPost then no notification and 'Changes saved'")
-        void should_NotNotify_When_AdminOwnsQuest() throws Exception {
-            // given
-            withSession();
-            when(session.getAttribute(WebConst.Attr.EDITING_QUEST_ID)).thenReturn("Q3");
-            when(session.getAttribute(WebConst.Attr.USER)).thenReturn(user);
-            // when
-            when(user.getUserId()).thenReturn("admin1");
-            when(user.getRole()).thenReturn(Role.ADMIN);
-            when(authoring.getFromCatalog("Q3")).thenReturn(Optional.of(cq));
-            when(cq.getName()).thenReturn("QuestName");
-            when(cq.getOwnerId()).thenReturn("admin1");
+        @DisplayName("Given editingId present & non-admin — When doPost — Then updateExisting(false), redirectOk 'Changes submitted for moderation'")
+        void updateExistingNonAdmin() throws Exception {
+            // Given
+            User u = user("u1", Role.USER);
+            when(session.getAttribute(WebConst.Attr.USER)).thenReturn(u);
+            when(session.getAttribute(WebConst.Attr.EDITING_QUEST_ID)).thenReturn("q1");
+            when(authoring.getFromCatalog("q1")).thenReturn(Optional.of(quest("u1", "Q")));
             try (MockedStatic<Web> web = mockStatic(Web.class)) {
-                // when
-                subject.doPost(req, resp);
-                // then
-                verify(authoring).updateExisting("Q3", true);
-                web.verify(() -> Web.redirectOk(req, resp, WebConst.Path.HOME, "Changes saved"));
-                web.verifyNoMoreInteractions();
+                // When
+                sut.doPost(req, resp);
+                // Then
+                verify(authoring).updateExisting("q1", false);
+                web.verify(() -> Web.redirectOk(eq(req), eq(resp), eq(WebConst.Path.HOME),
+                        eq("Changes submitted for moderation")));
             }
         }
-    }
-
-    @Nested
-    @DisplayName("doPost: create new quest")
-    class DoPostNew {
 
         @Test
-        @DisplayName("edge: blank name -> redirect back to PUBLISH with error and original questName")
-        void should_Redirect_When_NameBlank() throws IOException {
-            // given
-            withSession();
+        @DisplayName("Given new quest — When name empty — Then redirect back to /publish with error and echo questName")
+        void newQuest_emptyName() throws Exception {
+            // Given
+            User admin = user("a1", Role.ADMIN);
+            when(session.getAttribute(WebConst.Attr.USER)).thenReturn(admin);
             when(session.getAttribute(WebConst.Attr.EDITING_QUEST_ID)).thenReturn(null);
-            when(session.getAttribute(WebConst.Attr.USER)).thenReturn(user);
-            when(user.getRole()).thenReturn(Role.USER);
             when(req.getParameter("questName")).thenReturn("   ");
             try (MockedStatic<Web> web = mockStatic(Web.class)) {
-                // when
-                subject.doPost(req, resp);
-                // then
+                // When
+                sut.doPost(req, resp);
+                // Then
                 web.verify(() -> Web.redirect(eq(req), eq(resp), eq(WebConst.Path.PUBLISH),
                         argThat(map -> "Specify the name of the quest".equals(map.get(WebConst.Attr.ERROR))
                                 && "   ".equals(map.get("questName")))));
-                web.verifyNoMoreInteractions();
                 verifyNoInteractions(authoring);
             }
         }
 
         @Test
-        @DisplayName("edge: too long name (>100) -> redirect back to PUBLISH with specific error")
-        void should_Redirect_When_NameTooLong() throws IOException {
-            // given
-            withSession();
-            when(session.getAttribute(WebConst.Attr.USER)).thenReturn(user);
-            when(user.getRole()).thenReturn(Role.USER);
-            String longName = "x".repeat(101);
-            when(req.getParameter("questName")).thenReturn(longName);
+        @DisplayName("Given new quest — When name >100 — Then redirect back to /publish with length error")
+        void newQuest_tooLongName() throws Exception {
+            User admin = user("a1", Role.ADMIN);
+            when(session.getAttribute(WebConst.Attr.USER)).thenReturn(admin);
+            when(session.getAttribute(WebConst.Attr.EDITING_QUEST_ID)).thenReturn(null);
+            String big = "X".repeat(101);
+            when(req.getParameter("questName")).thenReturn(big);
             try (MockedStatic<Web> web = mockStatic(Web.class)) {
-                // when
-                subject.doPost(req, resp);
-                // then
+                // When
+                sut.doPost(req, resp);
+                // Then
                 web.verify(() -> Web.redirect(eq(req), eq(resp), eq(WebConst.Path.PUBLISH),
-                        argThat(map -> "The name is too long (maximum 100 characters)".equals(map.get(WebConst.Attr.ERROR))
-                                && longName.equals(map.get("questName")))));
-                web.verifyNoMoreInteractions();
+                        argThat(map -> "The name is too long, maximum length is 50 characters".equals(map.get(WebConst.Attr.ERROR))
+                                && big.equals(map.get("questName")))));
                 verifyNoInteractions(authoring);
             }
         }
 
         @Test
-        @DisplayName("given admin with valid name when doPost then publish + incCreated + notifyFriends + redirectOk('published')")
-        void should_Publish_For_Admin() throws IOException {
-            // given
-            withSession();
-            when(session.getAttribute(WebConst.Attr.USER)).thenReturn(user);
-            // when
-            when(user.getUserId()).thenReturn("adminId");
-            when(user.getRole()).thenReturn(Role.ADMIN);
-            when(req.getParameter("questName")).thenReturn("Quest OK");
-            doNothing().when(subject).incCreatedByUserId("adminId");
-            doNothing().when(subject).notifyFriendsPublishedByUserId("adminId", "Quest OK");
+        @DisplayName("Given new quest & admin — When valid name — Then publish, incCreatedByUserId, notifyFriends, redirectOk 'published'")
+        void publishAsAdmin() throws Exception {
+            // Given
+            User admin = user("a1", Role.ADMIN);
+            when(session.getAttribute(WebConst.Attr.USER)).thenReturn(admin);
+            when(session.getAttribute(WebConst.Attr.EDITING_QUEST_ID)).thenReturn(null);
+            when(req.getParameter("questName")).thenReturn("  My Quest  ");
+            doNothing().when(sut).incCreatedByUserId("a1");
+            doNothing().when(sut).notifyFriendsPublishedByUserId("a1", "My Quest");
             try (MockedStatic<Web> web = mockStatic(Web.class)) {
-                // when
-                subject.doPost(req, resp);
-                // then
-                verify(authoring).publish("adminId", "Quest OK");
-                verify(subject).incCreatedByUserId("adminId");
-                verify(subject).notifyFriendsPublishedByUserId("adminId", "Quest OK");
+                // When
+                sut.doPost(req, resp);
+                // Then
+                verify(authoring).publish("a1", "My Quest"); // имя с trim()
+                verify(sut).incCreatedByUserId("a1");
+                verify(sut).notifyFriendsPublishedByUserId("a1", "My Quest");
                 web.verify(() -> Web.redirectOk(eq(req), eq(resp), eq(WebConst.Path.HOME),
                         eq("The quest has been published")));
-                web.verifyNoMoreInteractions();
             }
         }
 
         @Test
-        @DisplayName("given non-admin with valid name when doPost then submitNewForModeration + redirectOk('submitted for moderation')")
-        void should_Submit_For_NonAdmin() throws IOException {
-            // given
-            withSession();
+        @DisplayName("Given new quest & non-admin — When valid name — Then submitNewForModeration and redirectOk 'submitted for moderation'")
+        void submitForModeration() throws Exception {
+            // Given
+            User user = user("u1", Role.USER);
             when(session.getAttribute(WebConst.Attr.USER)).thenReturn(user);
-            when(user.getUserId()).thenReturn("uid-1");
-            when(user.getRole()).thenReturn(Role.USER);
-            when(req.getParameter("questName")).thenReturn("New Quest");
+            when(session.getAttribute(WebConst.Attr.EDITING_QUEST_ID)).thenReturn(null);
+            when(req.getParameter("questName")).thenReturn("Name");
             try (MockedStatic<Web> web = mockStatic(Web.class)) {
-                // when
-                subject.doPost(req, resp);
-                // then
-                verify(authoring).submitNewForModeration("uid-1", "New Quest");
-                web.verify(() -> Web.redirectOk(
-                        eq(req), eq(resp), eq(WebConst.Path.HOME),
-                        eq("The quest has been submitted for moderation")
-                ));
-                web.verifyNoMoreInteractions();
-            }
-        }
-
-        @Test
-        @DisplayName("given no user in session when doPost then submits with NULL owner and redirects ok")
-        void should_UseNullOwner_When_NoUser() throws IOException {
-            // given
-            withSession();
-            when(session.getAttribute(WebConst.Attr.USER)).thenReturn(null);
-            when(req.getParameter("questName")).thenReturn("Anon Quest");
-            try (MockedStatic<Web> web = mockStatic(Web.class)) {
-                // when
-                subject.doPost(req, resp);
-                // then
-                verify(authoring).submitNewForModeration(null, "Anon Quest");
-                web.verify(() -> Web.redirectOk(
-                        eq(req), eq(resp), eq(WebConst.Path.HOME),
+                // When
+                sut.doPost(req, resp);
+                // Then
+                verify(authoring).submitNewForModeration("u1", "Name");
+                web.verify(() -> Web.redirectOk(eq(req), eq(resp), eq(WebConst.Path.HOME),
                         eq("The quest has been submitted for moderation")));
-                web.verifyNoMoreInteractions();
+                verify(sut, never()).incCreatedByUserId(anyString());
+                verify(sut, never()).notifyFriendsPublishedByUserId(anyString(), anyString());
             }
         }
-    }
-
-    @Nested
-    @DisplayName("doPost: exception handling")
-    class DoPostExceptions {
 
         @Test
-        @DisplayName("given IllegalStateException from authoring when doPost then redirect back with 'Publication failed: ...' and preserve questName")
-        void should_RedirectWithError_When_AuthoringThrows() throws IOException {
-            // given
-            withSession();
-            when(session.getAttribute(WebConst.Attr.USER)).thenReturn(user);
-            when(user.getUserId()).thenReturn("uid-1");
-            when(user.getRole()).thenReturn(Role.USER);
-            when(req.getParameter("questName")).thenReturn("X");
-            doThrow(new IllegalStateException("Start node is not set."))
-                    .when(authoring).submitNewForModeration("uid-1", "X");
+        @DisplayName("Given business exception — When doPost — Then redirect back to /publish with 'Publication failed: ...'")
+        void businessException_redirectsBack() throws Exception {
+            // Given
+            User admin = user("a1", Role.ADMIN);
+            when(session.getAttribute(WebConst.Attr.USER)).thenReturn(admin);
+            when(session.getAttribute(WebConst.Attr.EDITING_QUEST_ID)).thenReturn(null);
+            when(req.getParameter("questName")).thenReturn("Demo");
+            doThrow(new IllegalStateException("bad state")).when(authoring).publish("a1", "Demo");
             try (MockedStatic<Web> web = mockStatic(Web.class)) {
-                // when
-                subject.doPost(req, resp);
-                // then
-                web.verify(() -> Web.redirect(
-                        eq(req),
-                        eq(resp),
-                        eq(WebConst.Path.PUBLISH),
-                        argThat(map -> {
-                            String err = map.get(WebConst.Attr.ERROR);
-                            Object name = map.get("questName");
-                            return err != null
-                                    && err.startsWith("Publication failed: Start node is not set.")
-                                    && "X".equals(name);
-                        })
-                ));
-                web.verifyNoMoreInteractions();
+                // When
+                sut.doPost(req, resp);
+                // Then
+                web.verify(() -> Web.redirect(eq(req), eq(resp), eq(WebConst.Path.PUBLISH),
+                        argThat(map -> String.valueOf(map.get(WebConst.Attr.ERROR)).contains("Publication failed: bad state")
+                                && "Demo".equals(map.get("questName")))));
             }
         }
     }

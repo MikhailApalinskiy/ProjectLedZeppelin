@@ -1,143 +1,229 @@
 package com.javarush.apalinskiy.domain.notify;
 
+import com.javarush.apalinskiy.domain.user.User;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
 import java.util.Date;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-@DisplayName("Notification")
+@DisplayName("Notification entity")
 class NotificationTest {
 
     @Nested
-    @DisplayName("of()")
-    class OfFactory {
+    @DisplayName("factory method 'of'")
+    class OfFactoryMethod {
 
         @Test
-        @DisplayName("creates with given fields when FRIEND_REQUEST then ok")
-        void createsWithGivenFields() {
+        @DisplayName("should generate non-null id")
+        void generatesNonNullId() {
             // Given
-            String userId = "u1";
+            User user = new User();
             // When
-            Notification n = Notification.of(userId, NotificationType.FRIEND_REQUEST, "title", "body");
+            Notification n = Notification.of(user, NotificationType.FRIEND_REQUEST, "t", null);
             // Then
-            assertEquals(userId, n.getUserId());
-            assertEquals(NotificationType.FRIEND_REQUEST, n.getType());
-            assertEquals("title", n.getTitle());
-            assertEquals("body", n.getBody());
             assertNotNull(n.getId());
-            assertFalse(n.isRead());
         }
 
         @Test
-        @DisplayName("generates unique UUID id when created twice then different")
-        void idIsUuid() {
+        @DisplayName("should generate a valid UUID string")
+        void generatesValidUuid() {
             // Given
+            User user = new User();
             // When
-            Notification n1 = Notification.of("u1", NotificationType.FRIEND_REQUEST, "t", "b");
-            Notification n2 = Notification.of("u1", NotificationType.FRIEND_REQUEST, "t", "b");
+            Notification n = Notification.of(user, NotificationType.FRIEND_REQUEST, "t", null);
             // Then
-            assertNotEquals(n1.getId(), n2.getId());
-            assertTrue(n1.getId().matches("^[0-9a-f\\-]+$"));
+            assertDoesNotThrow(() -> UUID.fromString(n.getId()));
         }
 
         @Test
-        @DisplayName("sets createdAt ~ now when created then within bounds")
-        void createdAtIsNow() {
+        @DisplayName("should assign provided user")
+        void assignsUser() {
+            // Given
+            User user = new User();
+            // When
+            Notification n = Notification.of(user, NotificationType.FRIEND_REQUEST, "t", null);
+            // Then
+            assertSame(user, n.getUser());
+        }
+
+        @Test
+        @DisplayName("should assign provided type")
+        void assignsType() {
+            // Given
+            User user = new User();
+            NotificationType type = NotificationType.USER_ADMIN_CHANGED;
+            // When
+            Notification n = Notification.of(user, type, "t", null);
+            // Then
+            assertEquals(type, n.getType());
+        }
+
+        @Test
+        @DisplayName("should assign provided title")
+        void assignsTitle() {
+            // Given
+            User user = new User();
+            String title = "Welcome!";
+            // When
+            Notification n = Notification.of(user, NotificationType.FRIEND_REQUEST, title, null);
+            // Then
+            assertEquals(title, n.getTitle());
+        }
+
+        @Test
+        @DisplayName("should assign provided body (nullable)")
+        void assignsBody() {
+            // Given
+            User user = new User();
+            String body = "Hello there";
+            // When
+            Notification n = Notification.of(user, NotificationType.FRIEND_REQUEST, "t", body);
+            // Then
+            assertEquals(body, n.getBody());
+        }
+
+        @Test
+        @DisplayName("should set createdAt to non-null")
+        void setsCreatedAtNonNull() {
+            // Given
+            User user = new User();
+            // When
+            Notification n = Notification.of(user, NotificationType.FRIEND_REQUEST, "t", null);
+            // Then
+            assertNotNull(n.getCreatedAt());
+        }
+
+        @Test
+        @DisplayName("should set read=false by default")
+        void setsUnreadByDefault() {
+            // Given
+            User user = new User();
+            // When
+            Notification n = Notification.of(user, NotificationType.FRIEND_REQUEST, "t", null);
+            // Then
+            assertFalse(n.getRead());
+        }
+
+        @Test
+        @DisplayName("should set createdAt approximately to now")
+        void setsCreatedAtApproximatelyNow() {
             // Given
             Instant before = Instant.now();
+            User user = new User();
             // When
-            Notification n = Notification.of("u1", NotificationType.FRIEND_REQUEST, "t", "b");
+            Notification n = Notification.of(user, NotificationType.FRIEND_REQUEST, "t", null);
             Instant after = Instant.now();
             // Then
-            assertFalse(n.getCreatedAt().isBefore(before));
-            assertFalse(n.getCreatedAt().isAfter(after));
+            assertFalse(n.getCreatedAt().isBefore(before), "createdAt must be >= before");
+            assertFalse(n.getCreatedAt().isAfter(after), "createdAt must be <= after");
         }
     }
 
     @Nested
-    @DisplayName("markRead()")
-    class MarkRead {
-
-        @Test
-        @DisplayName("returns new instance with read=true when called then original remains false")
-        void setsReadTrue() {
-            // Given
-            Notification n = Notification.of("u1", NotificationType.FRIEND_REQUEST, "t", "b");
-            // When
-            Notification marked = n.markRead();
-            // Then
-            assertTrue(marked.isRead());
-            assertFalse(n.isRead());
-        }
-
-        @Test
-        @DisplayName("preserves id when marked then equal")
-        void preservesId() {
-            // Given
-            Notification n = Notification.of("u1", NotificationType.FRIEND_REQUEST, "t", "b");
-            String id = n.getId();
-            // When
-            Notification marked = n.markRead();
-            // Then
-            assertEquals(id, marked.getId());
-        }
-
-        @Test
-        @DisplayName("preserves createdAt when marked then equal")
-        void preservesCreatedAt() {
-            // Given
-            Notification n = Notification.of("u1", NotificationType.FRIEND_REQUEST, "t", "b");
-            Instant created = n.getCreatedAt();
-            // When
-            Notification marked = n.markRead();
-            // Then
-            assertEquals(created, marked.getCreatedAt());
-        }
-    }
-
-    @Nested
-    @DisplayName("getCreatedAtDate()")
+    @DisplayName("method 'getCreatedAtDate'")
     class GetCreatedAtDate {
 
         @Test
-        @DisplayName("converts Instant to Date when requested then equals Date.from(instant)")
+        @DisplayName("should convert createdAt Instant to Date")
         void convertsInstantToDate() {
             // Given
-            Notification n = Notification.of("u1", NotificationType.FRIEND_REQUEST, "t", "b");
+            Notification n = new Notification();
+            Instant ts = Instant.now();
+            n.setCreatedAt(ts);
             // When
             Date d = n.getCreatedAtDate();
             // Then
-            assertEquals(Date.from(n.getCreatedAt()), d);
+            assertEquals(Date.from(ts), d);
         }
     }
 
     @Nested
-    @DisplayName("NotificationType enum")
-    class NotificationTypeEnum {
+    @DisplayName("accessors (getters/setters)")
+    class Accessors {
 
         @Test
-        @DisplayName("has expected size 7 when values() called then 7")
-        void hasSevenValues() {
+        @DisplayName("should set/get id")
+        void idAccessor() {
             // Given
+            Notification n = new Notification();
+            String id = UUID.randomUUID().toString();
             // When
-            int len = NotificationType.values().length;
+            n.setId(id);
             // Then
-            assertEquals(7, len);
+            assertEquals(id, n.getId());
         }
 
         @Test
-        @DisplayName("contains FRIEND_REQUEST when valueOf then enum constant")
-        void containsFriendRequest() {
+        @DisplayName("should set/get user")
+        void userAccessor() {
             // Given
-            String name = "FRIEND_REQUEST";
+            Notification n = new Notification();
+            User u = new User();
             // When
-            NotificationType t = NotificationType.valueOf(name);
+            n.setUser(u);
             // Then
-            assertEquals(NotificationType.FRIEND_REQUEST, t);
+            assertSame(u, n.getUser());
+        }
+
+        @Test
+        @DisplayName("should set/get type")
+        void typeAccessor() {
+            // Given
+            Notification n = new Notification();
+            // When
+            n.setType(NotificationType.FRIEND_REQUEST);
+            // Then
+            assertEquals(NotificationType.FRIEND_REQUEST, n.getType());
+        }
+
+        @Test
+        @DisplayName("should set/get title")
+        void titleAccessor() {
+            // Given
+            Notification n = new Notification();
+            // When
+            n.setTitle("X");
+            // Then
+            assertEquals("X", n.getTitle());
+        }
+
+        @Test
+        @DisplayName("should set/get body")
+        void bodyAccessor() {
+            // Given
+            Notification n = new Notification();
+            // When
+            n.setBody("Y");
+            // Then
+            assertEquals("Y", n.getBody());
+        }
+
+        @Test
+        @DisplayName("should set/get createdAt")
+        void createdAtAccessor() {
+            // Given
+            Notification n = new Notification();
+            Instant ts = Instant.now();
+            // When
+            n.setCreatedAt(ts);
+            // Then
+            assertEquals(ts, n.getCreatedAt());
+        }
+
+        @Test
+        @DisplayName("should set/get read flag")
+        void readAccessor() {
+            // Given
+            Notification n = new Notification();
+            // When
+            n.setRead(true);
+            // Then
+            assertTrue(n.getRead());
         }
     }
 }

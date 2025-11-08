@@ -1,6 +1,7 @@
 package com.javarush.apalinskiy.web.servlet;
 
 import com.javarush.apalinskiy.app.WebConst;
+import com.javarush.apalinskiy.domain.notify.NotificationEvent;
 import com.javarush.apalinskiy.domain.user.Role;
 import com.javarush.apalinskiy.domain.user.User;
 import com.javarush.apalinskiy.exceptions.DuplicateLoginException;
@@ -9,27 +10,24 @@ import com.javarush.apalinskiy.service.user.UserService;
 import com.javarush.apalinskiy.web.util.Web;
 import jakarta.servlet.ServletConfig;
 import jakarta.servlet.ServletContext;
+import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
+import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.lang.reflect.Field;
-import java.util.List;
-import java.util.Map;
-import java.util.NoSuchElementException;
-import java.util.Optional;
+import java.util.*;
 
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.*;
 
-@DisplayName("AdminUserEditServlet")
-@ExtendWith(org.mockito.junit.jupiter.MockitoExtension.class)
+@DisplayName("AdminUserEditServlet (unit)")
+@ExtendWith(MockitoExtension.class)
 class AdminUserEditServletTest {
 
     @Mock
@@ -37,303 +35,304 @@ class AdminUserEditServletTest {
     @Mock
     ServletContext ctx;
     @Mock
+    UserService users;
+    @Mock
+    NotificationService notifySvc;
+    @Mock
     HttpServletRequest req;
     @Mock
     HttpServletResponse resp;
     @Mock
     HttpSession session;
-    @Mock
-    UserService users;
-    @Mock
-    NotificationService notify;
-    @Mock
-    User userBefore;
-    @Mock
-    User userUpdated;
-    @Mock
-    User me;
 
-    private static void setField(Object target, String fieldName, Object value) {
-        try {
-            Field f;
-            try {
-                f = target.getClass().getDeclaredField(fieldName);
-            } catch (NoSuchFieldException ex) {
-                f = target.getClass().getSuperclass().getDeclaredField(fieldName);
+    private AdminUserEditServlet sut;
+
+    private User realUser(String id, String login, String name, Role role) {
+        User u = new User();
+        u.setUserId(id);
+        u.setUserLogin(login);
+        u.setUserName(name);
+        u.setRole(role);
+        return u;
+    }
+
+    @Nested
+    @DisplayName("init(config)")
+    class InitPhase {
+
+        @Test
+        @DisplayName("Given beans present in ServletContext — When init — Then ctxBean called and fields set")
+        void initHappy() throws ServletException {
+            // Given
+            sut = new AdminUserEditServlet();
+            when(config.getServletContext()).thenReturn(ctx);
+            try (MockedStatic<Web> web = mockStatic(Web.class)) {
+                web.when(() -> Web.ctxBean(ctx, WebConst.Ctx.USER_SERVICE, UserService.class))
+                        .thenReturn(users);
+                web.when(() -> Web.ctxBean(ctx, WebConst.Ctx.NOTIFY_SERVICE, NotificationService.class))
+                        .thenReturn(notifySvc);
+                // When
+                sut.init(config);
+                // Then
+                web.verify(() -> Web.ctxBean(ctx, WebConst.Ctx.USER_SERVICE, UserService.class));
+                web.verify(() -> Web.ctxBean(ctx, WebConst.Ctx.NOTIFY_SERVICE, NotificationService.class));
             }
-            f.setAccessible(true);
-            f.set(target, value);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
         }
     }
 
-    private AdminUserEditServlet newServletWithDeps() {
-        AdminUserEditServlet s = spy(new AdminUserEditServlet());
-        setField(s, "users", users);
-        setField(s, "notify", notify);
-        return s;
-    }
-
-    @Test
-    @DisplayName("given ctx beans when init then services are resolved")
-    void init_ok() throws Exception {
-        // given
-        AdminUserEditServlet s = new AdminUserEditServlet();
+    private void initServletWithBeans() throws ServletException {
+        sut = new AdminUserEditServlet();
         when(config.getServletContext()).thenReturn(ctx);
         try (MockedStatic<Web> web = mockStatic(Web.class)) {
-            web.when(() -> Web.ctxBean(ctx, WebConst.Ctx.USER_SERVICE, UserService.class)).thenReturn(users);
-            web.when(() -> Web.ctxBean(ctx, WebConst.Ctx.NOTIFY_SERVICE, NotificationService.class)).thenReturn(notify);
-            // when
-            s.init(config);
-            // then
-            web.verify(() -> Web.ctxBean(ctx, WebConst.Ctx.USER_SERVICE, UserService.class));
-            web.verify(() -> Web.ctxBean(ctx, WebConst.Ctx.NOTIFY_SERVICE, NotificationService.class));
+            web.when(() -> Web.ctxBean(ctx, WebConst.Ctx.USER_SERVICE, UserService.class))
+                    .thenReturn(users);
+            web.when(() -> Web.ctxBean(ctx, WebConst.Ctx.NOTIFY_SERVICE, NotificationService.class))
+                    .thenReturn(notifySvc);
+            sut.init(config);
         }
     }
 
     @Nested
-    @DisplayName("doGet")
+    @DisplayName("doGet(req, resp)")
     class DoGet {
 
+        @BeforeEach
+        void setUp() throws ServletException {
+            initServletWithBeans();
+        }
+
         @Test
-        @DisplayName("given no id when doGet then redirectErr to USERS")
+        @DisplayName("Given missing id — When doGet — Then redirectErr to USERS with message")
         void missingId() throws Exception {
-            // given
-            AdminUserEditServlet s = newServletWithDeps();
-            when(req.getParameter(WebConst.Param.ID)).thenReturn(null);
             try (MockedStatic<Web> web = mockStatic(Web.class)) {
-                web.when(() -> Web.redirectErr(eq(req), eq(resp), eq(WebConst.Path.USERS), anyString())).then(inv -> null);
-                // when
-                s.doGet(req, resp);
-                // then
-                web.verify(() -> Web.redirectErr(eq(req), eq(resp), eq(WebConst.Path.USERS), eq("Missing user id")));
+                // Given
+                web.when(() -> Web.pullFlash(req, WebConst.Attr.OK)).thenAnswer(inv -> null);
+                web.when(() -> Web.pullFlash(req, WebConst.Attr.ERROR)).thenAnswer(inv -> null);
+                when(req.getParameter(WebConst.Param.ID)).thenReturn(null);
+                web.when(() -> Web.trimOrNull(null)).thenReturn(null);
+                // When
+                sut.doGet(req, resp);
+                // Then
+                web.verify(() -> Web.redirectErr(req, resp, WebConst.Path.USERS, "Missing user id"));
             }
         }
 
         @Test
-        @DisplayName("given unknown id when doGet then redirectErr to USERS")
+        @DisplayName("Given id provided but user not found — When doGet — Then redirectErr to USERS")
         void userNotFound() throws Exception {
-            // given
-            AdminUserEditServlet s = newServletWithDeps();
-            when(req.getParameter(WebConst.Param.ID)).thenReturn("u1");
-            when(users.findById("u1")).thenReturn(Optional.empty());
-            try (MockedStatic<Web> web = mockStatic(Web.class, CALLS_REAL_METHODS)) {
-                web.when(() -> Web.redirectErr(eq(req), eq(resp), eq(WebConst.Path.USERS), anyString())).then(inv -> null);
-                // when
-                s.doGet(req, resp);
-                // then
-                web.verify(() -> Web.redirectErr(eq(req), eq(resp), eq(WebConst.Path.USERS), eq("User not found")));
+            //Given
+            try (MockedStatic<Web> web = mockStatic(Web.class)) {
+                web.when(() -> Web.pullFlash(req, WebConst.Attr.OK)).thenAnswer(inv -> null);
+                web.when(() -> Web.pullFlash(req, WebConst.Attr.ERROR)).thenAnswer(inv -> null);
+                when(req.getParameter(WebConst.Param.ID)).thenReturn("u3");
+                web.when(() -> Web.trimOrNull("u3")).thenReturn("u3");
+                when(users.findById("u3")).thenReturn(Optional.empty());
+                //When
+                sut.doGet(req, resp);
+                //Then
+                web.verify(() -> Web.redirectErr(req, resp, WebConst.Path.USERS, "User not found"));
             }
         }
 
         @Test
-        @DisplayName("given existing user when doGet then set attributes and forward to edit JSP")
-        void okForwards() throws Exception {
-            // given
-            AdminUserEditServlet s = newServletWithDeps();
-            User target = mock(User.class);
-            when(req.getParameter(WebConst.Param.ID)).thenReturn("id");
-            when(users.findById("id")).thenReturn(Optional.of(target));
-            try (MockedStatic<Web> web = mockStatic(Web.class, CALLS_REAL_METHODS)) {
-                web.when(() -> Web.forward(eq(req), eq(resp), eq(WebConst.Jsp.USER_EDIT))).then(inv -> null);
-                // when
-                s.doGet(req, resp);
-                // then
-                verify(req).setAttribute("editUser", target);
-                verify(req).setAttribute("roles", List.of(Role.USER, Role.ADMIN));
+        @DisplayName("Given id and user exists — When doGet — Then set attributes and forward to JSP")
+        void happyPath() throws Exception {
+            try (MockedStatic<Web> web = mockStatic(Web.class)) {
+                web.when(() -> Web.pullFlash(req, WebConst.Attr.OK)).thenAnswer(inv -> null);
+                web.when(() -> Web.pullFlash(req, WebConst.Attr.ERROR)).thenAnswer(inv -> null);
+                when(req.getParameter(WebConst.Param.ID)).thenReturn("u1");
+                web.when(() -> Web.trimOrNull("u1")).thenReturn("u1");
+                User target = realUser("u1", "login1", "Name1", Role.USER);
+                when(users.findById("u1")).thenReturn(Optional.of(target));
+                // When
+                sut.doGet(req, resp);
+                // Then
+                verify(req).setAttribute(eq("editUser"), same(target));
+                @SuppressWarnings("unchecked")
+                ArgumentCaptor<List<Role>> cap = ArgumentCaptor.forClass(List.class);
+                verify(req).setAttribute(eq("roles"), cap.capture());
+                List<Role> roles = cap.getValue();
+                assertTrue(roles.contains(Role.USER) && roles.contains(Role.ADMIN));
                 web.verify(() -> Web.forward(req, resp, WebConst.Jsp.USER_EDIT));
             }
         }
     }
 
     @Nested
-    @DisplayName("doPost validations")
-    class DoPostValidations {
+    @DisplayName("doPost(req, resp)")
+    class DoPost {
+
+        @BeforeEach
+        void setUp() throws ServletException {
+            initServletWithBeans();
+        }
 
         @Test
-        @DisplayName("given id=null when doPost then redirectErr to USERS")
+        @DisplayName("Given missing id — When doPost — Then redirectErr to USERS")
         void missingId() throws Exception {
-            // given
-            AdminUserEditServlet s = newServletWithDeps();
-            when(req.getParameter(WebConst.Param.ID)).thenReturn(null);
             try (MockedStatic<Web> web = mockStatic(Web.class)) {
-                web.when(() -> Web.redirectErr(eq(req), eq(resp), eq(WebConst.Path.USERS), anyString())).then(inv -> null);
-                // when
-                s.doPost(req, resp);
-                // then
-                web.verify(() -> Web.redirectErr(eq(req), eq(resp), eq(WebConst.Path.USERS), eq("Missing user id")));
+                when(req.getParameter(WebConst.Param.ID)).thenReturn(null);
+                web.when(() -> Web.trimOrNull(null)).thenReturn(null);
+                sut.doPost(req, resp);
+                web.verify(() -> Web.redirectErr(req, resp, WebConst.Path.USERS, "Missing user id"));
             }
-        }
-    }
-
-    @Nested
-    @DisplayName("doPost updates")
-    class DoPostUpdates {
-
-        @BeforeEach
-        void commonInput() {
-            when(req.getParameter(WebConst.Param.ID)).thenReturn("u1");
-            when(req.getParameter(WebConst.Param.USER_NAME)).thenReturn("New Name");
-            when(req.getParameter(WebConst.Param.USER_LOGIN)).thenReturn("newlogin");
-            when(req.getParameter(WebConst.Param.ROLE)).thenReturn("ADMIN");
-            when(req.getParameter(WebConst.Param.PASSWORD)).thenReturn(null);
-            when(users.findById("u1")).thenReturn(Optional.of(userBefore));
         }
 
         @Test
-        @DisplayName("given updating another user when doPost then no session touch, notify (visible), redirectOk")
-        void updateOtherUser_visibleChanges() throws Exception {
-            // given
-            AdminUserEditServlet s = newServletWithDeps();
-            when(users.adminUpdate("u1", Role.ADMIN, "New Name", "newlogin", null)).thenReturn(userUpdated);
-            when(req.getSession(false)).thenReturn(session);
-            when(session.getAttribute(WebConst.Attr.USER)).thenReturn(me);
-            when(me.getUserId()).thenReturn("admin");
-            when(userUpdated.getUserId()).thenReturn("u1");
-            try (MockedStatic<Web> web = mockStatic(Web.class, CALLS_REAL_METHODS)) {
-                web.when(() -> Web.buildAdminChangeSummary(userBefore, userUpdated, false))
-                        .thenReturn("role: USER → ADMIN");
-                web.when(() -> Web.buildMachineReadableDiff(userBefore, userUpdated, false))
-                        .thenReturn(Map.of("what", "role: USER → ADMIN"));
-                web.when(() -> Web.redirectOk(eq(req), eq(resp), anyString(), anyString())).then(inv -> null);
-                // when
-                s.doPost(req, resp);
-                // then
-                verify(session, never()).setAttribute(eq(WebConst.Attr.USER), any());
-                web.verify(() -> Web.renewSessionAndPut(any(), anyString(), any()), never());
-                verify(notify, atLeastOnce()).notify(any());
+        @DisplayName("Given valid self-update and sensitiveChanged=true — When doPost — Then renewSessionAndPut, notify, redirectOk")
+        void selfUpdateSensitiveChanged() throws Exception {
+            try (MockedStatic<Web> web = mockStatic(Web.class)) {
+                // Given
+                when(req.getParameter(WebConst.Param.ID)).thenReturn("u1");
+                when(req.getParameter(WebConst.Param.USER_NAME)).thenReturn("New Name");
+                when(req.getParameter(WebConst.Param.USER_LOGIN)).thenReturn("newlogin");
+                when(req.getParameter(WebConst.Param.ROLE)).thenReturn("ADMIN");
+                when(req.getParameter(WebConst.Param.PASSWORD)).thenReturn("secret");
+                web.when(() -> Web.trimOrNull("u1")).thenReturn("u1");
+                web.when(() -> Web.trimOrNull("New Name")).thenReturn("New Name");
+                web.when(() -> Web.trimOrNull("newlogin")).thenReturn("newlogin");
+                web.when(() -> Web.trimOrNull("ADMIN")).thenReturn("ADMIN");
+                web.when(() -> Web.trimOrNull("secret")).thenReturn("secret");
+                User before = realUser("u1", "oldlogin", "Old Name", Role.USER);
+                User updated = realUser("u1", "newlogin", "New Name", Role.ADMIN);
+                when(users.findById("u1")).thenReturn(Optional.of(before));
+                when(users.adminUpdate("u1", Role.ADMIN, "New Name", "newlogin", "secret")).thenReturn(updated);
+                when(req.getSession(false)).thenReturn(session);
+                when(session.getAttribute(WebConst.Attr.USER)).thenReturn(updated); // self-update
+                web.when(() -> Web.sensitiveChanged(before, updated, true)).thenReturn(true);
+                web.when(() -> Web.buildAdminChangeSummary(before, updated, true)).thenReturn("Changed");
+                web.when(() -> Web.buildMachineReadableDiff(before, updated, true)).thenReturn(Map.of("k", "v"));
+                // When
+                sut.doPost(req, resp);
+                // Then
+                web.verify(() -> Web.renewSessionAndPut(req, WebConst.Attr.USER, updated));
+                verify(session, never()).setAttribute(anyString(), any());
+                verify(notifySvc).notify(any(NotificationEvent.class));
                 web.verify(() -> Web.redirectOk(eq(req), eq(resp),
-                        eq(WebConst.Path.USER_EDIT + "?id=u1"),
+                        eq(WebConst.Path.USER_EDIT + "?" + WebConst.Param.ID + "=u1"),
                         eq("The user has been updated")));
             }
         }
 
         @Test
-        @DisplayName("given updating myself and sensitiveChanged=true when doPost then renewSessionAndPut, notify, redirectOk")
-        void updateSelf_sensitiveChanged() throws Exception {
-            // given
-            AdminUserEditServlet s = newServletWithDeps();
-            when(users.adminUpdate("u1", Role.ADMIN, "New Name", "newlogin", null)).thenReturn(userUpdated);
-            when(req.getSession(false)).thenReturn(session);
-            when(session.getAttribute(WebConst.Attr.USER)).thenReturn(me);
-            when(me.getUserId()).thenReturn("u1");
-            when(userUpdated.getUserId()).thenReturn("u1");
-            try (MockedStatic<Web> web = mockStatic(Web.class, CALLS_REAL_METHODS)) {
-                web.when(() -> Web.sensitiveChanged(userBefore, userUpdated, false)).thenReturn(true);
-                web.when(() -> Web.renewSessionAndPut(eq(req), eq(WebConst.Attr.USER), eq(userUpdated))).then(inv -> null);
-                web.when(() -> Web.buildAdminChangeSummary(userBefore, userUpdated, false))
-                        .thenReturn("login: old → new");
-                web.when(() -> Web.buildMachineReadableDiff(userBefore, userUpdated, false))
-                        .thenReturn(Map.of("what", "login: old → new"));
-                web.when(() -> Web.redirectOk(eq(req), eq(resp), anyString(), anyString())).then(inv -> null);
-                // when
-                s.doPost(req, resp);
-                // then
-                web.verify(() -> Web.renewSessionAndPut(eq(req), eq(WebConst.Attr.USER), eq(userUpdated)));
-                verify(session, never()).setAttribute(eq(WebConst.Attr.USER), any());
-                verify(notify, atLeastOnce()).notify(any());
+        @DisplayName("Given valid self-update and sensitiveChanged=false — When doPost — Then session.setAttribute, notify, redirectOk")
+        void selfUpdateNotSensitive() throws Exception {
+            try (MockedStatic<Web> web = mockStatic(Web.class)) {
+                //Given
+                when(req.getParameter(WebConst.Param.ID)).thenReturn("u1");
+                when(req.getParameter(WebConst.Param.USER_NAME)).thenReturn("Same Name");
+                when(req.getParameter(WebConst.Param.USER_LOGIN)).thenReturn("same");
+                when(req.getParameter(WebConst.Param.ROLE)).thenReturn("USER");
+                when(req.getParameter(WebConst.Param.PASSWORD)).thenReturn(null);
+                web.when(() -> Web.trimOrNull("u1")).thenReturn("u1");
+                web.when(() -> Web.trimOrNull("Same Name")).thenReturn("Same Name");
+                web.when(() -> Web.trimOrNull("same")).thenReturn("same");
+                web.when(() -> Web.trimOrNull("USER")).thenReturn("USER");
+                web.when(() -> Web.trimOrNull(null)).thenReturn(null);
+                User before = realUser("u1", "same", "Same Name", Role.USER);
+                User updated = realUser("u1", "same", "Same Name", Role.USER);
+                when(users.findById("u1")).thenReturn(Optional.of(before));
+                when(users.adminUpdate("u1", Role.USER, "Same Name", "same", null)).thenReturn(updated);
+                when(req.getSession(false)).thenReturn(session);
+                when(session.getAttribute(WebConst.Attr.USER)).thenReturn(updated); // self-update
+                web.when(() -> Web.sensitiveChanged(before, updated, false)).thenReturn(false);
+                web.when(() -> Web.buildAdminChangeSummary(before, updated, false)).thenReturn("Changed");
+                web.when(() -> Web.buildMachineReadableDiff(before, updated, false)).thenReturn(Map.of());
+                //When
+                sut.doPost(req, resp);
+                //Then
+                verify(session).setAttribute(WebConst.Attr.USER, updated);
+                web.verify(() -> Web.renewSessionAndPut(any(), anyString(), any()), times(0));
+                verify(notifySvc).notify(any(NotificationEvent.class));
                 web.verify(() -> Web.redirectOk(eq(req), eq(resp),
-                        eq(WebConst.Path.USER_EDIT + "?id=u1"),
+                        eq(WebConst.Path.USER_EDIT + "?" + WebConst.Param.ID + "=u1"),
                         eq("The user has been updated")));
             }
         }
 
         @Test
-        @DisplayName("given updating myself and sensitiveChanged=false & no visible changes when doPost then setAttribute only, no notify, redirectOk")
-        void updateSelf_noSensitive_noVisible() throws Exception {
-            // given
-            AdminUserEditServlet s = newServletWithDeps();
-            when(users.adminUpdate("u1", Role.ADMIN, "New Name", "newlogin", null)).thenReturn(userUpdated);
-            when(req.getSession(false)).thenReturn(session);
-            when(session.getAttribute(WebConst.Attr.USER)).thenReturn(me);
-            when(me.getUserId()).thenReturn("u1");
-            when(userUpdated.getUserId()).thenReturn("u1");
-            try (MockedStatic<Web> web = mockStatic(Web.class, CALLS_REAL_METHODS)) {
-                web.when(() -> Web.sensitiveChanged(userBefore, userUpdated, false)).thenReturn(false);
-                web.when(() -> Web.buildAdminChangeSummary(userBefore, userUpdated, false))
-                        .thenReturn("No visible changes");
-                web.when(() -> Web.buildMachineReadableDiff(userBefore, userUpdated, false))
-                        .thenReturn(Map.of("what", "No visible changes"));
-                web.when(() -> Web.redirectOk(eq(req), eq(resp), anyString(), anyString())).then(inv -> null);
-                // when
-                s.doPost(req, resp);
-                // then
-                verify(session).setAttribute(WebConst.Attr.USER, userUpdated);
-                verify(notify, never()).notify(any());
-                web.verify(() -> Web.renewSessionAndPut(any(), anyString(), any()), never());
+        @DisplayName("Given update but 'No visible changes' — When doPost — Then no notify, just redirectOk")
+        void noVisibleChangesNoNotify() throws Exception {
+            try (MockedStatic<Web> web = mockStatic(Web.class)) {
+                //Given
+                when(req.getParameter(WebConst.Param.ID)).thenReturn("u1");
+                when(req.getParameter(WebConst.Param.USER_NAME)).thenReturn("A");
+                when(req.getParameter(WebConst.Param.USER_LOGIN)).thenReturn("a");
+                when(req.getParameter(WebConst.Param.ROLE)).thenReturn("USER");
+                when(req.getParameter(WebConst.Param.PASSWORD)).thenReturn(null);
+                web.when(() -> Web.trimOrNull("u1")).thenReturn("u1");
+                web.when(() -> Web.trimOrNull("A")).thenReturn("A");
+                web.when(() -> Web.trimOrNull("a")).thenReturn("a");
+                web.when(() -> Web.trimOrNull("USER")).thenReturn("USER");
+                web.when(() -> Web.trimOrNull(null)).thenReturn(null);
+                User before = realUser("u1", "a", "A", Role.USER);
+                User updated = realUser("u1", "a", "A", Role.USER);
+                when(users.findById("u1")).thenReturn(Optional.of(before));
+                when(users.adminUpdate("u1", Role.USER, "A", "a", null)).thenReturn(updated);
+                when(req.getSession(false)).thenReturn(null);
+                web.when(() -> Web.buildAdminChangeSummary(before, updated, false)).thenReturn("No visible changes");
+                web.when(() -> Web.buildMachineReadableDiff(before, updated, false)).thenReturn(Map.of());
+                //When
+                sut.doPost(req, resp);
+                //Then
+                verify(notifySvc, never()).notify(any());
                 web.verify(() -> Web.redirectOk(eq(req), eq(resp),
-                        eq(WebConst.Path.USER_EDIT + "?id=u1"),
+                        eq(WebConst.Path.USER_EDIT + "?" + WebConst.Param.ID + "=u1"),
                         eq("The user has been updated")));
             }
         }
-    }
-
-    @Nested
-    @DisplayName("doPost errors")
-    class DoPostErrors {
-
-        @BeforeEach
-        void formInput() {
-            when(req.getParameter(WebConst.Param.ID)).thenReturn("u1");
-            when(req.getParameter(WebConst.Param.USER_NAME)).thenReturn("N");
-            when(req.getParameter(WebConst.Param.USER_LOGIN)).thenReturn("l");
-            when(req.getParameter(WebConst.Param.ROLE)).thenReturn("USER");
-            when(req.getParameter(WebConst.Param.PASSWORD)).thenReturn(null);
-            when(users.findById("u1")).thenReturn(Optional.of(userBefore));
-        }
 
         @Test
-        @DisplayName("given DuplicateLoginException when doPost then redirectErr with fixed message")
+        @DisplayName("Given DuplicateLoginException — When doPost — Then redirectErr back to edit with message")
         void duplicateLogin() throws Exception {
-            // given
-            AdminUserEditServlet s = newServletWithDeps();
-            when(users.adminUpdate("u1", Role.USER, "N", "l", null))
-                    .thenThrow(new DuplicateLoginException("dup"));
-            try (MockedStatic<Web> web = mockStatic(Web.class, CALLS_REAL_METHODS)) {
-                web.when(() -> Web.redirectErr(eq(req), eq(resp), anyString(), anyString())).then(inv -> null);
-                // when
-                s.doPost(req, resp);
-                // then
+            try (MockedStatic<Web> web = mockStatic(Web.class)) {
+                //Given
+                when(req.getParameter(WebConst.Param.ID)).thenReturn("u3");
+                when(req.getParameter(WebConst.Param.USER_NAME)).thenReturn("N");
+                when(req.getParameter(WebConst.Param.USER_LOGIN)).thenReturn("exists");
+                when(req.getParameter(WebConst.Param.ROLE)).thenReturn("ADMIN");
+                when(req.getParameter(WebConst.Param.PASSWORD)).thenReturn(null);
+                web.when(() -> Web.trimOrNull("u3")).thenReturn("u3");
+                web.when(() -> Web.trimOrNull("N")).thenReturn("N");
+                web.when(() -> Web.trimOrNull("exists")).thenReturn("exists");
+                web.when(() -> Web.trimOrNull("ADMIN")).thenReturn("ADMIN");
+                web.when(() -> Web.trimOrNull(null)).thenReturn(null);
+                when(users.findById("u3")).thenReturn(Optional.of(realUser("u3", "old", "Old", Role.USER)));
+                when(users.adminUpdate(eq("u3"), eq(Role.ADMIN), any(), any(), isNull()))
+                        .thenThrow(new DuplicateLoginException("dup"));
+                //When
+                sut.doPost(req, resp);
+                //Then
                 web.verify(() -> Web.redirectErr(eq(req), eq(resp),
-                        eq(WebConst.Path.USER_EDIT + "?id=u1"),
-                        eq("The username is already occupied")));
+                        eq(WebConst.Path.USER_EDIT + "?" + WebConst.Param.ID + "=u3"),
+                        eq("The login is already occupied")));
             }
         }
 
         @Test
-        @DisplayName("given IllegalArgumentException when doPost then redirectErr with ex message")
-        void illegalArgument() throws Exception {
-            // given
-            AdminUserEditServlet s = newServletWithDeps();
-            when(users.adminUpdate("u1", Role.USER, "N", "l", null))
-                    .thenThrow(new IllegalArgumentException("bad args"));
-            try (MockedStatic<Web> web = mockStatic(Web.class, CALLS_REAL_METHODS)) {
-                web.when(() -> Web.redirectErr(eq(req), eq(resp), anyString(), anyString())).then(inv -> null);
-                // when
-                s.doPost(req, resp);
-                // then
+        @DisplayName("Given IllegalArgumentException — When doPost — Then redirectErr back with exception message")
+        void illegalArgs() throws Exception {
+            try (MockedStatic<Web> web = mockStatic(Web.class)) {
+                //Given
+                when(req.getParameter(WebConst.Param.ID)).thenReturn("bad");
+                when(req.getParameter(WebConst.Param.USER_NAME)).thenReturn("X");
+                when(req.getParameter(WebConst.Param.USER_LOGIN)).thenReturn("x");
+                when(req.getParameter(WebConst.Param.ROLE)).thenReturn("USER");
+                when(req.getParameter(WebConst.Param.PASSWORD)).thenReturn(null);
+                web.when(() -> Web.trimOrNull("bad")).thenReturn("bad");
+                web.when(() -> Web.trimOrNull("X")).thenReturn("X");
+                web.when(() -> Web.trimOrNull("x")).thenReturn("x");
+                web.when(() -> Web.trimOrNull("USER")).thenReturn("USER");
+                web.when(() -> Web.trimOrNull(null)).thenReturn(null);
+                when(users.findById("bad")).thenReturn(Optional.of(realUser("bad", "x", "X", Role.USER)));
+                when(users.adminUpdate(eq("bad"), any(), any(), any(), isNull()))
+                        .thenThrow(new IllegalArgumentException("Bad input"));
+                //When
+                sut.doPost(req, resp);
+                //Then
                 web.verify(() -> Web.redirectErr(eq(req), eq(resp),
-                        eq(WebConst.Path.USER_EDIT + "?id=u1"),
-                        eq("bad args")));
-            }
-        }
-
-        @Test
-        @DisplayName("given NoSuchElementException when doPost then redirectErr with ex message")
-        void noSuchElement() throws Exception {
-            // given
-            AdminUserEditServlet s = newServletWithDeps();
-            when(users.adminUpdate("u1", Role.USER, "N", "l", null))
-                    .thenThrow(new NoSuchElementException("not found"));
-            try (MockedStatic<Web> web = mockStatic(Web.class, CALLS_REAL_METHODS)) {
-                web.when(() -> Web.redirectErr(eq(req), eq(resp), anyString(), anyString())).then(inv -> null);
-                // when
-                s.doPost(req, resp);
-                // then
-                web.verify(() -> Web.redirectErr(eq(req), eq(resp),
-                        eq(WebConst.Path.USER_EDIT + "?id=u1"),
-                        eq("not found")));
+                        eq(WebConst.Path.USER_EDIT + "?" + WebConst.Param.ID + "=bad"),
+                        eq("Bad input")));
             }
         }
     }

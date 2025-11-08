@@ -6,12 +6,13 @@ import com.javarush.apalinskiy.domain.user.UserStats;
 import com.javarush.apalinskiy.service.user.UserService;
 import com.javarush.apalinskiy.service.user.UserStatsService;
 import com.javarush.apalinskiy.web.util.Web;
-import jakarta.servlet.RequestDispatcher;
 import jakarta.servlet.ServletConfig;
 import jakarta.servlet.ServletContext;
+import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -22,12 +23,18 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Optional;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.*;
 
+@DisplayName("ProfileServlet (unit)")
 @ExtendWith(MockitoExtension.class)
-@DisplayName("ProfileServlet tests")
 class ProfileServletTest {
 
+    @Mock
+    ServletConfig config;
+    @Mock
+    ServletContext ctx;
     @Mock
     HttpServletRequest req;
     @Mock
@@ -35,252 +42,330 @@ class ProfileServletTest {
     @Mock
     HttpSession session;
     @Mock
-    ServletConfig config;
-    @Mock
-    ServletContext ctx;
-    @Mock
-    RequestDispatcher rd;
-    @Mock
     UserService userService;
     @Mock
     UserStatsService userStats;
-    @Mock
-    User me;
-    @Mock
-    User updated;
-    @Mock
-    UserStats stats;
 
-    private ProfileServlet servlet() {
-        return new ProfileServlet();
+    private ProfileServlet sut;
+
+    private static User user(String name) {
+        User u = new User();
+        u.setUserId("u1");
+        u.setUserName(name);
+        return u;
+    }
+
+    private void initWith(boolean statsPresent) {
+        sut = new ProfileServlet();
+        when(config.getServletContext()).thenReturn(ctx);
+        try (MockedStatic<Web> web = mockStatic(Web.class)) {
+            web.when(() -> Web.ctxBean(ctx, WebConst.Ctx.USER_SERVICE, UserService.class))
+                    .thenReturn(userService);
+            if (statsPresent) {
+                web.when(() -> Web.ctxBean(ctx, WebConst.Ctx.USER_STATS_SERVICE, UserStatsService.class))
+                        .thenReturn(userStats);
+            } else {
+                web.when(() -> Web.ctxBean(ctx, WebConst.Ctx.USER_STATS_SERVICE, UserStatsService.class))
+                        .thenThrow(new IllegalStateException("no stats"));
+            }
+            assertDoesNotThrow(() -> sut.init(config));
+        }
     }
 
     @Nested
-    @DisplayName("doGet")
-    class DoGet {
+    @DisplayName("init(config)")
+    class InitPhase {
         @Test
-        @DisplayName("given user & stats available when doGet then set attrs and forward to PROFILE")
-        void user_with_stats() throws Exception {
-            // given
-            ProfileServlet s = servlet();
+        @DisplayName("Given userService and userStats present — When init — Then OK")
+        void initOkWithStats() {
+            // Given
+            sut = new ProfileServlet();
             when(config.getServletContext()).thenReturn(ctx);
-            when(req.getSession(false)).thenReturn(session);
-            when(req.getSession()).thenReturn(session);
-            when(session.getAttribute(WebConst.Attr.OK)).thenReturn(null);
-            when(session.getAttribute(WebConst.Attr.ERROR)).thenReturn(null);
-            when(session.getAttribute(WebConst.Attr.USER)).thenReturn(me);
-            when(me.getUserId()).thenReturn("u1");
-            when(userStats.statsOf("u1")).thenReturn(stats);
-            when(req.getRequestDispatcher(WebConst.Jsp.PROFILE)).thenReturn(rd);
-            try (MockedStatic<Web> web = mockStatic(Web.class, CALLS_REAL_METHODS)) {
+            try (MockedStatic<Web> web = mockStatic(Web.class)) {
                 web.when(() -> Web.ctxBean(ctx, WebConst.Ctx.USER_SERVICE, UserService.class))
                         .thenReturn(userService);
                 web.when(() -> Web.ctxBean(ctx, WebConst.Ctx.USER_STATS_SERVICE, UserStatsService.class))
                         .thenReturn(userStats);
-                s.init(config);
-                // when
-                s.doGet(req, resp);
-                // then
-                verify(req).setAttribute(WebConst.Attr.USER, me);
-                verify(req).setAttribute(eq("stats"), eq(stats));
-                verify(rd).forward(req, resp);
+                // When / Then
+                assertDoesNotThrow(() -> sut.init(config));
             }
         }
 
         @Test
-        @DisplayName("given no user when doGet then just forward to PROFILE (no stats call)")
-        void no_user() throws Exception {
-            // given
-            ProfileServlet s = servlet();
+        @DisplayName("Given userStats missing — When init — Then still OK (stats=null)")
+        void initOkWithoutStats() {
+            // Given
+            sut = new ProfileServlet();
             when(config.getServletContext()).thenReturn(ctx);
-            when(req.getSession(false)).thenReturn(session);
-            when(req.getSession()).thenReturn(session);
-            when(session.getAttribute(WebConst.Attr.OK)).thenReturn(null);
-            when(session.getAttribute(WebConst.Attr.ERROR)).thenReturn(null);
-            when(session.getAttribute(WebConst.Attr.USER)).thenReturn(null);
-            when(req.getRequestDispatcher(WebConst.Jsp.PROFILE)).thenReturn(rd);
-            try (MockedStatic<Web> web = mockStatic(Web.class, CALLS_REAL_METHODS)) {
+            try (MockedStatic<Web> web = mockStatic(Web.class)) {
                 web.when(() -> Web.ctxBean(ctx, WebConst.Ctx.USER_SERVICE, UserService.class))
                         .thenReturn(userService);
                 web.when(() -> Web.ctxBean(ctx, WebConst.Ctx.USER_STATS_SERVICE, UserStatsService.class))
                         .thenThrow(new IllegalStateException("no stats"));
-                s.init(config);
-                // when
-                s.doGet(req, resp);
-                // then
-                verify(rd).forward(req, resp);
-                verifyNoInteractions(userStats);
+                // When / Then
+                assertDoesNotThrow(() -> sut.init(config));
+            }
+        }
+
+        @Test
+        @DisplayName("Given userService missing — When init — Then throws IllegalStateException")
+        void initFailsWhenUserServiceMissing() {
+            // Given
+            sut = new ProfileServlet();
+            when(config.getServletContext()).thenReturn(ctx);
+            try (MockedStatic<Web> web = mockStatic(Web.class)) {
+                web.when(() -> Web.ctxBean(ctx, WebConst.Ctx.USER_SERVICE, UserService.class))
+                        .thenThrow(new IllegalStateException("no userService"));
+                // When / Then
+                assertThrows(IllegalStateException.class, () -> sut.init(config));
             }
         }
     }
 
     @Nested
-    @DisplayName("doPost")
-    class DoPost {
-        @Test
-        @DisplayName("given no user when doPost then redirect to LOGIN")
-        void unauth_redirects_login() throws Exception {
-            // given
-            ProfileServlet s = servlet();
-            when(config.getServletContext()).thenReturn(ctx);
+    @DisplayName("doGet(req, resp)")
+    class DoGet {
+
+        @BeforeEach
+        void setUp() throws ServletException {
+            initWith(true);
             when(req.getSession()).thenReturn(session);
+        }
+
+        @Test
+        @DisplayName("Given unauthenticated — When doGet — Then forward PROFILE without stats")
+        void unauthenticatedForwards() throws Exception {
+            // Given
             when(session.getAttribute(WebConst.Attr.USER)).thenReturn(null);
-            try (MockedStatic<Web> web = mockStatic(Web.class, CALLS_REAL_METHODS)) {
-                web.when(() -> Web.ctxBean(ctx, WebConst.Ctx.USER_SERVICE, UserService.class))
-                        .thenReturn(userService);
-                web.when(() -> Web.ctxBean(ctx, WebConst.Ctx.USER_STATS_SERVICE, UserStatsService.class))
-                        .thenThrow(new IllegalStateException("no stats"));
-                s.init(config);
-                // when
-                s.doPost(req, resp);
-                // then
-                web.verify(() -> Web.redirect(eq(req), eq(resp), eq(WebConst.Path.LOGIN), isNull()));
+            try (MockedStatic<Web> web = mockStatic(Web.class)) {
+                web.when(() -> Web.copyParamsToAttrs(eq(req), anyString(), anyString())).thenAnswer(inv -> null);
+                web.when(() -> Web.pullFlash(req, WebConst.Attr.OK)).thenAnswer(inv -> null);
+                web.when(() -> Web.pullFlash(req, WebConst.Attr.ERROR)).thenAnswer(inv -> null);
+                // When
+                sut.doGet(req, resp);
+                // Then
+                web.verify(() -> Web.forward(eq(req), eq(resp), eq(WebConst.Jsp.PROFILE)));
+                verify(session).getAttribute(WebConst.Attr.USER);
+                verify(req, never()).setAttribute(eq(WebConst.Attr.USER), any());
+                verifyNoInteractions(userStats);
             }
         }
 
         @Test
-        @DisplayName("given action=updateName and displayName provided when doPost then update profile + redirectOk")
-        void updateName_ok() throws Exception {
-            // given
-            ProfileServlet s = servlet();
-            when(config.getServletContext()).thenReturn(ctx);
-            when(req.getSession()).thenReturn(session);
+        @DisplayName("Given authenticated and stats available — When doGet — Then sets USER and stats, forward PROFILE")
+        void authenticatedWithStats() throws Exception {
+            // Given
+            User me = user("Mike");
             when(session.getAttribute(WebConst.Attr.USER)).thenReturn(me);
-            when(me.getUserId()).thenReturn("u1");
+            UserStats stats = mock(UserStats.class);
+            when(userStats.statsOf("u1")).thenReturn(stats);
+            try (MockedStatic<Web> web = mockStatic(Web.class)) {
+                web.when(() -> Web.copyParamsToAttrs(eq(req), anyString(), anyString())).thenAnswer(inv -> null);
+                web.when(() -> Web.pullFlash(req, WebConst.Attr.OK)).thenAnswer(inv -> null);
+                web.when(() -> Web.pullFlash(req, WebConst.Attr.ERROR)).thenAnswer(inv -> null);
+                // When
+                sut.doGet(req, resp);
+                // Then
+                verify(req).setAttribute(WebConst.Attr.USER, me);
+                verify(req).setAttribute("stats", stats);
+                web.verify(() -> Web.forward(eq(req), eq(resp), eq(WebConst.Jsp.PROFILE)));
+            }
+        }
+
+        @Test
+        @DisplayName("Given authenticated and stats service absent — When doGet — Then only USER set, forward PROFILE")
+        void authenticatedWithoutStats() throws Exception {
+            // Given
+            initWith(false);
+            when(req.getSession()).thenReturn(session);
+            User me = user("Mike");
+            when(session.getAttribute(WebConst.Attr.USER)).thenReturn(me);
+            try (MockedStatic<Web> web = mockStatic(Web.class)) {
+                web.when(() -> Web.copyParamsToAttrs(eq(req), anyString(), anyString())).thenAnswer(inv -> null);
+                web.when(() -> Web.pullFlash(req, WebConst.Attr.OK)).thenAnswer(inv -> null);
+                web.when(() -> Web.pullFlash(req, WebConst.Attr.ERROR)).thenAnswer(inv -> null);
+                // When
+                sut.doGet(req, resp);
+                // Then
+                verify(req).setAttribute(WebConst.Attr.USER, me);
+                verify(req, never()).setAttribute(eq("stats"), any());
+                web.verify(() -> Web.forward(eq(req), eq(resp), eq(WebConst.Jsp.PROFILE)));
+            }
+        }
+    }
+
+    @Nested
+    @DisplayName("doPost(req, resp)")
+    class DoPost {
+
+        @BeforeEach
+        void setUp() throws ServletException {
+            initWith(true);
+            when(req.getSession()).thenReturn(session);
+        }
+
+        @Test
+        @DisplayName("Given unauthenticated — When doPost — Then redirect to /login and return")
+        void unauthenticatedRedirectsLogin() throws Exception {
+            // Given
+            when(session.getAttribute(WebConst.Attr.USER)).thenReturn(null);
+            try (MockedStatic<Web> web = mockStatic(Web.class)) {
+                // When
+                sut.doPost(req, resp);
+                // Then
+                web.verify(() -> Web.redirect(eq(req), eq(resp), eq(WebConst.Path.LOGIN), isNull()));
+                verifyNoInteractions(userService);
+            }
+        }
+
+        @Test
+        @DisplayName("Given action=updateName — When valid name — Then userService.updateProfile, set session user, redirectOk")
+        void updateNameHappy() throws Exception {
+            // Given
+            User me = user("Old");
+            when(session.getAttribute(WebConst.Attr.USER)).thenReturn(me);
+            when(req.getParameter(WebConst.Param.ACTION)).thenReturn("updateName");
+            when(req.getParameter("displayName")).thenReturn("  New Name  ");
+            User updated = user("New Name");
             when(userService.updateProfile("u1", "New Name")).thenReturn(updated);
-            try (MockedStatic<Web> web = mockStatic(Web.class, CALLS_REAL_METHODS)) {
-                web.when(() -> Web.ctxBean(ctx, WebConst.Ctx.USER_SERVICE, UserService.class))
-                        .thenReturn(userService);
-                web.when(() -> Web.ctxBean(ctx, WebConst.Ctx.USER_STATS_SERVICE, UserStatsService.class))
-                        .thenThrow(new IllegalStateException("no stats"));
-                when(req.getParameter(WebConst.Param.ACTION)).thenReturn("updateName");
-                when(req.getParameter("displayName")).thenReturn("New Name");
-                s.init(config);
-                // when
-                s.doPost(req, resp);
-                // then
+            try (MockedStatic<Web> web = mockStatic(Web.class)) {
+                web.when(() -> Web.trimOrNull("  New Name  ")).thenReturn("New Name");
+                // When
+                sut.doPost(req, resp);
+                // Then
                 verify(userService).updateProfile("u1", "New Name");
                 verify(session).setAttribute(WebConst.Attr.USER, updated);
                 web.verify(() -> Web.redirectOk(eq(req), eq(resp), eq(WebConst.Path.PROFILE),
-                        eq("Password changed successfully")));
+                        eq("Display name changed successfully")));
             }
         }
 
         @Test
-        @DisplayName("given action=changePassword mismatch confirm when doPost then redirectErr with message")
-        void changePassword_mismatch() throws Exception {
-            // given
-            ProfileServlet s = servlet();
-            when(config.getServletContext()).thenReturn(ctx);
-            when(req.getSession()).thenReturn(session);
+        @DisplayName("Given action=updateName — When empty name — Then redirectErr with message")
+        void updateNameValidationError() throws Exception {
+            // Given
+            User me = user("Old");
             when(session.getAttribute(WebConst.Attr.USER)).thenReturn(me);
-            try (MockedStatic<Web> web = mockStatic(Web.class, CALLS_REAL_METHODS)) {
-                web.when(() -> Web.ctxBean(ctx, WebConst.Ctx.USER_SERVICE, UserService.class))
-                        .thenReturn(userService);
-                web.when(() -> Web.ctxBean(ctx, WebConst.Ctx.USER_STATS_SERVICE, UserStatsService.class))
-                        .thenThrow(new IllegalStateException("no stats"));
-                when(req.getParameter(WebConst.Param.ACTION)).thenReturn("changePassword");
-                web.when(() -> Web.trimOrNull("old")).thenReturn("old");
-                web.when(() -> Web.trimOrNull("new1")).thenReturn("new1");
-                web.when(() -> Web.trimOrNull("new2")).thenReturn("new2");
-                when(req.getParameter(WebConst.Param.CURRENT_PASSWORD)).thenReturn("old");
-                when(req.getParameter(WebConst.Param.NEW_PASSWORD)).thenReturn("new1");
-                when(req.getParameter(WebConst.Param.CONFIRM_PASSWORD)).thenReturn("new2");
-                s.init(config);
-                // when
-                s.doPost(req, resp);
-                // then
-                verify(userService, never()).changePassword(anyString(), anyString(), anyString());
+            when(req.getParameter(WebConst.Param.ACTION)).thenReturn("updateName");
+            when(req.getParameter("displayName")).thenReturn("  ");
+            try (MockedStatic<Web> web = mockStatic(Web.class)) {
+                web.when(() -> Web.trimOrNull("  ")).thenReturn(null);
+                // When
+                sut.doPost(req, resp);
+                // Then
                 web.verify(() -> Web.redirectErr(eq(req), eq(resp), eq(WebConst.Path.PROFILE),
-                        eq("The new password and the confirmation don't match")));
+                        eq("The name cannot be empty.")));
+                verify(userService, never()).updateProfile(anyString(), anyString());
             }
         }
 
         @Test
-        @DisplayName("given action=changePassword ok when doPost then service called, session updated, redirectOk")
-        void changePassword_ok() throws Exception {
-            // given
-            ProfileServlet s = servlet();
-            when(config.getServletContext()).thenReturn(ctx);
-            when(req.getSession()).thenReturn(session);
+        @DisplayName("Given action=changePassword — When valid data — Then changePassword, refresh user, redirectOk")
+        void changePasswordHappy() throws Exception {
+            // Given
+            User me = user("Mike");
             when(session.getAttribute(WebConst.Attr.USER)).thenReturn(me);
-            when(me.getUserId()).thenReturn("u1");
-            when(userService.findById("u1")).thenReturn(Optional.of(updated));
-            try (MockedStatic<Web> web = mockStatic(Web.class, CALLS_REAL_METHODS)) {
-                web.when(() -> Web.ctxBean(ctx, WebConst.Ctx.USER_SERVICE, UserService.class))
-                        .thenReturn(userService);
-                web.when(() -> Web.ctxBean(ctx, WebConst.Ctx.USER_STATS_SERVICE, UserStatsService.class))
-                        .thenThrow(new IllegalStateException("no stats"));
-                when(req.getParameter(WebConst.Param.ACTION)).thenReturn("changePassword");
-                when(req.getParameter(WebConst.Param.CURRENT_PASSWORD)).thenReturn("oldpass");
-                when(req.getParameter(WebConst.Param.NEW_PASSWORD)).thenReturn("newpass");
-                when(req.getParameter(WebConst.Param.CONFIRM_PASSWORD)).thenReturn("newpass");
-                web.when(() -> Web.trimOrNull("oldpass")).thenReturn("oldpass");
-                web.when(() -> Web.trimOrNull("newpass")).thenReturn("newpass");
-                s.init(config);
-                // when
-                s.doPost(req, resp);
-                // then
-                verify(userService).changePassword("u1", "oldpass", "newpass");
+            when(req.getParameter(WebConst.Param.ACTION)).thenReturn("changePassword");
+            when(req.getParameter(WebConst.Param.CURRENT_PASSWORD)).thenReturn(" cur ");
+            when(req.getParameter(WebConst.Param.NEW_PASSWORD)).thenReturn(" newpass ");
+            when(req.getParameter(WebConst.Param.CONFIRM_PASSWORD)).thenReturn(" newpass ");
+            User fresh = user("Mike");
+            when(userService.findById("u1")).thenReturn(Optional.of(fresh));
+            try (MockedStatic<Web> web = mockStatic(Web.class)) {
+                web.when(() -> Web.trimOrNull(" cur ")).thenReturn("cur");
+                web.when(() -> Web.trimOrNull(" newpass ")).thenReturn("newpass");
+                web.when(() -> Web.trimOrNull(" newpass ")).thenReturn("newpass");
+                // When
+                sut.doPost(req, resp);
+                // Then
+                verify(userService).changePassword("u1", "cur", "newpass");
                 verify(userService).findById("u1");
-                verify(session).setAttribute(WebConst.Attr.USER, updated);
+                verify(session).setAttribute(WebConst.Attr.USER, fresh);
                 web.verify(() -> Web.redirectOk(eq(req), eq(resp), eq(WebConst.Path.PROFILE),
                         eq("Password changed successfully")));
             }
         }
 
         @Test
-        @DisplayName("given action=changePassword wrong current when doPost then redirectErr specific message")
-        void changePassword_wrong_current() throws Exception {
-            // given
-            ProfileServlet s = servlet();
-            when(config.getServletContext()).thenReturn(ctx);
-            when(req.getSession()).thenReturn(session);
+        @DisplayName("Given action=changePassword — When wrong current — Then redirectErr 'current password is incorrect'")
+        void changePasswordWrongCurrent() throws Exception {
+            // Given
+            User me = user("Mike");
             when(session.getAttribute(WebConst.Attr.USER)).thenReturn(me);
-            when(me.getUserId()).thenReturn("u1");
-            doThrow(new SecurityException("bad"))
-                    .when(userService).changePassword(eq("u1"), eq("old"), eq("newpass"));
-            try (MockedStatic<Web> web = mockStatic(Web.class, CALLS_REAL_METHODS)) {
-                web.when(() -> Web.ctxBean(ctx, WebConst.Ctx.USER_SERVICE, UserService.class))
-                        .thenReturn(userService);
-                web.when(() -> Web.ctxBean(ctx, WebConst.Ctx.USER_STATS_SERVICE, UserStatsService.class))
-                        .thenThrow(new IllegalStateException("no stats"));
-                when(req.getParameter(WebConst.Param.ACTION)).thenReturn("changePassword");
-                when(req.getParameter(WebConst.Param.CURRENT_PASSWORD)).thenReturn("old");
-                when(req.getParameter(WebConst.Param.NEW_PASSWORD)).thenReturn("newpass");
-                when(req.getParameter(WebConst.Param.CONFIRM_PASSWORD)).thenReturn("newpass");
-                web.when(() -> Web.trimOrNull("old")).thenReturn("old");
-                web.when(() -> Web.trimOrNull("newpass")).thenReturn("newpass");
-                s.init(config);
-                // when
-                s.doPost(req, resp);
-                // then
+            when(req.getParameter(WebConst.Param.ACTION)).thenReturn("changePassword");
+            when(req.getParameter(WebConst.Param.CURRENT_PASSWORD)).thenReturn("c");
+            when(req.getParameter(WebConst.Param.NEW_PASSWORD)).thenReturn("x12345");
+            when(req.getParameter(WebConst.Param.CONFIRM_PASSWORD)).thenReturn("x12345");
+            doThrow(new SecurityException("bad")).when(userService).changePassword("u1", "c", "x12345");
+            try (MockedStatic<Web> web = mockStatic(Web.class)) {
+                web.when(() -> Web.trimOrNull("c")).thenReturn("c");
+                web.when(() -> Web.trimOrNull("x12345")).thenReturn("x12345");
+                // When
+                sut.doPost(req, resp);
+                // Then
                 web.verify(() -> Web.redirectErr(eq(req), eq(resp), eq(WebConst.Path.PROFILE),
                         eq("The current password is incorrect")));
             }
         }
 
         @Test
-        @DisplayName("given unknown action when doPost then redirectErr('Unknown action')")
-        void unknown_action() throws Exception {
-            // given
-            ProfileServlet s = servlet();
-            when(config.getServletContext()).thenReturn(ctx);
-            when(req.getSession()).thenReturn(session);
+        @DisplayName("Given action=changePassword — When confirm mismatch — Then redirectErr with message")
+        void changePasswordConfirmMismatch() throws Exception {
+            // Given
+            User me = user("Mike");
             when(session.getAttribute(WebConst.Attr.USER)).thenReturn(me);
-            when(req.getParameter(WebConst.Param.ACTION)).thenReturn("???");
-            try (MockedStatic<Web> web = mockStatic(Web.class, CALLS_REAL_METHODS)) {
-                web.when(() -> Web.ctxBean(ctx, WebConst.Ctx.USER_SERVICE, UserService.class))
-                        .thenReturn(userService);
-                web.when(() -> Web.ctxBean(ctx, WebConst.Ctx.USER_STATS_SERVICE, UserStatsService.class))
-                        .thenThrow(new IllegalStateException("no stats"));
-                s.init(config);
-                // when
-                s.doPost(req, resp);
-                // then
+            when(req.getParameter(WebConst.Param.ACTION)).thenReturn("changePassword");
+            when(req.getParameter(WebConst.Param.CURRENT_PASSWORD)).thenReturn("cur");
+            when(req.getParameter(WebConst.Param.NEW_PASSWORD)).thenReturn("abc123");
+            when(req.getParameter(WebConst.Param.CONFIRM_PASSWORD)).thenReturn("zzz");
+            try (MockedStatic<Web> web = mockStatic(Web.class)) {
+                web.when(() -> Web.trimOrNull("cur")).thenReturn("cur");
+                web.when(() -> Web.trimOrNull("abc123")).thenReturn("abc123");
+                web.when(() -> Web.trimOrNull("zzz")).thenReturn("zzz");
+                // When
+                sut.doPost(req, resp);
+                // Then
+                web.verify(() -> Web.redirectErr(eq(req), eq(resp), eq(WebConst.Path.PROFILE),
+                        eq("The new password and the confirmation don't match")));
+                verify(userService, never()).changePassword(anyString(), anyString(), anyString());
+            }
+        }
+
+        @Test
+        @DisplayName("Given unknown action — When doPost — Then redirectErr 'Unknown action'")
+        void unknownAction() throws Exception {
+            // Given
+            User me = user("Mike");
+            when(session.getAttribute(WebConst.Attr.USER)).thenReturn(me);
+            when(req.getParameter(WebConst.Param.ACTION)).thenReturn("whatever");
+            try (MockedStatic<Web> web = mockStatic(Web.class)) {
+                // When
+                sut.doPost(req, resp);
+                // Then
                 web.verify(() -> Web.redirectErr(eq(req), eq(resp), eq(WebConst.Path.PROFILE),
                         eq("Unknown action")));
-                verifyNoInteractions(userService);
+            }
+        }
+
+        @Test
+        @DisplayName("Given changePassword — When unexpected exception — Then redirectErr INTERNAL_ERROR")
+        void unexpectedException() throws Exception {
+            // Given
+            User me = user("Mike");
+            when(session.getAttribute(WebConst.Attr.USER)).thenReturn(me);
+            when(req.getParameter(WebConst.Param.ACTION)).thenReturn("changePassword");
+            when(req.getParameter(WebConst.Param.CURRENT_PASSWORD)).thenReturn("c");
+            when(req.getParameter(WebConst.Param.NEW_PASSWORD)).thenReturn("n123456");
+            when(req.getParameter(WebConst.Param.CONFIRM_PASSWORD)).thenReturn("n123456");
+            doThrow(new RuntimeException("boom")).when(userService).changePassword(anyString(), anyString(), anyString());
+            try (MockedStatic<Web> web = mockStatic(Web.class)) {
+                web.when(() -> Web.trimOrNull("c")).thenReturn("c");
+                web.when(() -> Web.trimOrNull("n123456")).thenReturn("n123456");
+                // When
+                sut.doPost(req, resp);
+                // Then
+                web.verify(() -> Web.redirectErr(eq(req), eq(resp), eq(WebConst.Path.PROFILE),
+                        eq(WebConst.Msg.INTERNAL_ERROR)));
             }
         }
     }

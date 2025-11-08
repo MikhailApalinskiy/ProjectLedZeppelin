@@ -5,18 +5,21 @@ import com.javarush.apalinskiy.domain.user.User;
 import com.javarush.apalinskiy.exceptions.DuplicateIdException;
 import com.javarush.apalinskiy.exceptions.DuplicateLoginException;
 import com.javarush.apalinskiy.repository.user.UserRepository;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Test;
+import com.javarush.apalinskiy.utils.HibernateUtil;
+import org.hibernate.Session;
+import org.hibernate.SessionFactory;
+import org.hibernate.Transaction;
+import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -26,178 +29,267 @@ import static org.mockito.Mockito.*;
 class DefaultUserServiceTest {
 
     @Mock
-    UserRepository repo;
+    SessionFactory sessionFactory;
+    @Mock
+    Session session;
+    @Mock
+    Transaction tx;
+    @Mock
+    UserRepository users;
 
-    DefaultUserService sut;
-
-    private User u(String id, String name, String login, String pass) {
-        return User.of(Role.USER, name, login, pass).withId(id);
-    }
+    private AutoCloseable staticMock;
+    private DefaultUserService sut;
 
     @BeforeEach
-    void setUp() {
-        sut = new DefaultUserService(repo);
+    void init() {
+        staticMock = Mockito.mockStatic(HibernateUtil.class);
+        lenient().when(HibernateUtil.getSessionFactory()).thenReturn(sessionFactory);
+        lenient().when(sessionFactory.getCurrentSession()).thenReturn(session);
+        lenient().when(session.getTransaction()).thenReturn(tx);
+        sut = new DefaultUserService(users);
+    }
+
+    @AfterEach
+    void cleanup() throws Exception {
+        if (staticMock != null) {
+            staticMock.close();
+        }
     }
 
     @Nested
-    @DisplayName("register(role, name, login, rawPassword)")
+    @DisplayName("findPage(page,size)")
+    class FindPage {
+
+        @Test
+        @DisplayName("starts local read-only tx, queries total+items, commits and restores RO")
+        void startsReadonlyTx_commits() {
+            // Given
+            when(tx.isActive()).thenReturn(false);
+            when(session.isDefaultReadOnly()).thenReturn(false);
+            when(session.beginTransaction()).thenReturn(tx);
+            when(users.countAll()).thenReturn(3L);
+            var u1 = user("1", "alice", "Alice");
+            var u2 = user("2", "bob", "Bob");
+            when(users.findPage(1, 2)).thenReturn(List.of(u1, u2));
+            // When
+            DefaultUserService.PagedResult<User> page = sut.findPage(1, 2);
+            // Then
+            verify(session).beginTransaction();
+            InOrder io = inOrder(session, users, tx);
+            io.verify(session).setDefaultReadOnly(true);
+            io.verify(users).countAll();
+            io.verify(users).findPage(1, 2);
+            io.verify(tx).commit();
+            io.verify(session).setDefaultReadOnly(false);
+            assertEquals(3, page.total());
+            assertEquals(List.of(u1, u2), page.items());
+            assertEquals(1, page.page());
+            assertEquals(2, page.size());
+        }
+
+        @Test
+        @DisplayName("propagates runtime errors and rolls back when started here")
+        void error_rollsBack() {
+            // Given
+            when(tx.isActive()).thenReturn(false);
+            when(session.isDefaultReadOnly()).thenReturn(false);
+            when(session.beginTransaction()).thenReturn(tx);
+            when(users.countAll()).thenThrow(new RuntimeException("boom"));
+            // When / Then
+            assertThrows(RuntimeException.class, () -> sut.findPage(1, 10));
+            verify(tx).rollback();
+            verify(session).setDefaultReadOnly(false);
+        }
+    }
+
+    @Nested
+    @DisplayName("register(role,name,login,password)")
     class Register {
 
         @Test
-        @DisplayName("saves immediately when id unique then returns user")
-        void savesImmediately() {
-            // Given / When
-            User user = sut.register(Role.USER, "Alice", "alice", "p@ssw0rd");
-            // Then
-            assertEquals("alice", user.getUserLogin());
-            verify(repo, times(1)).save(any(User.class));
-        }
-
-        @Test
-        @DisplayName("retries on DuplicateIdException then succeeds")
-        void retriesOnDuplicateIdThenSuccess() {
+        @DisplayName("persists user on first try and commits")
+        void firstTry_ok() {
             // Given
-            doThrow(new DuplicateIdException("dup1"))
-                    .doNothing()
-                    .when(repo).save(any(User.class));
+            when(session.beginTransaction()).thenReturn(tx);
             // When
-            User user = sut.register(Role.USER, "Bob", "bob", "secret!");
+            User created = sut.register(Role.USER, "Alice", "alice", "pwd123");
             // Then
-            assertEquals("bob", user.getUserLogin());
-            verify(repo, times(2)).save(any(User.class));
+            verify(users).save(argThat(u -> "alice".equals(u.getUserLogin())));
+            verify(tx).commit();
+            assertNotNull(created.getUserId());
+            assertEquals("alice", created.getUserLogin());
+            assertEquals("Alice", created.getUserName());
+            assertEquals(Role.USER, created.getRole());
         }
 
         @Test
-        @DisplayName("fails after 3 DuplicateIdException then ISE")
-        void failsAfterThreeRetries() {
+        @DisplayName("duplicate login -> rolls back and rethrows DuplicateLoginException")
+        void duplicateLogin_throws() {
             // Given
-            doThrow(new DuplicateIdException("1"))
-                    .doThrow(new DuplicateIdException("2"))
-                    .doThrow(new DuplicateIdException("3"))
-                    .when(repo).save(any(User.class));
-            // When / Then
-            assertThrows(IllegalStateException.class,
-                    () -> sut.register(Role.USER, "C", "c", "passwd1"));
-            verify(repo, times(3)).save(any(User.class));
-        }
-
-        @Test
-        @DisplayName("bubbles DuplicateLoginException then thrown")
-        void bubblesDuplicateLogin() {
-            // Given
-            doThrow(new DuplicateLoginException("dupLogin"))
-                    .when(repo).save(any(User.class));
+            when(session.beginTransaction()).thenReturn(tx);
+            doThrow(new DuplicateLoginException("dup"))
+                    .when(users).save(any(User.class));
             // When / Then
             assertThrows(DuplicateLoginException.class,
-                    () -> sut.register(Role.USER, "D", "dup", "qwerty1"));
+                    () -> sut.register(Role.USER, "Alice", "alice", "pwd123"));
+            verify(tx).rollback();
+        }
+
+        @Test
+        @DisplayName("duplicate id first 3 attempts -> IllegalStateException after retries")
+        void duplicateId_retriesAndFails() {
+            // Given
+            when(session.beginTransaction()).thenReturn(tx);
+            doThrow(new DuplicateIdException("dup id")).when(users).save(any(User.class));
+            // When / Then
+            assertThrows(IllegalStateException.class,
+                    () -> sut.register(Role.USER, "Bob", "bob", "xxyyzz"));
+            verify(tx, times(3)).rollback();
         }
     }
 
     @Nested
-    @DisplayName("login(login, rawPassword)")
+    @DisplayName("login(login,password)")
     class Login {
 
         @Test
-        @DisplayName("returns user when password matches")
-        void okWhenPasswordMatches() {
+        @DisplayName("success -> returns user, commits, restores RO")
+        void success() {
             // Given
-            when(repo.findByLogin("john"))
-                    .thenReturn(Optional.of(u("id1", "John", "john", "pass123")));
+            var u = user("id-1", "admin", "test");
+            u.setPassword("secret");
+            when(session.beginTransaction()).thenReturn(tx);
+            when(session.isDefaultReadOnly()).thenReturn(false);
+            when(users.findByLogin("admin")).thenReturn(Optional.of(u));
             // When
-            Optional<User> got = sut.login("john", "pass123");
+            var res = sut.login("admin", "secret");
             // Then
-            assertTrue(got.isPresent());
-            assertEquals("id1", got.get().getUserId());
+            assertTrue(res.isPresent());
+            verify(session).setDefaultReadOnly(true);
+            verify(tx).commit();
+            verify(session).setDefaultReadOnly(false);
         }
 
         @Test
-        @DisplayName("returns empty when password mismatch or user not found")
-        void emptyWhenMismatchOrMissing() {
+        @DisplayName("wrong password -> empty, commits, restores RO")
+        void wrongPassword() {
             // Given
-            when(repo.findByLogin("john"))
-                    .thenReturn(Optional.of(u("id1", "John", "john", "pass123")));
+            var u = user("id-2", "alice", "Alice");
+            u.setPassword("p1");
+            when(session.beginTransaction()).thenReturn(tx);
+            when(session.isDefaultReadOnly()).thenReturn(true);
+            when(users.findByLogin("alice")).thenReturn(Optional.of(u));
             // When
-            Optional<User> a = sut.login("john", "wrong");
-            Optional<User> b = sut.login("ghost", "any");
+            var res = sut.login("alice", "p2");
             // Then
-            assertTrue(a.isEmpty());
-            assertTrue(b.isEmpty());
+            assertTrue(res.isEmpty());
+            verify(tx).commit();
+            verify(session, times(2)).setDefaultReadOnly(true);
         }
     }
 
     @Nested
-    @DisplayName("finders delegation")
-    class Finders {
+    @DisplayName("findByLogin(login)")
+    class FindByLogin {
 
         @Test
-        @DisplayName("findByLogin delegates to repo")
-        void findByLoginDelegates() {
+        @DisplayName("starts local read-only tx when inactive, commits and restores RO")
+        void localTxReadonly() {
             // Given
-            when(repo.findByLogin("x")).thenReturn(Optional.of(u("id", "X", "x", "p")));
-            // When / Then
-            assertTrue(sut.findByLogin("x").isPresent());
-            verify(repo).findByLogin("x");
-        }
-
-        @Test
-        @DisplayName("findById delegates to repo")
-        void findByIdDelegates() {
-            // Given
-            when(repo.findById("id")).thenReturn(Optional.of(u("id", "A", "a", "p")));
-            // When / Then
-            assertTrue(sut.findById("id").isPresent());
-            verify(repo).findById("id");
-        }
-
-        @Test
-        @DisplayName("findAll delegates to repo")
-        void findAllDelegates() {
-            // Given
-            List<User> list = List.of(u("1", "A", "a", "p"));
-            when(repo.findAll()).thenReturn(list);
+            when(tx.isActive()).thenReturn(false);
+            when(session.isDefaultReadOnly()).thenReturn(false);
+            when(session.beginTransaction()).thenReturn(tx);
+            var u = user("u-1", "john", "John");
+            when(users.findByLogin("john")).thenReturn(Optional.of(u));
             // When
-            List<User> got = sut.findAll();
+            var res = sut.findByLogin("john");
             // Then
-            assertEquals(list, got);
-            verify(repo).findAll();
+            assertTrue(res.isPresent());
+            verify(session).beginTransaction();
+            verify(session).setDefaultReadOnly(true);
+            verify(tx).commit();
+            verify(session).setDefaultReadOnly(false);
         }
     }
 
     @Nested
-    @DisplayName("updateProfile(userId, newName)")
+    @DisplayName("findById(userId)")
+    class FindById {
+
+        @Test
+        @DisplayName("propagates read-only tx logic similar to findByLogin")
+        void localTxReadonly() {
+            // Given
+            when(tx.isActive()).thenReturn(false);
+            when(session.isDefaultReadOnly()).thenReturn(false);
+            when(session.beginTransaction()).thenReturn(tx);
+            var u = user("u-42", "kate", "Kate");
+            when(users.findById("u-42")).thenReturn(Optional.of(u));
+            // When
+            var res = sut.findById("u-42");
+            // Then
+            assertTrue(res.isPresent());
+            verify(session).beginTransaction();
+            verify(session).setDefaultReadOnly(true);
+            verify(tx).commit();
+            verify(session).setDefaultReadOnly(false);
+        }
+    }
+
+    @Nested
+    @DisplayName("updateProfile(userId, newDisplayName)")
     class UpdateProfile {
 
         @Test
-        @DisplayName("throws when newName blank")
-        void throwsOnBlank() {
+        @DisplayName("blank name -> throws IAE and does not start tx")
+        void blankName() {
             // Given / When / Then
             assertThrows(IllegalArgumentException.class,
-                    () -> sut.updateProfile("id", "   "));
+                    () -> sut.updateProfile("u", "   "));
+            verify(session, never()).beginTransaction();
+            verify(users, never()).findById(anyString());
         }
 
         @Test
-        @DisplayName("throws when user not found")
-        void throwsWhenMissing() {
+        @DisplayName("user not found -> throws NoSuchElementException and rolls back")
+        void userMissing_throws() {
             // Given
-            when(repo.findById("id")).thenReturn(Optional.empty());
+            when(session.beginTransaction()).thenReturn(tx);
+            when(users.findById("ghost")).thenReturn(Optional.empty());
             // When / Then
             assertThrows(NoSuchElementException.class,
-                    () -> sut.updateProfile("id", "Name"));
+                    () -> sut.updateProfile("ghost", "New Name"));
+            verify(tx).rollback();
         }
 
         @Test
-        @DisplayName("updates name and calls repo.update")
-        void updatesName() {
+        @DisplayName("same display name -> no-op but commits")
+        void sameName_noop() {
             // Given
-            User cur = u("id", "Old", "login", "pass");
-            when(repo.findById("id")).thenReturn(Optional.of(cur));
+            when(session.beginTransaction()).thenReturn(tx);
+            var u = user("u-1", "kate", "Kate");
+            when(users.findById("u-1")).thenReturn(Optional.of(u));
             // When
-            User updated = sut.updateProfile("id", "  New Name ");
+            var out = sut.updateProfile("u-1", "Kate");
             // Then
-            ArgumentCaptor<User> cap = ArgumentCaptor.forClass(User.class);
-            verify(repo).update(cap.capture());
-            assertEquals("New Name", cap.getValue().getUserName());
-            assertEquals("New Name", updated.getUserName());
+            assertEquals("Kate", out.getUserName());
+            verify(users, never()).update(any());
+            verify(tx).commit();
+        }
+
+        @Test
+        @DisplayName("changes name and commits")
+        void changesName() {
+            // Given
+            when(session.beginTransaction()).thenReturn(tx);
+            var u = user("u-2", "david", "David");
+            when(users.findById("u-2")).thenReturn(Optional.of(u));
+            // When
+            var out = sut.updateProfile("u-2", "Dave");
+            // Then
+            assertEquals("Dave", out.getUserName());
+            verify(users).update(out);
+            verify(tx).commit();
         }
     }
 
@@ -206,150 +298,166 @@ class DefaultUserServiceTest {
     class ChangePassword {
 
         @Test
-        @DisplayName("throws when new blank or too short")
-        void throwsOnBadNew() {
+        @DisplayName("invalid new password -> throws IAE, no tx")
+        void invalidNew_throws() {
             // Given / When / Then
             assertThrows(IllegalArgumentException.class,
-                    () -> sut.changePassword("id", "old", "  "));
-            assertThrows(IllegalArgumentException.class,
-                    () -> sut.changePassword("id", "old", "short"));
+                    () -> sut.changePassword("u", "old", "123"));
+            verify(session, never()).beginTransaction();
         }
 
         @Test
-        @DisplayName("throws when user not found")
-        void throwsWhenMissing() {
+        @DisplayName("user not found -> throws NoSuchElementException and rolls back")
+        void userMissing() {
             // Given
-            when(repo.findById("id")).thenReturn(Optional.empty());
+            when(session.beginTransaction()).thenReturn(tx);
+            when(users.findById("ghost")).thenReturn(Optional.empty());
             // When / Then
             assertThrows(NoSuchElementException.class,
-                    () -> sut.changePassword("id", "old", "newpass"));
+                    () -> sut.changePassword("ghost", "x", "newpass"));
+            verify(tx).rollback();
         }
 
         @Test
-        @DisplayName("throws when current password mismatch")
-        void throwsOnWrongCurrent() {
+        @DisplayName("wrong current -> throws SecurityException and rolls back")
+        void wrongCurrent() {
             // Given
-            when(repo.findById("id"))
-                    .thenReturn(Optional.of(u("id", "A", "a", "secret")));
+            when(session.beginTransaction()).thenReturn(tx);
+            var u = user("u", "usr", "User");
+            u.setPassword("old");
+            when(users.findById("u")).thenReturn(Optional.of(u));
             // When / Then
             assertThrows(SecurityException.class,
-                    () -> sut.changePassword("id", "oops", "newpass"));
+                    () -> sut.changePassword("u", "BAD", "newpass"));
+            verify(tx).rollback();
         }
 
         @Test
-        @DisplayName("updates when ok then repo.update called with new password")
-        void updatesWhenOk() {
+        @DisplayName("same as current -> throws IAE and rolls back")
+        void sameAsCurrent() {
             // Given
-            when(repo.findById("id"))
-                    .thenReturn(Optional.of(u("id", "A", "a", "secret")));
+            when(session.beginTransaction()).thenReturn(tx);
+            var u = user("u","usr","User");
+            u.setPassword("samepass");         // длина >= 6
+            when(users.findById("u")).thenReturn(Optional.of(u));
+            // When / Then
+            assertThrows(IllegalArgumentException.class,
+                    () -> sut.changePassword("u", "samepass", "samepass"));
+            verify(tx).rollback(); // теперь вызовется
+        }
+
+        @Test
+        @DisplayName("changes password and commits")
+        void ok() {
+            // Given
+            when(session.beginTransaction()).thenReturn(tx);
+            var u = user("u", "usr", "User");
+            u.setPassword("old");
+            when(users.findById("u")).thenReturn(Optional.of(u));
             // When
-            sut.changePassword("id", "secret", "newpass");
+            sut.changePassword("u", "old", "newpass");
             // Then
-            ArgumentCaptor<User> cap = ArgumentCaptor.forClass(User.class);
-            verify(repo).update(cap.capture());
-            assertEquals("newpass", cap.getValue().getPassword());
+            assertEquals("newpass", u.getPassword());
+            verify(users).update(u);
+            verify(tx).commit();
         }
     }
 
     @Nested
-    @DisplayName("adminUpdate(userId, role, name, login, newPasswordOrNull)")
+    @DisplayName("adminUpdate(userId, role, name, login, newPassword)")
     class AdminUpdate {
 
         @Test
-        @DisplayName("ignores blank newPassword (non-null but blank) then keeps old password")
-        void ignoresBlankNewPassword() {
-            // Given
-            User cur = User.of(Role.USER, "Old", "old", "oldpass").withId("id");
-            when(repo.findById("id")).thenReturn(Optional.of(cur));
-            // When
-            User out = sut.adminUpdate("id", Role.ADMIN, "Name", "Login", "   ");
-            // Then
-            ArgumentCaptor<User> cap = ArgumentCaptor.forClass(User.class);
-            verify(repo).update(cap.capture());
-            User upd = cap.getValue();
-            assertEquals("oldpass", upd.getPassword());
-            assertEquals("oldpass", out.getPassword());
-            assertEquals(Role.ADMIN, upd.getRole());
-            assertEquals("Name", upd.getUserName());
-            assertEquals("login", upd.getUserLogin());
+        @DisplayName("blank name/login -> throws IAE and no tx")
+        void blank_throws() {
+            // Given / When / Then
+            assertThrows(IllegalArgumentException.class,
+                    () -> sut.adminUpdate("u", Role.ADMIN, "  ", "  ", null));
+            verify(session, never()).beginTransaction();
         }
 
         @Test
-        @DisplayName("throws when user not found")
-        void throwsWhenMissing() {
+        @DisplayName("user not found -> throws NoSuchElementException and rolls back")
+        void userMissing() {
             // Given
-            when(repo.findById("id")).thenReturn(Optional.empty());
+            when(session.beginTransaction()).thenReturn(tx);
+            when(users.findById("ghost")).thenReturn(Optional.empty());
             // When / Then
             assertThrows(NoSuchElementException.class,
-                    () -> sut.adminUpdate("id", Role.ADMIN, "Name", "login", null));
+                    () -> sut.adminUpdate("ghost", Role.ADMIN, "X", "x", null));
+            verify(tx).rollback();
         }
 
         @Test
-        @DisplayName("throws when name or login blank")
-        void throwsWhenBlankNameOrLogin() {
+        @DisplayName("too short new password -> IAE and rolls back")
+        void shortPwd_throws() {
             // Given
-            when(repo.findById("id")).thenReturn(Optional.of(u("id", "A", "a", "p")));
+            when(session.beginTransaction()).thenReturn(tx);
+            var u = user("u1", "john", "John");
+            u.setPassword("oldpass");
+            when(users.findById("u1")).thenReturn(Optional.of(u));
             // When / Then
             assertThrows(IllegalArgumentException.class,
-                    () -> sut.adminUpdate("id", Role.ADMIN, "   ", "login", null));
-            assertThrows(IllegalArgumentException.class,
-                    () -> sut.adminUpdate("id", Role.ADMIN, "Name", "   ", null));
+                    () -> sut.adminUpdate("u1", Role.ADMIN, "John2", "john2", "123"));
+            verify(tx).rollback();
         }
 
         @Test
-        @DisplayName("updates role/name/login (login lowercased) when valid and no password change")
-        void updatesCoreFields() {
+        @DisplayName("same new password -> IAE and rolls back")
+        void samePwd_throws() {
             // Given
-            User cur = u("id", "Old", "old", "pass123");
-            when(repo.findById("id")).thenReturn(Optional.of(cur));
+            when(session.beginTransaction()).thenReturn(tx);
+            var u = user("u1", "john", "John");
+            u.setPassword("oldpass");
+            when(users.findById("u1")).thenReturn(Optional.of(u));
+            // When / Then
+            assertThrows(IllegalArgumentException.class,
+                    () -> sut.adminUpdate("u1", Role.ADMIN, "John2", "john2", "oldpass"));
+            verify(tx).rollback();
+        }
+
+        @Test
+        @DisplayName("updates fields and commits")
+        void ok() {
+            // Given
+            when(session.beginTransaction()).thenReturn(tx);
+            var u = user("u1", "john", "John");
+            u.setPassword("oldpass");
+            when(users.findById("u1")).thenReturn(Optional.of(u));
             // When
-            User out = sut.adminUpdate("id", Role.ADMIN, "  New Name  ", "NewLogin", null);
+            User out = sut.adminUpdate("u1", Role.ADMIN, "Johnny", "johnny", "newpass");
             // Then
-            ArgumentCaptor<User> cap = ArgumentCaptor.forClass(User.class);
-            verify(repo).update(cap.capture());
-            User upd = cap.getValue();
-            assertEquals(Role.ADMIN, upd.getRole());
-            assertEquals("New Name", upd.getUserName());
-            assertEquals("newlogin", upd.getUserLogin());
-            assertEquals("pass123", upd.getPassword());
-            assertEquals("newlogin", out.getUserLogin());
-        }
-
-        @Test
-        @DisplayName("throws when new password equals current")
-        void throwsWhenSamePassword() {
-            // Given
-            when(repo.findById("id"))
-                    .thenReturn(Optional.of(u("id", "A", "a", "samePass")));
-            // When / Then
-            assertThrows(IllegalArgumentException.class,
-                    () -> sut.adminUpdate("id", null, "Name", "login", "samePass"));
-        }
-
-        @Test
-        @DisplayName("throws when new password too short")
-        void throwsWhenPasswordTooShort() {
-            // Given
-            when(repo.findById("id"))
-                    .thenReturn(Optional.of(u("id", "A", "a", "oldpass")));
-            // When / Then
-            assertThrows(IllegalArgumentException.class,
-                    () -> sut.adminUpdate("id", null, "Name", "login", "12345"));
-        }
-
-        @Test
-        @DisplayName("sets new password when valid")
-        void setsNewPasswordWhenValid() {
-            // Given
-            when(repo.findById("id"))
-                    .thenReturn(Optional.of(u("id", "A", "a", "oldpass")));
-            // When
-            User out = sut.adminUpdate("id", null, "Name", "login", "newpass");
-            // Then
-            ArgumentCaptor<User> cap = ArgumentCaptor.forClass(User.class);
-            verify(repo).update(cap.capture());
-            assertEquals("newpass", cap.getValue().getPassword());
+            assertEquals(Role.ADMIN, out.getRole());
+            assertEquals("Johnny", out.getUserName());
+            assertEquals("johnny", out.getUserLogin());
             assertEquals("newpass", out.getPassword());
+            verify(users).update(out);
+            verify(tx).commit();
         }
+
+        @Test
+        @DisplayName("duplicate login during update -> propagates and rolls back")
+        void duplicateLogin_propagates() {
+            // Given
+            when(session.beginTransaction()).thenReturn(tx);
+            var u = user("u1", "john", "John");
+            when(users.findById("u1")).thenReturn(Optional.of(u));
+            doThrow(new DuplicateLoginException("dup"))
+                    .when(users).update(any(User.class));
+            // When / Then
+            assertThrows(DuplicateLoginException.class,
+                    () -> sut.adminUpdate("u1", null, "John", "admin", null));
+            verify(tx).rollback();
+        }
+    }
+
+    private static User user(String id, String login, String name) {
+        User u = new User();
+        u.setUserId(id != null ? id : UUID.randomUUID().toString());
+        u.setUserLogin(login);
+        u.setUserName(name);
+        u.setRole(Role.USER);
+        u.setPassword("test");
+        return u;
     }
 }

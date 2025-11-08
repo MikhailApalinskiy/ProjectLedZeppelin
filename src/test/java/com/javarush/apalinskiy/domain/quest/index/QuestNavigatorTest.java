@@ -84,7 +84,7 @@ class QuestNavigatorTest {
         @DisplayName("ignores option with next=null in strict mode (via mocks) then no throw and choose empty")
         void strictSkipsNullNext_viaMocks() {
             // Given
-            when(opt.next()).thenReturn(null);
+            when(opt.getNext()).thenReturn(null);
             when(qn.getId()).thenReturn(1);
             when(qn.getOptions()).thenReturn(List.of(opt));
             QuestNode fin = QuestNode.fin(2, "end2", null);

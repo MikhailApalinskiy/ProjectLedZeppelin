@@ -47,7 +47,7 @@ class FormQuestNodeParserTest {
                 // When
                 QuestNode n = FormQuestNodeParser.parseNode(req);
                 // Then
-                assertFalse(n.isFin());
+                assertFalse(n.getFin());
                 assertEquals(10, n.getId());
                 assertEquals("Hello", n.getText());
                 assertEquals("pic name.png", n.getImage());
@@ -118,7 +118,7 @@ class FormQuestNodeParserTest {
             // When
             QuestNode n = FormQuestNodeParser.parseNode(req);
             // Then
-            assertFalse(n.isFin());
+            assertFalse(n.getFin());
             assertEquals(2, n.getOptions().size());
             assertEquals("open", n.getOptions().get(0).getChoice());
             assertEquals(2, n.getOptions().get(0).getNext());
@@ -175,7 +175,7 @@ class FormQuestNodeParserTest {
             // When
             QuestNode n = FormQuestNodeParser.parseNode(req);
             // Then
-            assertTrue(n.isFin());
+            assertTrue(n.getFin());
             assertEquals(2, n.getId());
             assertTrue(n.getOptions().isEmpty());
         }
@@ -193,7 +193,7 @@ class FormQuestNodeParserTest {
                 // When
                 QuestNode n = FormQuestNodeParser.parseNode(req);
                 // Then
-                assertTrue(n.isFin());
+                assertTrue(n.getFin());
                 assertNull(n.getImage());
             }
         }

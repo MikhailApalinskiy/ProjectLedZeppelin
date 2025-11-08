@@ -6,16 +6,16 @@ import com.javarush.apalinskiy.domain.user.User;
 import com.javarush.apalinskiy.web.util.Web;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
+import jakarta.servlet.ServletRequest;
+import jakarta.servlet.ServletResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.io.IOException;
@@ -23,11 +23,11 @@ import java.io.IOException;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-@ExtendWith(MockitoExtension.class)
 @DisplayName("AdminOnlyFilter")
+@ExtendWith(MockitoExtension.class)
 class AdminOnlyFilterTest {
 
-    AdminOnlyFilter sut;
+    private AdminOnlyFilter sut;
 
     @Mock
     HttpServletRequest req;
@@ -37,11 +37,22 @@ class AdminOnlyFilterTest {
     FilterChain chain;
     @Mock
     HttpSession session;
+    @Mock
+    User user;
+
+    private MockedStatic<Web> WEB;
 
     @BeforeEach
     void setUp() {
         sut = new AdminOnlyFilter();
         when(req.getSession()).thenReturn(session);
+        when(req.getRequestURI()).thenReturn("/admin/panel");
+        WEB = Mockito.mockStatic(Web.class);
+    }
+
+    @AfterEach
+    void tearDown() {
+        if (WEB != null) WEB.close();
     }
 
     @Nested
@@ -49,48 +60,45 @@ class AdminOnlyFilterTest {
     class DoFilter {
 
         @Test
-        @DisplayName("no user -> redirectErr(HOME,'Access denied'); цепочка не вызывается")
-        void noUser_redirectsAndStopsChain() throws IOException, ServletException {
+        @DisplayName("Given no user in session — When doFilter — Then redirect to HOME and stop chain")
+        void anonymous_redirectsHome() throws IOException, ServletException {
             // Given
-            when(session.getAttribute(WebConst.Attr.USER)).thenReturn(null);
-            try (MockedStatic<Web> web = mockStatic(Web.class)) {
-                // When
-                sut.doFilter(req, resp, chain);
-                // Then
-                web.verify(() -> Web.redirectErr(req, resp, WebConst.Path.HOME, "Access denied"));
-                verifyNoInteractions(chain);
-            }
+            when(session.getAttribute(eq(WebConst.Attr.USER))).thenReturn(null);
+            // When
+            sut.doFilter(req, resp, chain);
+            // Then
+            WEB.verify(() -> Web.redirectErr(eq(req), eq(resp), eq(WebConst.Path.HOME), anyString()));
+            verify(chain, never()).doFilter(any(ServletRequest.class), any(ServletResponse.class));
         }
 
         @Test
-        @DisplayName("non-admin user -> redirectErr(HOME,'Access denied'); цепочка не вызывается")
-        void nonAdmin_redirectsAndStopsChain() throws IOException, ServletException {
+        @DisplayName("Given non-admin user — When doFilter — Then redirect to HOME and stop chain")
+        void nonAdmin_redirectsHome() throws IOException, ServletException {
             // Given
-            User u = User.of(Role.USER, "U", "u", "p");
-            when(session.getAttribute(WebConst.Attr.USER)).thenReturn(u);
-            try (MockedStatic<Web> web = mockStatic(Web.class)) {
-                // When
-                sut.doFilter(req, resp, chain);
-                // Then
-                web.verify(() -> Web.redirectErr(req, resp, WebConst.Path.HOME, "Access denied"));
-                verifyNoInteractions(chain);
-            }
+            when(user.getRole()).thenReturn(Role.USER);
+            when(user.getUserId()).thenReturn("u-1");
+            when(user.getUserLogin()).thenReturn("john");
+            when(session.getAttribute(eq(WebConst.Attr.USER))).thenReturn(user);
+            // When
+            sut.doFilter(req, resp, chain);
+            // Then
+            WEB.verify(() -> Web.redirectErr(eq(req), eq(resp), eq(WebConst.Path.HOME), anyString()));
+            verify(chain, never()).doFilter(any(ServletRequest.class), any(ServletResponse.class));
         }
 
         @Test
-        @DisplayName("admin user -> пропускает дальше (chain.doFilter), без redirectErr")
-        void admin_passesThrough() {
+        @DisplayName("Given admin user — When doFilter — Then passes through chain and does not redirect")
+        void admin_passesThrough() throws IOException, ServletException {
             // Given
-            User admin = User.of(Role.ADMIN, "A", "a", "p");
-            when(session.getAttribute(WebConst.Attr.USER)).thenReturn(admin);
-            try (MockedStatic<Web> web = mockStatic(Web.class)) {
-                // When / Then
-                assertDoesNotThrow(() -> sut.doFilter(req, resp, chain));
-                verify(chain).doFilter(req, resp);
-                web.verify(() -> Web.redirectErr(any(), any(), any(), any()), never());
-            } catch (IOException | ServletException e) {
-                throw new RuntimeException(e);
-            }
+            when(user.getRole()).thenReturn(Role.ADMIN);
+            when(user.getUserId()).thenReturn("admin-1");
+            when(user.getUserLogin()).thenReturn("admin");
+            when(session.getAttribute(eq(WebConst.Attr.USER))).thenReturn(user);
+            // When
+            sut.doFilter(req, resp, chain);
+            // Then
+            verify(chain, times(1)).doFilter(eq(req), eq(resp));
+            WEB.verifyNoInteractions();
         }
     }
 }

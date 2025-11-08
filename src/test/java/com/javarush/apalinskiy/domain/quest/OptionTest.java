@@ -1,104 +1,113 @@
 package com.javarush.apalinskiy.domain.quest;
 
+import com.javarush.apalinskiy.domain.quest.choice.ChoiceNormalizer;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.mockito.MockedStatic;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.mockStatic;
 
-@DisplayName("Option")
+@DisplayName("Option entity")
 class OptionTest {
 
     @Nested
     @DisplayName("constructor")
-    class Ctor {
+    class ConstructorTests {
 
         @Test
-        @DisplayName("sets fields when valid then ok")
-        void setsFields() {
+        @DisplayName("should initialize with valid choice and next")
+        void initializesWithValidValues() {
             // Given
-            String choice = "Open";
-            Integer next = 2;
+            String choice = "Go left";
+            Integer next = 5;
             // When
-            Option o = new Option(choice, next);
+            Option option = new Option(choice, next);
             // Then
-            assertEquals("Open", o.getChoice());
-            assertEquals(2, o.getNext());
+            assertEquals(choice, option.getChoice());
+            assertEquals(next, option.getNext());
+            assertNull(option.getChoiceId());
+            assertNull(option.getNode());
         }
 
         @Test
-        @DisplayName("allows next=null when constructed then ok")
+        @DisplayName("should allow null next")
         void allowsNullNext() {
             // Given
-            String choice = "ghost";
+            String choice = "Go right";
             // When
-            Option o = new Option(choice, null);
+            Option option = new Option(choice, null);
             // Then
-            assertNull(o.getNext());
+            assertEquals(choice, option.getChoice());
+            assertNull(option.getNext());
+        }
+
+        @SuppressWarnings("DataFlowIssue")
+        @Test
+        @DisplayName("should throw when choice is null")
+        void throwsWhenChoiceIsNull() {
+            // Given
+            // When / Then
+            assertThrows(NullPointerException.class, () -> new Option(null, 1));
         }
 
         @Test
-        @DisplayName("throws NPE when choice=null then error")
-        void throwsOnNullChoice() {
-            // Given / When / Then
-            assertThrows(NullPointerException.class, () -> new Option(null, 1));
+        @DisplayName("should throw when choice is too long")
+        void throwsWhenChoiceTooLong() {
+            // Given
+            String longText = "a".repeat(256);
+            // When / Then
+            IllegalArgumentException ex = assertThrows(
+                    IllegalArgumentException.class,
+                    () -> new Option(longText, 1)
+            );
+            assertTrue(ex.getMessage().contains("too long"));
         }
     }
 
     @Nested
     @DisplayName("normalizedChoice()")
-    class Normalized {
+    class NormalizedChoiceTests {
 
         @Test
-        @DisplayName("lowercases and collapses spaces when mixed case/whitespace then normalized")
-        void normalizesWhitespaceAndCase() {
+        @DisplayName("should normalize text via ChoiceNormalizer")
+        void usesChoiceNormalizer() {
             // Given
-            Option o = new Option("  HeLLo \t WoRLD  ", 3);
+            String choice = "  Hello   WORLD  ";
+            Option option = new Option(choice, 1);
             // When
-            String norm = o.normalizedChoice();
-            // Then
-            assertEquals("hello world", norm);
-        }
-
-        @Test
-        @DisplayName("returns empty when choice only whitespace then empty")
-        void returnsEmptyForWhitespaceOnly() {
-            // Given
-            Option o = new Option(" \n\t ", 1);
-            // When
-            String norm = o.normalizedChoice();
-            // Then
-            assertEquals("", norm);
+            try (MockedStatic<ChoiceNormalizer> normalizer = mockStatic(ChoiceNormalizer.class)) {
+                normalizer.when(() -> ChoiceNormalizer.normalize(choice))
+                        .thenReturn("hello world");
+                // Then
+                String result = option.normalizedChoice();
+                assertEquals("hello world", result);
+                normalizer.verify(() -> ChoiceNormalizer.normalize(choice));
+            }
         }
     }
 
     @Nested
-    @DisplayName("record semantics")
-    class RecordSemantics {
+    @DisplayName("setters and getters")
+    class Accessors {
 
         @Test
-        @DisplayName("equals/hashCode when same components then equal")
-        void equalsAndHashCode() {
+        @DisplayName("should correctly set and return all fields")
+        void setsAndGetsAllFields() {
             // Given
-            Option a = new Option("go", 2);
-            Option b = new Option("go", 2);
+            Option option = new Option("Take path", 10);
+            QuestNode node = new QuestNode();
             // When
-            boolean eq = a.equals(b);
+            option.setChoiceId(42L);
+            option.setNode(node);
             // Then
-            assertTrue(eq);
-            assertEquals(a.hashCode(), b.hashCode());
-        }
-
-        @Test
-        @DisplayName("toString contains field names when called then readable")
-        void toStringContainsFields() {
-            // Given
-            Option o = new Option("take key", 5);
-            // When
-            String s = o.toString();
-            // Then
-            assertTrue(s.contains("choice="));
-            assertTrue(s.contains("next="));
+            assertAll(
+                    () -> assertEquals(42L, option.getChoiceId()),
+                    () -> assertEquals("Take path", option.getChoice()),
+                    () -> assertEquals(10, option.getNext()),
+                    () -> assertSame(node, option.getNode())
+            );
         }
     }
 }

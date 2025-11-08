@@ -94,7 +94,7 @@ public class HUserRepository implements UserRepository {
             if ("users_pk_2".equalsIgnoreCase(c)) {
                 throw new DuplicateLoginException("Login already exists: " + user.getUserLogin());
             }
-            if ("users_pkey".equalsIgnoreCase(c) || "pk_users".equalsIgnoreCase(c)) {
+            if ("users_pk".equalsIgnoreCase(c) || "pk_users".equalsIgnoreCase(c)) {
                 throw new DuplicateIdException("UserId already exists: " + user.getUserId());
             }
             throw cve;

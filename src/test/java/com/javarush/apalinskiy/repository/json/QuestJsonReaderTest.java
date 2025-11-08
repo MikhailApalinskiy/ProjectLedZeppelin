@@ -32,7 +32,7 @@ class QuestJsonReaderTest {
         assertEquals("start", list.getFirst().getText());
         assertEquals(1, list.get(0).getOptions().size());
         assertEquals(2, list.get(0).getOptions().getFirst().getNext());
-        assertTrue(list.get(1).isFin());
+        assertTrue(list.get(1).getFin());
     }
 
     @Test

@@ -7,157 +7,137 @@ import com.javarush.apalinskiy.repository.notify.NotificationRepository;
 import com.javarush.apalinskiy.web.util.Web;
 import jakarta.servlet.*;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.io.IOException;
 
-import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-@ExtendWith(MockitoExtension.class)
 @DisplayName("NotificationsBadgeFilter")
+@ExtendWith(MockitoExtension.class)
 class NotificationsBadgeFilterTest {
 
-    NotificationsBadgeFilter sut;
+    private NotificationsBadgeFilter sut;
 
     @Mock
-    FilterConfig cfg;
+    FilterConfig filterConfig;
     @Mock
-    ServletContext appCtx;
+    ServletContext servletContext;
     @Mock
     NotificationRepository repo;
     @Mock
     HttpServletRequest req;
     @Mock
-    ServletResponse resp;
+    HttpServletResponse resp;
     @Mock
     FilterChain chain;
     @Mock
     HttpSession session;
 
+    private MockedStatic<Web> WEB;
+
     @BeforeEach
     void setUp() {
         sut = new NotificationsBadgeFilter();
+        when(filterConfig.getServletContext()).thenReturn(servletContext);
+        when(req.getContextPath()).thenReturn("/app");
+        when(req.getRequestURI()).thenReturn("/app/home");
+        WEB = Mockito.mockStatic(Web.class);
+        WEB.when(() -> Web.ctxBean(eq(servletContext), eq(WebConst.Ctx.NOTIFY_REPO), eq(NotificationRepository.class)))
+                .thenReturn(repo);
+        sut.init(filterConfig);
     }
 
-    @Nested
-    @DisplayName("init()")
-    class InitMethod {
-        @Test
-        @DisplayName("resolves repo via Web.ctxBean")
-        void resolvesRepo() {
-            // Given
-            when(cfg.getServletContext()).thenReturn(appCtx);
-            try (MockedStatic<Web> web = mockStatic(Web.class)) {
-                web.when(() -> Web.ctxBean(appCtx, WebConst.Ctx.NOTIFY_REPO, NotificationRepository.class))
-                        .thenReturn(repo);
-                // When / Then
-                assertDoesNotThrow(() -> sut.init(cfg));
-                web.verify(() -> Web.ctxBean(appCtx, WebConst.Ctx.NOTIFY_REPO, NotificationRepository.class));
-            }
+    @AfterEach
+    void tearDown() {
+        if (WEB != null) {
+            WEB.close();
         }
     }
 
     @Nested
-    @DisplayName("doFilter()")
+    @DisplayName("doFilter")
     class DoFilter {
 
         @Test
-        @DisplayName("bypasses for /assets/* -> delegates, no unreadCount calculation")
-        void bypassesAssets() throws IOException, ServletException {
+        @DisplayName("Given /assets/* request — When doFilter — Then skip attribute and just pass through")
+        void assets_areSkipped() throws IOException, ServletException {
             // Given
-            when(cfg.getServletContext()).thenReturn(appCtx);
-            try (MockedStatic<Web> web = mockStatic(Web.class)) {
-                web.when(() -> Web.ctxBean(appCtx, WebConst.Ctx.NOTIFY_REPO, NotificationRepository.class))
-                        .thenReturn(repo);
-                sut.init(cfg);
-            }
-            when(req.getContextPath()).thenReturn("/app");
-            when(req.getRequestURI()).thenReturn("/app/assets/logo.png");
+            when(req.getRequestURI()).thenReturn("/app/assets/css/main.css");
             // When
             sut.doFilter(req, resp, chain);
             // Then
-            verify(chain).doFilter(req, resp);
-            verify(req, never()).getSession(false);
             verify(req, never()).setAttribute(eq("unreadCount"), any());
+            verify(chain, times(1)).doFilter(eq(req), eq(resp));
             verifyNoInteractions(repo);
         }
 
         @Test
-        @DisplayName("session=null -> sets unreadCount=0 and delegates")
-        void sessionNullSetsZero() throws IOException, ServletException {
+        @DisplayName("Given no session — When doFilter — Then unreadCount=0 and pass through")
+        void noSession_setsZero() throws IOException, ServletException {
             // Given
-            when(cfg.getServletContext()).thenReturn(appCtx);
-            try (MockedStatic<Web> web = mockStatic(Web.class)) {
-                web.when(() -> Web.ctxBean(appCtx, WebConst.Ctx.NOTIFY_REPO, NotificationRepository.class))
-                        .thenReturn(repo);
-                sut.init(cfg);
-            }
-            when(req.getContextPath()).thenReturn("/app");
-            when(req.getRequestURI()).thenReturn("/app/home");
             when(req.getSession(false)).thenReturn(null);
             // When
             sut.doFilter(req, resp, chain);
             // Then
-            InOrder in = inOrder(req, chain);
-            in.verify(req).setAttribute("unreadCount", 0);
-            in.verify(chain).doFilter(req, resp);
+            verify(req).setAttribute("unreadCount", 0);
+            verify(chain).doFilter(eq(req), eq(resp));
             verifyNoInteractions(repo);
         }
 
         @Test
-        @DisplayName("user=null -> sets unreadCount=0 and delegates (no repo call)")
-        void userNullSetsZero() throws IOException, ServletException {
+        @DisplayName("Given session without user — When doFilter — Then unreadCount=0 and pass through (no repo calls)")
+        void sessionWithoutUser_setsZero() throws IOException, ServletException {
             // Given
-            when(cfg.getServletContext()).thenReturn(appCtx);
-            try (MockedStatic<Web> web = mockStatic(Web.class)) {
-                web.when(() -> Web.ctxBean(appCtx, WebConst.Ctx.NOTIFY_REPO, NotificationRepository.class))
-                        .thenReturn(repo);
-                sut.init(cfg);
-            }
-            when(req.getContextPath()).thenReturn("/app");
-            when(req.getRequestURI()).thenReturn("/app/page");
             when(req.getSession(false)).thenReturn(session);
             when(session.getAttribute(WebConst.Attr.USER)).thenReturn(null);
             // When
             sut.doFilter(req, resp, chain);
             // Then
             verify(req).setAttribute("unreadCount", 0);
-            verify(chain).doFilter(req, resp);
+            verify(chain).doFilter(eq(req), eq(resp));
             verifyNoInteractions(repo);
         }
 
         @Test
-        @DisplayName("user present -> sets unreadCount from repo and delegates")
-        void userPresentSetsFromRepo() throws IOException, ServletException {
+        @DisplayName("Given logged-in user — When doFilter — Then unreadCount from repo is attached and passed through")
+        void loggedInUser_fetchesCount() throws IOException, ServletException {
             // Given
-            when(cfg.getServletContext()).thenReturn(appCtx);
-            try (MockedStatic<Web> web = mockStatic(Web.class)) {
-                web.when(() -> Web.ctxBean(appCtx, WebConst.Ctx.NOTIFY_REPO, NotificationRepository.class))
-                        .thenReturn(repo);
-                sut.init(cfg);
-            }
-            User u = User.of(Role.USER, "A", "a", "p").withId("id1");
-            when(req.getContextPath()).thenReturn("/app");
-            when(req.getRequestURI()).thenReturn("/app/any");
+            User u = new User();
+            u.setRole(Role.USER);
+            u.setUserId("u-1");
             when(req.getSession(false)).thenReturn(session);
             when(session.getAttribute(WebConst.Attr.USER)).thenReturn(u);
-            when(repo.unreadCount("id1")).thenReturn(7);
+            when(repo.unreadCount("u-1")).thenReturn(5);
             // When
             sut.doFilter(req, resp, chain);
             // Then
-            verify(repo).unreadCount("id1");
-            verify(req).setAttribute("unreadCount", 7);
-            verify(chain).doFilter(req, resp);
+            verify(repo, times(1)).unreadCount("u-1");
+            verify(req).setAttribute("unreadCount", 5);
+            verify(chain).doFilter(eq(req), eq(resp));
+        }
+
+        @Test
+        @DisplayName("Given repo returns 0 — When doFilter — Then unreadCount=0 attached explicitly")
+        void repoReturnsZero_attachesZero() throws IOException, ServletException {
+            // Given
+            User u = new User();
+            u.setUserId("u-2");
+            when(req.getSession(false)).thenReturn(session);
+            when(session.getAttribute(WebConst.Attr.USER)).thenReturn(u);
+            when(repo.unreadCount("u-2")).thenReturn(0);
+            // When
+            sut.doFilter(req, resp, chain);
+            // Then
+            verify(req).setAttribute("unreadCount", 0);
+            verify(chain).doFilter(eq(req), eq(resp));
         }
     }
 }

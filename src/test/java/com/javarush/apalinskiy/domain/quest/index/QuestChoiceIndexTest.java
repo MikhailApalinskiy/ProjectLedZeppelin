@@ -28,9 +28,9 @@ class QuestChoiceIndexTest {
         void skipsOptionWhenNextNull_viaMocks() {
             // Given
             Option opt = mock(Option.class);
-            when(opt.next()).thenReturn(null);
+            when(opt.getNext()).thenReturn(null);
             when(opt.normalizedChoice()).thenReturn("ghost");
-            when(opt.choice()).thenReturn("ghost");
+            when(opt.getChoice()).thenReturn("ghost");
             QuestNode qn = mock(QuestNode.class);
             when(qn.getId()).thenReturn(42);
             when(qn.getOptions()).thenReturn(List.of(opt));

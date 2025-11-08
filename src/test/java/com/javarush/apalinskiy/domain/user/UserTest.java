@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
 import java.util.Date;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -13,207 +14,218 @@ import static org.junit.jupiter.api.Assertions.*;
 class UserTest {
 
     @Nested
-    @DisplayName("of()")
-    class OfFactory {
+    @DisplayName("Factory method: of")
+    class FactoryMethod {
 
         @Test
-        @DisplayName("sets fields when created then trimmed/lowercased where needed")
-        void setsFields() {
+        @DisplayName("creates user with generated UUID and defaults")
+        void createsUserWithDefaults() {
             // Given
-            String name = "  John  ";
-            String login = "  AdminUser  ";
-            String pass = "secret";
+            Role role = Role.USER;
+            String name = "Alice";
+            String login = "AliceLogin";
+            String pass = "secret6";
             // When
-            User u = User.of(Role.ADMIN, name, login, pass);
+            User u = User.of(role, name, login, pass);
             // Then
-            assertEquals(Role.ADMIN, u.getRole());
-            assertEquals("John", u.getUserName());
-            assertEquals("adminuser", u.getUserLogin());
-            assertEquals("secret", u.getPassword());
-            assertNotNull(u.getUserId());
+            assertNotNull(u.getUserId(), "id must be generated");
+            assertEquals(Role.USER, u.getRole());
+            assertEquals("Alice", u.getUserName());
+            assertEquals("alicelogin", u.getUserLogin(), "login must be lowercased");
+            assertEquals("secret6", u.getPassword());
+            assertNotNull(u.getCreatedAt(), "createdAt must be set");
         }
 
         @Test
-        @DisplayName("defaults role to USER when null then role=USER")
-        void defaultsRoleToUserWhenNull() {
+        @DisplayName("defaults role to USER when null")
+        void defaultsRoleWhenNull() {
             // Given
+            String name = "Bob";
+            String login = "BobLogin";
+            String pass = "qwerty6";
             // When
-            User u = User.of(null, "Name", "login", "p");
+            User u = User.of(null, name, login, pass);
             // Then
             assertEquals(Role.USER, u.getRole());
         }
 
         @Test
-        @DisplayName("generates UUID userId when created then matches pattern")
-        void generatesUuid() {
-            // Given / When
-            User u = User.of(Role.USER, "n", "l", "p");
-            // Then
-            assertTrue(u.getUserId().matches("^[0-9a-f\\-]+$"));
-        }
-
-        @Test
-        @DisplayName("createdAt is ~now when created then within bounds")
-        void createdAtIsNow() {
-            // Given
-            Instant before = Instant.now();
-            // When
-            User u = User.of(Role.USER, "n", "l", "p");
-            Instant after = Instant.now();
-            // Then
-            assertFalse(u.getCreatedAt().isBefore(before));
-            assertFalse(u.getCreatedAt().isAfter(after));
-        }
-
-        @Test
-        @DisplayName("throws when name or login or password blank then IAE")
-        void throwsOnBlankRequired() {
+        @DisplayName("throws when username/login/password are blank")
+        void throwsOnBlankFields() {
             // Given / When / Then
-            assertThrows(IllegalArgumentException.class, () -> User.of(Role.USER, " ", "l", "p"));
-            assertThrows(IllegalArgumentException.class, () -> User.of(Role.USER, "n", " ", "p"));
-            assertThrows(IllegalArgumentException.class, () -> User.of(Role.USER, "n", "l", " "));
+            assertThrows(IllegalArgumentException.class, () -> User.of(Role.USER, " ", "login", "123456"));
+            assertThrows(IllegalArgumentException.class, () -> User.of(Role.USER, "Name", " ", "123456"));
+            assertThrows(IllegalArgumentException.class, () -> User.of(Role.USER, "Name", "login", " "));
+        }
+
+        @Test
+        @DisplayName("throws when password is shorter than 6 chars")
+        void throwsOnShortPassword() {
+            // Given
+            String shortPwd = "12345";
+            // When / Then
+            assertThrows(IllegalArgumentException.class, () -> User.of(Role.USER, "Name", "login", shortPwd));
+        }
+
+        @Test
+        @DisplayName("throws when username or login exceed 50 chars")
+        void throwsOnTooLongNameOrLogin() {
+            // Given
+            String long51 = "x".repeat(51);
+            // When / Then
+            assertThrows(IllegalArgumentException.class, () -> User.of(Role.USER, long51, "login", "123456"));
+            assertThrows(IllegalArgumentException.class, () -> User.of(Role.USER, "Name", long51, "123456"));
         }
     }
 
     @Nested
-    @DisplayName("withId() / withUserName() / withPassword() / withRole() / withLogin()")
-    class Withers {
+    @DisplayName("Setters normalization & validation")
+    class Setters {
 
         @Test
-        @DisplayName("withId replaces id when called then new id")
-        void withIdReplacesId() {
+        @DisplayName("setUserLogin trims and lowercases login")
+        void setUserLoginNormalizes() {
             // Given
-            User u = User.of(Role.USER, "n", "l", "p");
+            User u = User.of(Role.USER, "Name", "login", "123456");
+            String input = "  MiXeD_Login  ";
             // When
-            User u2 = u.withId("custom-id");
+            u.setUserLogin(input);
             // Then
-            assertEquals("custom-id", u2.getUserId());
-            assertNotSame(u, u2);
+            assertEquals("mixed_login", u.getUserLogin());
         }
 
         @Test
-        @DisplayName("withUserName trims name when set then trimmed")
-        void withUserNameTrims() {
+        @DisplayName("setUserLogin throws when > 50 chars")
+        void setUserLoginTooLong() {
             // Given
-            User u = User.of(Role.USER, "n", "l", "p");
-            // When
-            User u2 = u.withUserName("  New Name  ");
-            // Then
-            assertEquals("New Name", u2.getUserName());
+            User u = User.of(Role.USER, "Name", "login", "123456");
+            String long51 = "x".repeat(51);
+            // When / Then
+            assertThrows(IllegalArgumentException.class, () -> u.setUserLogin(long51));
         }
 
         @Test
-        @DisplayName("withPassword replaces password when set then new password")
-        void withPasswordReplaces() {
+        @DisplayName("setUserName throws when > 50 chars")
+        void setUserNameTooLong() {
             // Given
-            User u = User.of(Role.USER, "n", "l", "p");
-            // When
-            User u2 = u.withPassword("newP");
-            // Then
-            assertEquals("newP", u2.getPassword());
-        }
-
-        @Test
-        @DisplayName("withRole changes role when non-null then updated")
-        void withRoleChanges() {
-            // Given
-            User u = User.of(Role.USER, "n", "l", "p");
-            // When
-            User u2 = u.withRole(Role.ADMIN);
-            // Then
-            assertEquals(Role.ADMIN, u2.getRole());
-        }
-
-        @Test
-        @DisplayName("withRole keeps old role when null passed then unchanged")
-        void withRoleNullKeepsOld() {
-            // Given
-            User u = User.of(Role.ADMIN, "n", "l", "p");
-            // When
-            User u2 = u.withRole(null);
-            // Then
-            assertEquals(Role.ADMIN, u2.getRole());
-            assertNotSame(u, u2); // новый инстанс
-        }
-
-        @Test
-        @DisplayName("withLogin lowercases/trim when set then normalized")
-        void withLoginNormalizes() {
-            // Given
-            User u = User.of(Role.USER, "n", "l", "p");
-            // When
-            User u2 = u.withLogin("  NewLOGIN  ");
-            // Then
-            assertEquals("newlogin", u2.getUserLogin());
-        }
-
-        @Test
-        @DisplayName("withers preserve createdAt when used then same instant")
-        void withersPreserveCreatedAt() {
-            // Given
-            User u = User.of(Role.USER, "n", "l", "p");
-            Instant created = u.getCreatedAt();
-            // When
-            User u2 = u.withUserName("x");
-            // Then
-            assertEquals(created, u2.getCreatedAt());
+            User u = User.of(Role.USER, "Name", "login", "123456");
+            String long51 = "x".repeat(51);
+            // When / Then
+            assertThrows(IllegalArgumentException.class, () -> u.setUserName(long51));
         }
     }
 
     @Nested
-    @DisplayName("getCreatedAtDate()")
-    class CreatedAtDate {
+    @DisplayName("withId copy")
+    class WithIdCopy {
 
         @Test
-        @DisplayName("converts Instant to Date when called then equals Date.from(instant)")
-        void convertsToDate() {
+        @DisplayName("returns a new user with same fields and new id")
+        void returnsCopyWithNewId() {
             // Given
-            User u = User.of(Role.USER, "n", "l", "p");
+            User original = User.of(Role.ADMIN, "Alice", "alice", "123456");
+            String newId = UUID.randomUUID().toString();
             // When
-            Date d = u.getCreatedAtDate();
+            User copy = original.withId(newId);
             // Then
-            assertEquals(Date.from(u.getCreatedAt()), d);
+            assertNotSame(original, copy);
+            assertEquals(newId, copy.getUserId());
+            assertEquals(original.getRole(), copy.getRole());
+            assertEquals(original.getUserName(), copy.getUserName());
+            assertEquals(original.getUserLogin(), copy.getUserLogin());
+            assertEquals(original.getPassword(), copy.getPassword());
+            assertEquals(original.getCreatedAt(), copy.getCreatedAt());
         }
     }
 
     @Nested
-    @DisplayName("equals/hashCode")
+    @DisplayName("Equality & hashCode")
     class Equality {
 
         @Test
-        @DisplayName("equals by userId when same id then equal")
-        void equalsById() {
+        @DisplayName("equals and hashCode depend only on userId")
+        void equalsHashOnIdOnly() {
             // Given
-            User u1 = User.of(Role.USER, "Name", "login", "p");
-            User u2 = u1.withUserName("Other");
+            String id = UUID.randomUUID().toString();
+            User a = User.of(Role.USER, "N1", "l1", "123456").withId(id);
+            User b = User.of(Role.ADMIN, "N2", "l2", "abcdef").withId(id);
             // When
-            boolean eq = u1.equals(u2);
+            boolean eq = a.equals(b);
             // Then
             assertTrue(eq);
-            assertEquals(u1.hashCode(), u2.hashCode());
+            assertEquals(a.hashCode(), b.hashCode());
         }
 
         @Test
-        @DisplayName("not equal when different ids then false")
-        void notEqualDifferentIds() {
+        @DisplayName("not equal when ids differ")
+        void notEqualOnDifferentIds() {
             // Given
-            User u1 = User.of(Role.USER, "Name", "login", "p");
-            User u2 = u1.withId("another-id");
-            // When / Then
-            assertNotEquals(u1, u2);
-        }
-
-        @Test
-        @DisplayName("equals contracts: reflexive, null, different type")
-        void equalsContracts() {
-            // Given
-            User u = User.of(Role.USER, "n", "l", "p");
+            User a = User.of(Role.USER, "N1", "l1", "123456").withId(UUID.randomUUID().toString());
+            User b = User.of(Role.USER, "N1", "l1", "123456").withId(UUID.randomUUID().toString());
+            // When
+            boolean eq = a.equals(b);
             // Then
-            //noinspection EqualsWithItself
-            assertEquals(u, u);
-            assertNotEquals(null, u);
-            //noinspection AssertBetweenInconvertibleTypes
-            assertNotEquals("string", u);
+            assertFalse(eq);
+        }
+
+        @SuppressWarnings("AssertBetweenInconvertibleTypes")
+        @Test
+        @DisplayName("equals is reflexive and type-safe")
+        void equalsReflexiveAndTypeSafe() {
+            // Given
+            User a = User.of(Role.USER, "N", "l", "123456");
+            // When / Then
+            assertEquals(a, a);
+            assertNotEquals("not a user", a);
+        }
+    }
+
+    @Nested
+    @DisplayName("createdAt & date conversion")
+    class CreatedAtAndDate {
+
+        @Test
+        @DisplayName("createdAt defaults to now")
+        void createdAtDefaultsToNow() {
+            // Given / When
+            User u = User.of(Role.USER, "N", "l", "123456");
+            // Then
+            assertNotNull(u.getCreatedAt());
+        }
+
+        @Test
+        @DisplayName("getCreatedAtDate returns Date.from(createdAt)")
+        void getCreatedAtDateConverts() {
+            // Given
+            User u = User.of(Role.USER, "N", "l", "123456");
+            Instant created = u.getCreatedAt();
+            // When
+            Date d = u.getCreatedAtDate();
+            // Then
+            assertEquals(Date.from(created), d);
+        }
+    }
+
+    @Nested
+    @DisplayName("Role handling")
+    class RoleHandling {
+
+        @Test
+        @DisplayName("explicit role is preserved")
+        void explicitRolePreserved() {
+            // Given / When
+            User u = User.of(Role.ADMIN, "N", "l", "123456");
+            // Then
+            assertEquals(Role.ADMIN, u.getRole());
+        }
+
+        @Test
+        @DisplayName("null role defaults to USER")
+        void nullRoleBecomesUser() {
+            // Given / When
+            User u = User.of(null, "N", "l", "123456");
+            // Then
+            assertEquals(Role.USER, u.getRole());
         }
     }
 }

@@ -16,3 +16,15 @@ services:
         value: /var/data/uploads
       - key: JAVA_TOOL_OPTIONS
         value: -XX:MaxRAMPercentage=75.0
+      - key: LIQUIBASE_URL
+        value: jdbc:postgresql://dpg-d47nl4ripnbc73d147cg-a.oregon-postgres.render.com:5432/questdb_3g3w?sslmode=require
+      - key: LIQUIBASE_USERNAME
+        value: questdb_3g3w_user
+      - key: e5siiQ5YVYD7D7ULGvWvsGSgUEywAUU2
+        value: postgres
+      - key: DB_URL
+        value: jdbc:postgresql://dpg-d47nl4ripnbc73d147cg-a.oregon-postgres.render.com:5432/questdb_3g3w?sslmode=require
+      - key: DB_USER
+        value: questdb_3g3w_user
+      - key: DB_PASS
+        value: e5siiQ5YVYD7D7ULGvWvsGSgUEywAUU2

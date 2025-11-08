@@ -305,7 +305,7 @@ class QuestServletTest {
                 when(chooseResult.isOk()).thenReturn(true);
                 QuestNode next = mock(QuestNode.class);
                 when(chooseResult.getNext()).thenReturn(next);
-                when(next.isFin()).thenReturn(true);
+                when(next.getFin()).thenReturn(true);
                 when(next.getId()).thenReturn(777);
                 when(session.getAttribute(WebConst.Attr.USER)).thenReturn(user);
                 when(user.getUserId()).thenReturn("U1");
@@ -379,7 +379,7 @@ class QuestServletTest {
                 when(chooseResult.isOk()).thenReturn(true);
                 QuestNode next = mock(QuestNode.class);
                 when(chooseResult.getNext()).thenReturn(next);
-                when(next.isFin()).thenReturn(true);
+                when(next.getFin()).thenReturn(true);
                 when(next.getId()).thenReturn(2);
                 when(session.getAttribute(WebConst.Attr.USER)).thenReturn(null);
                 web.when(() -> Web.questUrl(eq(req), eq(2), isNull())).thenReturn("/q?id=2");

@@ -1,0 +1,19 @@
+[
+  {
+    "id": 1,
+    "text": "Start",
+    "terminal": false,
+    "options": [
+      {
+        "text": "Go",
+        "next": 2
+      }
+    ]
+  },
+  {
+    "id": 2,
+    "text": "End",
+    "terminal": true,
+    "options": []
+  }
+]

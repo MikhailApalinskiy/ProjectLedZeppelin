@@ -2,7 +2,7 @@ package com.javarush.apalinskiy.web.servlet;
 
 import com.javarush.apalinskiy.app.WebConst;
 import com.javarush.apalinskiy.domain.quest.custom.CustomQuest;
-import com.javarush.apalinskiy.repository.inmemory.quest.InMemoryQuestStore;
+import com.javarush.apalinskiy.repository.hibernate.quest.InMemoryQuestStore;
 import com.javarush.apalinskiy.service.quest.QuestAuthoringService;
 import com.javarush.apalinskiy.web.util.Web;
 import jakarta.servlet.ServletConfig;

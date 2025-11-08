@@ -7,12 +7,14 @@ import com.javarush.apalinskiy.domain.quest.custom.CustomQuest;
 import com.javarush.apalinskiy.domain.user.Role;
 import com.javarush.apalinskiy.domain.user.User;
 import com.javarush.apalinskiy.service.quest.QuestAuthoringService;
+import com.javarush.apalinskiy.service.user.UserService;
 import com.javarush.apalinskiy.web.view.EdgeSeg;
 import jakarta.servlet.RequestDispatcher;
 import jakarta.servlet.ServletContext;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -61,6 +63,8 @@ class WebTest {
     User userBefore;
     @Mock
     User userAfter;
+    @Mock
+    UserService userService;
 
     @Nested
     class TrimOrNull {
@@ -692,7 +696,7 @@ class WebTest {
         void singleFinalBlank() {
             // given
             QuestNode n = mock(QuestNode.class);
-            when(n.isFin()).thenReturn(true);
+            when(n.getFin()).thenReturn(true);
             when(n.getText()).thenReturn("   ");
             assertTrue(Web.isEffectivelyEmpty(List.of(n)));
             // when
@@ -706,7 +710,7 @@ class WebTest {
         void notEmpty() {
             // given
             QuestNode n = mock(QuestNode.class);
-            when(n.isFin()).thenReturn(false);
+            when(n.getFin()).thenReturn(false);
             when(n.getText()).thenReturn(null);
             assertFalse(Web.isEffectivelyEmpty(List.of(n)));
             // when
@@ -961,14 +965,14 @@ class WebTest {
         void smallGraph() {
             // given
             when(nodeA.getId()).thenReturn(1);
-            when(nodeA.isFin()).thenReturn(false);
+            when(nodeA.getFin()).thenReturn(false);
             when(nodeA.getText()).thenReturn("Start node");
             when(nodeA.getOptions()).thenReturn(List.of(optAB));
             when(nodeA.getImage()).thenReturn(null);
-            when(optAB.next()).thenReturn(2);
-            when(optAB.choice()).thenReturn("Go");
+            when(optAB.getNext()).thenReturn(2);
+            when(optAB.getChoice()).thenReturn("Go");
             when(nodeB.getId()).thenReturn(2);
-            when(nodeB.isFin()).thenReturn(true);
+            when(nodeB.getFin()).thenReturn(true);
             when(nodeB.getText()).thenReturn("Finish");
             when(nodeB.getImage()).thenReturn(null);
             List<QuestNode> nodes = List.of(nodeA, nodeB);
@@ -1075,7 +1079,7 @@ class WebTest {
             when(req.getParameter("q")).thenReturn("  be  ");
             CustomQuest alpha = mock(CustomQuest.class);
             when(alpha.getName()).thenReturn("Alpha");
-            CustomQuest beta  = mock(CustomQuest.class);
+            CustomQuest beta = mock(CustomQuest.class);
             when(beta.getName()).thenReturn("BETA");
             List<CustomQuest> items = Arrays.asList(alpha, beta);
             // when
@@ -1089,6 +1093,197 @@ class WebTest {
             assertSame(beta, attached.get(0));
             verify(req).setAttribute(eq("createdMap"), any());
             verify(req).setAttribute(eq("updatedMap"), any());
+        }
+    }
+    @Nested
+    @DisplayName("Params (value object)")
+    class ParamsVo {
+
+        @Test
+        @DisplayName("given values — when construct — then fields exposed as-is")
+        void ctorStoresValues() {
+            // Given
+            String q = "Mike";
+            int page = 3;
+            int size = 12;
+            // When
+            Web.Params p = new Web.Params(q, page, size);
+            // Then
+            assertEquals("Mike", p.q);
+            assertEquals(3, p.page);
+            assertEquals(12, p.size);
+        }
+    }
+
+    @Nested
+    @DisplayName("extract(req)")
+    class ExtractParams {
+
+        @BeforeEach
+        void lenientDefaults() {
+            lenient().when(req.getParameter("q")).thenReturn(null);
+            lenient().when(req.getParameter("page")).thenReturn(null);
+        }
+
+        @Test
+        @DisplayName("given no params — when extract — then q=null, page=1, size=12")
+        void defaults() {
+            // when
+            Web.Params p = Web.extract(req);
+            // then
+            assertNull(p.q);
+            assertEquals(1, p.page);
+            assertEquals(12, p.size);
+        }
+
+        @Test
+        @DisplayName("given q with spaces — when extract — then q trimmed")
+        void trimsQ() {
+            // given
+            when(req.getParameter("q")).thenReturn("  He llo  ");
+            // when
+            Web.Params p = Web.extract(req);
+            // then
+            assertEquals("He llo", p.q);
+            assertEquals(1, p.page);
+            assertEquals(12, p.size);
+        }
+
+        @Test
+        @DisplayName("given page='5' — when extract — then page=5 (1-based), size=12")
+        void parsesPage() {
+            // given
+            when(req.getParameter("page")).thenReturn("5");
+            // when
+            Web.Params p = Web.extract(req);
+            // then
+            assertEquals(5, p.page);
+            assertEquals(12, p.size);
+        }
+
+        @Test
+        @DisplayName("given page is invalid — when extract — then page=1")
+        void invalidPageToOne() {
+            // given
+            when(req.getParameter("page")).thenReturn("x");
+            // when
+            Web.Params p = Web.extract(req);
+            // then
+            assertEquals(1, p.page);
+        }
+
+        @Test
+        @DisplayName("given page<1 — when extract — then page=1")
+        void clampsPageToOne() {
+            // given
+            when(req.getParameter("page")).thenReturn("-2");
+            // when
+            Web.Params p = Web.extract(req);
+            // then
+            assertEquals(1, p.page);
+        }
+    }
+
+    @Nested
+    @DisplayName("attachOwnerNamesById(req, items, userService)")
+    class AttachOwnerNamesById {
+
+        @Test
+        @DisplayName("given items with owners — when attachOwnerNamesById — then ownerNameById map with resolved names; duplicates collapsed")
+        void resolvesNamesAndSetsAttribute() {
+            // Given
+            CustomQuest q1 = mock(CustomQuest.class);
+            CustomQuest q2 = mock(CustomQuest.class);
+            CustomQuest q3 = mock(CustomQuest.class);
+            when(q1.getOwnerId()).thenReturn("u1");
+            when(q2.getOwnerId()).thenReturn("u2");
+            when(q3.getOwnerId()).thenReturn("u1");
+            User U1 = mock(User.class);
+            when(U1.getUserName()).thenReturn("Alice");
+            User U2 = mock(User.class);
+            when(U2.getUserName()).thenReturn("Bob");
+            when(userService.findById("u1")).thenReturn(Optional.of(U1));
+            when(userService.findById("u2")).thenReturn(Optional.of(U2));
+            List<CustomQuest> items = List.of(q1, q2, q3);
+            // When
+            Web.attachOwnerNamesById(req, items, userService);
+            // Then
+            ArgumentCaptor<Map<String, String>> cap = ArgumentCaptor.forClass(Map.class);
+            verify(req).setAttribute(eq("ownerNameById"), cap.capture());
+            Map<String, String> map = cap.getValue();
+            assertEquals(2, map.size());
+            assertEquals("Alice", map.get("u1"));
+            assertEquals("Bob", map.get("u2"));
+        }
+
+        @Test
+        @DisplayName("given userService misses some ids — when attachOwnerNamesById — then absent ids not added")
+        void missingUsersSkipped() {
+            // Given
+            CustomQuest q1 = mock(CustomQuest.class);
+            when(q1.getOwnerId()).thenReturn("uX");
+            when(userService.findById("uX")).thenReturn(Optional.empty());
+            // When
+            Web.attachOwnerNamesById(req, List.of(q1), userService);
+            // Then
+            ArgumentCaptor<Map<String, String>> cap = ArgumentCaptor.forClass(Map.class);
+            verify(req).setAttribute(eq("ownerNameById"), cap.capture());
+            assertTrue(cap.getValue().isEmpty());
+        }
+    }
+
+    @Nested
+    @DisplayName("applyPagedList(req, paged, userService, q)")
+    class ApplyPagedList {
+
+        @Test
+        @DisplayName("given paged data — when applyPagedList — then sets list attrs and ownerNameById")
+        void appliesAllAttributes() {
+            // Given
+            CustomQuest a = mock(CustomQuest.class);
+            CustomQuest b = mock(CustomQuest.class);
+            when(a.getOwnerId()).thenReturn("u1");
+            when(b.getOwnerId()).thenReturn("u2");
+            List<CustomQuest> items = List.of(a, b);
+            QuestAuthoringService.Paged<CustomQuest> paged =
+                    new QuestAuthoringService.Paged<>(items,42, 3, 12);
+            User U1 = mock(User.class); when(U1.getUserName()).thenReturn("Alice");
+            User U2 = mock(User.class); when(U2.getUserName()).thenReturn("Bob");
+            when(userService.findById("u1")).thenReturn(Optional.of(U1));
+            when(userService.findById("u2")).thenReturn(Optional.of(U2));
+            String q = "Mike";
+            // When
+            Web.applyPagedList(req, paged, userService, q);
+            // Then
+            ArgumentCaptor<Map<String, String>> ownersCap = ArgumentCaptor.forClass(Map.class);
+            verify(req).setAttribute(eq("ownerNameById"), ownersCap.capture());
+            Map<String, String> owners = ownersCap.getValue();
+            assertEquals("Alice", owners.get("u1"));
+            assertEquals("Bob", owners.get("u2"));
+            verify(req).setAttribute("items", items);
+            verify(req).setAttribute("total", 42);
+            verify(req).setAttribute("pages", paged.getPages());
+            verify(req).setAttribute("page", 3);
+            verify(req).setAttribute("q", "Mike");
+        }
+
+        @Test
+        @DisplayName("given empty items — when applyPagedList — then still sets attributes")
+        void emptyListStillSetsAttrs() {
+            // Given
+            QuestAuthoringService.Paged<CustomQuest> paged =
+                    new QuestAuthoringService.Paged<>(List.of(), 0, 1, 12);
+            // When
+            Web.applyPagedList(req, paged, userService, null);
+            // Then
+            verify(req).setAttribute("items", paged.getItems());
+            verify(req).setAttribute("total", 0);
+            verify(req).setAttribute("pages", paged.getPages());
+            verify(req).setAttribute("page", 1);
+            verify(req).setAttribute("q", null);
+            ArgumentCaptor<Map<String, String>> ownersCap = ArgumentCaptor.forClass(Map.class);
+            verify(req).setAttribute(eq("ownerNameById"), ownersCap.capture());
+            assertTrue(ownersCap.getValue().isEmpty());
         }
     }
 }

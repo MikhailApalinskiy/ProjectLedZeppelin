@@ -3,178 +3,222 @@ package com.javarush.apalinskiy.domain.quest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
-@DisplayName("QuestNode")
+@ExtendWith(MockitoExtension.class)
+@DisplayName("QuestNode entity")
 class QuestNodeTest {
 
-    private Option opt(String choice, Integer next) {
-        return new Option(choice, next);
-    }
+    @Mock
+    Option optionA;
+
+    @Mock
+    Option optionB;
 
     @Nested
-    @DisplayName("factories")
-    class Factories {
+    @DisplayName("factory methods")
+    class FactoryMethods {
 
         @Test
-        @DisplayName("of(): builds non-final node when valid then ok")
-        void ofBuildsNonFinal() {
+        @DisplayName("of() should create valid node with provided values")
+        void createsNodeWithOf() {
             // Given
-            List<Option> options = List.of(opt("go", 2));
+            when(optionA.normalizedChoice()).thenReturn("go");
+            when(optionA.getNext()).thenReturn(2);
+            List<Option> options = List.of(optionA);
             // When
-            QuestNode n = QuestNode.of(1, "text", options, false, "img.png");
+            QuestNode node = QuestNode.of(1, "Text", options, false, "img.png");
             // Then
-            assertEquals(1, n.getId());
+            assertEquals(1, node.getId());
+            assertEquals("Text", node.getText());
+            assertEquals("img.png", node.getImage());
+            assertFalse(node.getFin());
+            assertEquals(1, node.getOptions().size());
+            assertTrue(node.getOptions().contains(optionA));
+            verify(optionA).setNode(node);
         }
 
         @Test
-        @DisplayName("fin(): builds final node with empty options then ok")
-        void finBuildsFinal() {
+        @DisplayName("fin() should create final node with empty options")
+        void createsFinalNode() {
             // Given / When
-            QuestNode n = QuestNode.fin(2, "end", null);
+            QuestNode node = QuestNode.fin(1, "The End", "end.png");
             // Then
-            assertTrue(n.isFin());
+            assertTrue(node.getFin());
+            assertEquals("The End", node.getText());
+            assertTrue(node.getOptions().isEmpty());
+            assertEquals("end.png", node.getImage());
         }
 
         @Test
-        @DisplayName("nonFin(): builds node with options then ok")
-        void nonFinBuilds() {
+        @DisplayName("nonFin() should create non-final node with options")
+        void createsNonFinalNode() {
             // Given
-            QuestNode n = QuestNode.nonFin(3, "text", List.of(opt("go", 4)), null);
-            // When / Then
-            assertFalse(n.isFin());
-        }
-
-        @Test
-        @DisplayName("json(): maps fields including 'final' then ok")
-        void jsonBuilds() {
-            // Given
-            List<Option> opts = List.of(opt("go", 2));
+            when(optionA.normalizedChoice()).thenReturn("next");
+            when(optionA.getNext()).thenReturn(2);
             // When
-            QuestNode n = QuestNode.json(10, "t", opts, false, " img ");
+            QuestNode node = QuestNode.nonFin(2, "Continue", List.of(optionA), null);
             // Then
-            assertEquals(10, n.getId());
+            assertFalse(node.getFin());
+            assertEquals("Continue", node.getText());
+            assertEquals(1, node.getOptions().size());
+            assertTrue(node.getOptions().contains(optionA));
+            verify(optionA).setNode(node);
+        }
+
+        @Test
+        @DisplayName("json() should delegate to private constructor")
+        void createsNodeFromJson() {
+            // Given
+            when(optionA.normalizedChoice()).thenReturn("go");
+            when(optionA.getNext()).thenReturn(2);
+            // When
+            QuestNode node = QuestNode.json(1, "Story", List.of(optionA), false, "pic.jpg");
+            // Then
+            assertEquals(1, node.getId());
+            assertEquals("Story", node.getText());
+            assertEquals("pic.jpg", node.getImage());
+            assertFalse(node.getFin());
+            assertTrue(node.getOptions().contains(optionA));
+            verify(optionA).setNode(node);
         }
     }
 
     @Nested
-    @DisplayName("validation")
-    class Validation {
+    @DisplayName("validation rules")
+    class ValidationRules {
 
         @Test
-        @DisplayName("throws when id <= 0 then IAE")
-        void idMustBePositive() {
-            // Given / When / Then
+        @DisplayName("should throw when id ≤ 0")
+        void throwsWhenInvalidId() {
+            // Given
+            // When / Then
             assertThrows(IllegalArgumentException.class,
-                    () -> QuestNode.of(0, "t", List.of(), false, null));
+                    () -> QuestNode.of(0, "abc", List.of(), true, null));
         }
 
         @Test
-        @DisplayName("throws when text is blank then IAE")
-        void textNotBlank() {
-            // Given / When / Then
+        @DisplayName("should throw when text blank")
+        void throwsWhenTextBlank() {
+            // Given
+            // When / Then
             assertThrows(IllegalArgumentException.class,
                     () -> QuestNode.of(1, "   ", List.of(), false, null));
         }
 
         @Test
-        @DisplayName("throws when final node has options then IAE")
-        void finalNodeNoOptions() {
-            // Given / When / Then
-            assertThrows(IllegalArgumentException.class,
-                    () -> QuestNode.of(1, "t", List.of(opt("x", 2)), true, null));
-        }
-
-        @Test
-        @DisplayName("throws when non-final option has next=null then IAE")
-        void nonFinalOptionNeedsNext() {
-            // Given / When / Then
-            assertThrows(IllegalArgumentException.class,
-                    () -> QuestNode.nonFin(1, "t", List.of(opt("x", null)), null));
-        }
-
-        @Test
-        @DisplayName("throws when duplicate normalized options then IAE")
-        void duplicateNormalizedChoice() {
+        @DisplayName("should throw when final node has options")
+        void throwsWhenFinalNodeHasOptions() {
             // Given
-            List<Option> opts = List.of(opt(" Go  North ", 2), opt("go north", 3));
+            List<Option> options = List.of(optionA);
             // When / Then
             assertThrows(IllegalArgumentException.class,
-                    () -> QuestNode.nonFin(5, "t", opts, null));
+                    () -> QuestNode.of(1, "End", options, true, null));
         }
 
         @Test
-        @DisplayName("throws when text too long (>10000) then IAE")
-        void textTooLong() {
+        @DisplayName("should throw when text too long")
+        void throwsWhenTextTooLong() {
             // Given
-            String longText = "x".repeat(10_001);
+            String longText = "a".repeat(10_001);
             // When / Then
             assertThrows(IllegalArgumentException.class,
-                    () -> QuestNode.of(1, longText, List.of(), false, null));
+                    () -> QuestNode.of(1, longText, List.of(), true, null));
+        }
+
+        @Test
+        @DisplayName("should throw when duplicate normalized options")
+        void throwsWhenDuplicateChoices() {
+            // Given
+            when(optionA.normalizedChoice()).thenReturn("dup");
+            when(optionB.normalizedChoice()).thenReturn("dup");
+            // When / Then
+            assertThrows(IllegalArgumentException.class,
+                    () -> QuestNode.of(1, "Node", List.of(optionA, optionB), false, null));
+        }
+
+        @Test
+        @DisplayName("should throw when non-final node option has null next")
+        void throwsWhenOptionNextNull() {
+            // Given
+            when(optionA.normalizedChoice()).thenReturn("x");
+            when(optionA.getNext()).thenReturn(null);
+            // When / Then
+            assertThrows(IllegalArgumentException.class,
+                    () -> QuestNode.of(1, "Node", List.of(optionA), false, null));
         }
     }
 
     @Nested
-    @DisplayName("options list")
-    class OptionsList {
+    @DisplayName("setOptionsSafe()")
+    class SetOptionsSafe {
 
         @Test
-        @DisplayName("is defensive-copied when source mutated then node not affected")
-        void defensiveCopy() {
+        @DisplayName("should assign options and set node reference")
+        void assignsOptionsAndLinksBack() {
             // Given
-            List<Option> source = new ArrayList<>(List.of(opt("go", 2)));
-            QuestNode n = QuestNode.nonFin(1, "t", source, null);
+            QuestNode node = QuestNode.fin(1, "End", null);
             // When
-            source.add(opt("stay", 3));
+            node.setOptionsSafe(List.of(optionA));
             // Then
-            assertEquals(1, n.getOptions().size());
+            verify(optionA).setNode(node);
+            assertEquals(1, node.getOptions().size());
+            assertTrue(node.getOptions().contains(optionA));
         }
 
         @Test
-        @DisplayName("is unmodifiable when accessed then UOE")
-        void unmodifiableOnGetter() {
+        @DisplayName("should clear options when null provided")
+        void clearsWhenNull() {
             // Given
-            QuestNode n = QuestNode.nonFin(1, "t", List.of(opt("go", 2)), null);
-            // When / Then
-            //noinspection DataFlowIssue
-            assertThrows(UnsupportedOperationException.class,
-                    () -> n.getOptions().add(opt("x", 3)));
+            QuestNode node = QuestNode.fin(1, "End", null);
+            node.setOptionsSafe(List.of(optionA));
+            // When
+            node.setOptionsSafe(null);
+            // Then
+            assertTrue(node.getOptions().isEmpty());
         }
 
         @Test
-        @DisplayName("defaults to empty when options=null then empty list")
-        void defaultsToEmptyWhenNull() {
-            // Given / When
-            QuestNode n = QuestNode.of(1, "t", null, false, null);
+        @DisplayName("should skip null options")
+        void skipsNulls() {
+            // Given
+            QuestNode node = QuestNode.fin(1, "End", null);
+            // When
+            node.setOptionsSafe(Arrays.asList(null, null));
             // Then
-            assertTrue(n.getOptions().isEmpty());
+            assertTrue(node.getOptions().isEmpty());
         }
     }
 
     @Nested
-    @DisplayName("image normalization")
+    @DisplayName("image trimming and normalization")
     class ImageNormalization {
 
         @Test
-        @DisplayName("trims non-blank image when provided then no surrounding spaces")
+        @DisplayName("should trim image value")
         void trimsImage() {
             // Given / When
-            QuestNode n = QuestNode.of(1, "t", List.of(), false, " pic.png ");
+            QuestNode node = QuestNode.of(1, "Node", List.of(), false, "   img.png  ");
             // Then
-            assertEquals("pic.png", n.getImage());
+            assertEquals("img.png", node.getImage());
         }
 
         @Test
-        @DisplayName("null when image blank then null")
-        void blankBecomesNull() {
+        @DisplayName("should set image null when blank")
+        void nullsBlankImage() {
             // Given / When
-            QuestNode n = QuestNode.of(1, "t", List.of(), false, "   ");
+            QuestNode node = QuestNode.of(1, "Node", List.of(), false, "  ");
             // Then
-            assertNull(n.getImage());
+            assertNull(node.getImage());
         }
     }
 }

@@ -1,0 +1,25 @@
+databaseChangeLog:
+  - changeSet:
+      id: 015-fix-quest-and-options-sequences
+      author: mikhail
+      dbms: postgresql
+      runInTransaction: true
+      changes:
+        - sql:
+            splitStatements: false
+            stripComments: false
+            endDelimiter: ;
+            sql: |
+              -- options.choice_id -> поднимаем seq до MAX(choice_id)
+              SELECT setval(
+                pg_get_serial_sequence('public.options','choice_id'),
+                COALESCE((SELECT MAX(choice_id) FROM public.options), 0),
+                true
+              );
+
+              -- quest_nodes.db_quest_node_id -> поднимаем seq до MAX(db_quest_node_id)
+              SELECT setval(
+                pg_get_serial_sequence('public.quest_nodes','db_quest_node_id'),
+                COALESCE((SELECT MAX(db_quest_node_id) FROM public.quest_nodes), 0),
+                true
+              );

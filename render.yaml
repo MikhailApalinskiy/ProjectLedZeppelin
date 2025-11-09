@@ -7,24 +7,24 @@ services:
     dockerfilePath: ./Dockerfile
     dockerContext: .
     healthCheckPath: /
-    disks:
-      - name: data
-        mountPath: /var/data
-        sizeGB: 1
+    disk:
+      name: data
+      mountPath: /var/data
+      sizeGB: 1
     envVars:
       - key: TEXTQUEST_UPLOADS_DIR
         value: /var/data/uploads
       - key: JAVA_TOOL_OPTIONS
-        value: -XX:MaxRAMPercentage=75.0
+        value: >-
+          -XX:MaxRAMPercentage=75.0
+          -Dhibernate.connection.driver_class=org.postgresql.Driver
+          -Dhibernate.connection.provider_class=org.hibernate.engine.jdbc.connections.internal.DriverManagerConnectionProviderImpl
+          -Dhibernate.connection.url=jdbc:postgresql://dpg-d47nl4ripnbc73d147cg-a.oregon-postgres.render.com:5432/questdb_3g3w?sslmode=require
+          -Dhibernate.connection.username=questdb_3g3w_user
+          -Dhibernate.connection.password=e5siiQ5YYVD7D7ULGvWvsGSgUEywAUU2
       - key: LIQUIBASE_URL
         value: jdbc:postgresql://dpg-d47nl4ripnbc73d147cg-a.oregon-postgres.render.com:5432/questdb_3g3w?sslmode=require
       - key: LIQUIBASE_USERNAME
         value: questdb_3g3w_user
-      - key: e5siiQ5YVYD7D7ULGvWvsGSgUEywAUU2
-        value: postgres
-      - key: DB_URL
-        value: jdbc:postgresql://dpg-d47nl4ripnbc73d147cg-a.oregon-postgres.render.com:5432/questdb_3g3w?sslmode=require
-      - key: DB_USER
-        value: questdb_3g3w_user
-      - key: DB_PASS
-        value: e5siiQ5YVYD7D7ULGvWvsGSgUEywAUU2
+      - key: LIQUIBASE_PASSWORD
+        value: e5siiQ5YYVD7D7ULGvWvsGSgUEywAUU2

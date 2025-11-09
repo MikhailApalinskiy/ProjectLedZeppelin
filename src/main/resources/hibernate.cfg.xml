@@ -2,17 +2,6 @@
 <hibernate-configuration>
     <session-factory>
 
-        <property name="hibernate.connection.driver_class">org.postgresql.Driver</property>
-        <property name="hibernate.connection.url">
-            ${DB_URL:jdbc:postgresql://localhost:5432/questdb}
-        </property>
-        <property name="hibernate.connection.username">
-            ${DB_USER:postgres}
-        </property>
-        <property name="hibernate.connection.password">
-            ${DB_PASS:postgres}
-        </property>
-        <property name="hibernate.dialect">org.hibernate.dialect.PostgreSQLDialect</property>
         <property name="hibernate.hbm2ddl.auto">validate</property>
         <property name="hibernate.show_sql">false</property>
         <property name="hibernate.format_sql">false</property>

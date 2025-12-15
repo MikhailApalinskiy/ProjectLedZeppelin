@@ -18,10 +18,16 @@ services:
         value: >-
           -XX:MaxRAMPercentage=75.0
           -Dhibernate.connection.driver_class=org.postgresql.Driver
-          -Dhibernate.connection.provider_class=org.hibernate.engine.jdbc.connections.internal.DriverManagerConnectionProviderImpl
           -Dhibernate.connection.url=jdbc:postgresql://dpg-d47nl4ripnbc73d147cg-a.oregon-postgres.render.com:5432/questdb_3g3w?sslmode=require
           -Dhibernate.connection.username=questdb_3g3w_user
           -Dhibernate.connection.password=e5siiQ5YYVD7D7ULGvWvsGSgUEywAUU2
+          -Dhibernate.connection.provider_class=org.hibernate.hikaricp.internal.HikariCPConnectionProvider
+          -Dhibernate.hikari.maximumPoolSize=10
+          -Dhibernate.hikari.minimumIdle=1
+          -Dhibernate.hikari.idleTimeout=300000
+          -Dhibernate.hikari.maxLifetime=1800000
+          -Dhibernate.hikari.connectionTimeout=10000
+          -Dhibernate.hikari.validationTimeout=5000
       - key: LIQUIBASE_URL
         value: jdbc:postgresql://dpg-d47nl4ripnbc73d147cg-a.oregon-postgres.render.com:5432/questdb_3g3w?sslmode=require
       - key: LIQUIBASE_USERNAME
